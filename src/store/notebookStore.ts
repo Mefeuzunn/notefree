@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import {
   AudioNoteRecording,
   CoverStyle,
+  FillItem,
   Flashcard,
   LassoSelection,
   Notebook,
@@ -179,6 +180,14 @@ interface NotebookStoreState {
   addTapeToCurrentPage: (tape: TapeItem) => void;
   removeTapeFromCurrentPage: (tapeId: string) => void;
 
+  // Artist & Ink Engine Enhancements (Faz 1)
+  setStreamline: (streamline: number) => void;
+  setFillTolerance: (tolerance: number) => void;
+  addFavoriteColor: (color: string) => void;
+  addFillToCurrentPage: (fill: FillItem) => void;
+  removeFillFromCurrentPage: (fillId: string) => void;
+  seekAudioToStroke: (stroke: Stroke) => void;
+
   // Text Annotations
   addTextAnnotation: (
     pageIndex: number,
@@ -271,6 +280,8 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
     favoriteSizes: [2.0, 3.5, 6.0],
     activeColorIndex: 0,
     activeSizeIndex: 1,
+    streamline: 0.55,
+    fillTolerance: 35,
     fontFamily: 'Inter',
     fontSize: 18,
     laserStyle: 'trail',
@@ -1728,5 +1739,90 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
       notebooks: notebooks.map((n) => (n.id === activeNotebookId ? updatedNotebook : n)),
     });
     saveNotebookToDB(updatedNotebook);
+  },
+
+  // Faz 1: Artist & Ink Engine Implementations
+  setStreamline: (streamline: number) => {
+    set((state) => ({
+      toolSettings: {
+        ...state.toolSettings,
+        streamline: Math.max(0.0, Math.min(0.95, streamline)),
+      },
+    }));
+  },
+
+  setFillTolerance: (fillTolerance: number) => {
+    set((state) => ({
+      toolSettings: {
+        ...state.toolSettings,
+        fillTolerance: Math.max(1, Math.min(100, fillTolerance)),
+      },
+    }));
+  },
+
+  addFavoriteColor: (color: string) => {
+    set((state) => {
+      const existing = state.toolSettings.favoriteColors || [];
+      const filtered = existing.filter((c) => c.toLowerCase() !== color.toLowerCase());
+      const updated = [color, ...filtered].slice(0, 8);
+      return {
+        toolSettings: {
+          ...state.toolSettings,
+          color,
+          favoriteColors: updated,
+          activeColorIndex: 0,
+        },
+      };
+    });
+  },
+
+  addFillToCurrentPage: (fill: FillItem) => {
+    const { notebooks, activeNotebookId, activePageIndex } = get();
+    const nb = notebooks.find((n) => n.id === activeNotebookId);
+    if (!nb || !nb.pages[activePageIndex]) return;
+
+    const currentPage = nb.pages[activePageIndex];
+    const updatedFills = [...(currentPage.fills || []), fill];
+
+    const updatedPages = [...nb.pages];
+    updatedPages[activePageIndex] = { ...currentPage, fills: updatedFills };
+    const updatedNotebook = { ...nb, pages: updatedPages, updatedAt: Date.now() };
+
+    set({
+      notebooks: notebooks.map((n) => (n.id === activeNotebookId ? updatedNotebook : n)),
+    });
+    saveNotebookToDB(updatedNotebook);
+  },
+
+  removeFillFromCurrentPage: (fillId: string) => {
+    const { notebooks, activeNotebookId, activePageIndex } = get();
+    const nb = notebooks.find((n) => n.id === activeNotebookId);
+    if (!nb || !nb.pages[activePageIndex]) return;
+
+    const currentPage = nb.pages[activePageIndex];
+    const updatedFills = (currentPage.fills || []).filter((f) => f.id !== fillId);
+
+    const updatedPages = [...nb.pages];
+    updatedPages[activePageIndex] = { ...currentPage, fills: updatedFills };
+    const updatedNotebook = { ...nb, pages: updatedPages, updatedAt: Date.now() };
+
+    set({
+      notebooks: notebooks.map((n) => (n.id === activeNotebookId ? updatedNotebook : n)),
+    });
+    saveNotebookToDB(updatedNotebook);
+  },
+
+  seekAudioToStroke: (stroke: Stroke) => {
+    if (stroke.audioTimestamp !== undefined) {
+      set({ audioPlaybackTimeMs: stroke.audioTimestamp });
+      const audioEl = document.querySelector('audio');
+      if (audioEl) {
+        audioEl.currentTime = stroke.audioTimestamp / 1000;
+        if (audioEl.paused) {
+          audioEl.play().catch(() => {});
+          set({ audioPlaying: true });
+        }
+      }
+    }
   },
 }));

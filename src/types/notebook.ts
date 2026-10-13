@@ -17,7 +17,10 @@ export type ToolType =
   | 'text'
   | 'laser'
   | 'ruler'
-  | 'pan';
+  | 'pan'
+  | 'eyedropper'
+  | 'fill'
+  | 'audio-scrub';
 
 export type EraserMode = 'stroke' | 'pixel';
 
@@ -124,6 +127,19 @@ export interface TapeItem {
   timestamp: number;
 }
 
+export interface FillItem {
+  id: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  color: string;
+  opacity: number;
+  dataUrl: string;
+  bounds: StrokeBounds;
+  timestamp: number;
+}
+
 export interface Page {
   id: string;
   pageNumber: number;
@@ -134,6 +150,7 @@ export interface Page {
   texts?: TextAnnotation[];
   stickers?: PageSticker[];
   tapes?: TapeItem[];
+  fills?: FillItem[];
   backgroundImageUrl?: string; // Rendered PDF or Word page
   width: number;
   height: number;
@@ -201,6 +218,8 @@ export interface ToolSettings {
   color: string;
   size: number;
   opacity: number;
+  streamline?: number; // 0.0 - 0.95 (Stabilizer / smoothing level)
+  fillTolerance?: number; // 1 - 100 for paint bucket fill
   eraserMode: EraserMode;
   eraserSize: number;
   eraseHighlighterOnly: boolean;

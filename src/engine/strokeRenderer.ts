@@ -1,10 +1,11 @@
 import { getStroke } from 'perfect-freehand';
-import { PenType, Stroke, StrokeBounds, StrokePoint, TapeItem } from '../types/notebook';
+import { PenType, Stroke, StrokeBounds, StrokePoint, TapeItem, FillItem } from '../types/notebook';
 
-export function getStrokeOptions(tool: PenType, size: number) {
+export function getStrokeOptions(tool: PenType, size: number, customStreamline?: number) {
+  let opts: any;
   switch (tool) {
     case 'ballpoint':
-      return {
+      opts = {
         size,
         thinning: 0.15,
         smoothing: 0.65,
@@ -12,8 +13,9 @@ export function getStrokeOptions(tool: PenType, size: number) {
         start: { taper: 0, cap: true },
         end: { taper: 0, cap: true },
       };
+      break;
     case 'fountain':
-      return {
+      opts = {
         size,
         thinning: 0.65,
         smoothing: 0.75,
@@ -21,8 +23,9 @@ export function getStrokeOptions(tool: PenType, size: number) {
         start: { taper: size * 2, cap: true },
         end: { taper: size * 2.5, cap: true },
       };
+      break;
     case 'brush':
-      return {
+      opts = {
         size: size * 1.6,
         thinning: 0.85,
         smoothing: 0.8,
@@ -30,8 +33,9 @@ export function getStrokeOptions(tool: PenType, size: number) {
         start: { taper: size * 3, cap: true },
         end: { taper: size * 3.5, cap: true },
       };
+      break;
     case 'highlighter':
-      return {
+      opts = {
         size: size * 3.2,
         thinning: 0,
         smoothing: 0.5,
@@ -39,8 +43,9 @@ export function getStrokeOptions(tool: PenType, size: number) {
         start: { taper: 0, cap: true },
         end: { taper: 0, cap: true },
       };
+      break;
     case 'pencil':
-      return {
+      opts = {
         size: size * 1.1,
         thinning: 0.35,
         smoothing: 0.55,
@@ -48,8 +53,9 @@ export function getStrokeOptions(tool: PenType, size: number) {
         start: { taper: size * 1.2, cap: true },
         end: { taper: size * 1.2, cap: true },
       };
+      break;
     case 'fineliner':
-      return {
+      opts = {
         size,
         thinning: 0,
         smoothing: 0.85,
@@ -57,8 +63,9 @@ export function getStrokeOptions(tool: PenType, size: number) {
         start: { taper: 0, cap: true },
         end: { taper: 0, cap: true },
       };
+      break;
     case 'neon':
-      return {
+      opts = {
         size: size * 1.3,
         thinning: 0.1,
         smoothing: 0.7,
@@ -66,8 +73,9 @@ export function getStrokeOptions(tool: PenType, size: number) {
         start: { taper: size, cap: true },
         end: { taper: size, cap: true },
       };
+      break;
     case 'dashed':
-      return {
+      opts = {
         size,
         thinning: 0,
         smoothing: 0.6,
@@ -75,8 +83,9 @@ export function getStrokeOptions(tool: PenType, size: number) {
         start: { taper: 0, cap: true },
         end: { taper: 0, cap: true },
       };
+      break;
     case 'tape':
-      return {
+      opts = {
         size: size * 4.5,
         thinning: 0,
         smoothing: 0.7,
@@ -84,7 +93,23 @@ export function getStrokeOptions(tool: PenType, size: number) {
         start: { taper: 0, cap: true },
         end: { taper: 0, cap: true },
       };
+      break;
+    default:
+      opts = {
+        size,
+        thinning: 0.2,
+        smoothing: 0.6,
+        streamline: 0.5,
+        start: { taper: 0, cap: true },
+        end: { taper: 0, cap: true },
+      };
   }
+
+  if (opts && customStreamline !== undefined && customStreamline !== null) {
+    opts.streamline = Math.max(0.0, Math.min(0.95, customStreamline));
+  }
+
+  return opts;
 }
 
 /**
@@ -137,7 +162,8 @@ export function calculateStrokeBounds(points: StrokePoint[], strokeSize: number)
  */
 export function drawStrokeOnCanvas(
   ctx: CanvasRenderingContext2D,
-  stroke: Stroke | { tool: PenType; color: string; size: number; points: StrokePoint[] }
+  stroke: Stroke | { tool: PenType; color: string; size: number; points: StrokePoint[] },
+  customStreamline?: number
 ) {
   if (!stroke.points || stroke.points.length === 0) return;
 
@@ -160,7 +186,7 @@ export function drawStrokeOnCanvas(
     return;
   }
 
-  const options = getStrokeOptions(stroke.tool, stroke.size);
+  const options = getStrokeOptions(stroke.tool, stroke.size, customStreamline);
   const rawPoints = stroke.points.map((pt) => [pt.x, pt.y, pt.pressure]);
   const outline = getStroke(rawPoints, options);
 
@@ -341,4 +367,38 @@ function distanceSqToSegment(
   const projX = v.x + t * (w.x - v.x);
   const projY = v.y + t * (w.y - v.y);
   return (p.x - projX) * (p.x - projX) + (p.y - projY) * (p.y - projY);
+}
+
+const fillImgCache = new Map<string, HTMLImageElement>();
+
+/**
+ * Draws a Flood Fill region onto a CanvasRenderingContext2D
+ */
+export function drawFillOnCanvas(ctx: CanvasRenderingContext2D, fill: FillItem) {
+  if (!fill.dataUrl) return;
+  let img = fillImgCache.get(fill.id);
+  if (!img) {
+    img = new Image();
+    img.src = fill.dataUrl;
+    fillImgCache.set(fill.id, img);
+  }
+
+  if (img.complete && img.naturalWidth > 0) {
+    ctx.save();
+    ctx.globalAlpha = fill.opacity;
+    ctx.drawImage(img, fill.bounds.minX, fill.bounds.minY);
+    ctx.restore();
+  }
+}
+
+/**
+ * Checks if a point falls within a FillItem's bounding box
+ */
+export function isPointInsideFill(point: { x: number; y: number }, fill: FillItem): boolean {
+  return (
+    point.x >= fill.bounds.minX &&
+    point.x <= fill.bounds.maxX &&
+    point.y >= fill.bounds.minY &&
+    point.y <= fill.bounds.maxY
+  );
 }

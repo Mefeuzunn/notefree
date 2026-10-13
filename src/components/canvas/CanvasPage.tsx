@@ -1,13 +1,17 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
-import { LassoSelection, Page, PageSticker, Stroke, StrokePoint, TapeItem } from '../../types/notebook';
+import { FillItem, LassoSelection, Page, PageSticker, Stroke, StrokePoint, TapeItem } from '../../types/notebook';
 import { useNotebookStore } from '../../store/notebookStore';
 import {
   calculateStrokeBounds,
   drawStrokeOnCanvas,
   drawTapeOnCanvas,
+  drawFillOnCanvas,
+  isPointInsideFill,
+  getStrokeOptions,
   detectScratchOutGesture,
   isPointNearStroke,
 } from '../../engine/strokeRenderer';
+import { performFloodFill } from '../../engine/floodFill';
 import { drawPaperTemplate } from '../../engine/paperTemplates';
 import {
   detectGeometricShape,
@@ -31,6 +35,10 @@ import {
   BookmarkPlus,
   X,
   Sparkles,
+  Pipette,
+  PaintBucket,
+  Volume2,
+  Check,
 } from 'lucide-react';
 
 interface CanvasPageProps {
@@ -82,12 +90,24 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
     toggleTapeReveal,
     addTapeToCurrentPage,
     removeTapeFromCurrentPage,
+    setActiveTool,
+    previousTool,
+    setToolColor,
+    addFavoriteColor,
+    addFillToCurrentPage,
+    removeFillFromCurrentPage,
+    seekAudioToStroke,
   } = useNotebookStore();
 
   const [isDrawing, setIsDrawing] = useState(false);
   const [isDraggingLasso, setIsDraggingLasso] = useState(false);
   const [lassoDragStart, setLassoDragStart] = useState<{ x: number; y: number } | null>(null);
   const [recolorMenuOpen, setRecolorMenuOpen] = useState(false);
+
+  // Faz 1 interactive states
+  const [eyedropperLoupe, setEyedropperLoupe] = useState<{ x: number; y: number; hex: string } | null>(null);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [audioRipple, setAudioRipple] = useState<{ x: number; y: number } | null>(null);
 
   const currentPointsRef = useRef<StrokePoint[]>([]);
   const lastPointRef = useRef<{ x: number; y: number; time: number } | null>(null);
@@ -119,7 +139,7 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
     ctx.restore();
   }, [page.template, page.paperColor, page.backgroundImageUrl, width, height, dpr]);
 
-  // 2. Draw Committed Strokes Layer
+  // 2. Draw Committed Strokes Layer & Fills
   const redrawCommittedStrokes = useCallback(() => {
     const canvas = strokesCanvasRef.current;
     if (!canvas) return;
@@ -130,20 +150,36 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
     ctx.save();
     ctx.scale(dpr, dpr);
 
+    // 1. Draw Flood Fills Layer (beneath ink strokes)
+    if (page.fills) {
+      for (const fill of page.fills) {
+        drawFillOnCanvas(ctx, fill);
+      }
+    }
+
+    // 2. Draw Committed Ink Strokes
     for (const stroke of page.strokes) {
       if (audioPlaying && stroke.audioTimestamp !== undefined) {
         if (stroke.audioTimestamp > audioPlaybackTimeMs) {
           ctx.save();
           ctx.globalAlpha = 0.15;
-          drawStrokeOnCanvas(ctx, stroke);
+          drawStrokeOnCanvas(ctx, stroke, toolSettings.streamline);
+          ctx.restore();
+          continue;
+        } else if (Math.abs(stroke.audioTimestamp - audioPlaybackTimeMs) < 1500) {
+          // Audio synchronous highlight pulse
+          ctx.save();
+          ctx.shadowColor = '#6366f1';
+          ctx.shadowBlur = 12;
+          drawStrokeOnCanvas(ctx, stroke, toolSettings.streamline);
           ctx.restore();
           continue;
         }
       }
-      drawStrokeOnCanvas(ctx, stroke);
+      drawStrokeOnCanvas(ctx, stroke, toolSettings.streamline);
     }
 
-    // Draw GoodNotes 6 Tape Strips
+    // 3. Draw GoodNotes 6 Tape Strips
     if (page.tapes) {
       for (const tape of page.tapes) {
         drawTapeOnCanvas(ctx, tape);
@@ -151,7 +187,7 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
     }
 
     ctx.restore();
-  }, [page.strokes, page.tapes, dpr, audioPlaying, audioPlaybackTimeMs]);
+  }, [page.strokes, page.tapes, page.fills, dpr, audioPlaying, audioPlaybackTimeMs, toolSettings.streamline]);
 
   useEffect(() => {
     redrawCommittedStrokes();
@@ -185,6 +221,112 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
     return Math.max(0.2, Math.min(0.9, 0.7 - speed * 0.15));
   };
 
+  // Faz 1: Eyedropper Color Sampler
+  const sampleColorAt = (x: number, y: number): string => {
+    const strokesCanvas = strokesCanvasRef.current;
+    if (strokesCanvas) {
+      const ctx = strokesCanvas.getContext('2d');
+      if (ctx) {
+        const px = Math.floor(x * dpr);
+        const py = Math.floor(y * dpr);
+        if (px >= 0 && px < strokesCanvas.width && py >= 0 && py < strokesCanvas.height) {
+          const p = ctx.getImageData(px, py, 1, 1).data;
+          if (p[3] > 20) {
+            return `#${((1 << 24) + (p[0] << 16) + (p[1] << 8) + p[2]).toString(16).slice(1)}`;
+          }
+        }
+      }
+    }
+
+    const bgCanvas = bgCanvasRef.current;
+    if (bgCanvas) {
+      const ctx = bgCanvas.getContext('2d');
+      if (ctx) {
+        const px = Math.floor(x * dpr);
+        const py = Math.floor(y * dpr);
+        if (px >= 0 && px < bgCanvas.width && py >= 0 && py < bgCanvas.height) {
+          const p = ctx.getImageData(px, py, 1, 1).data;
+          if (p[3] > 20) {
+            return `#${((1 << 24) + (p[0] << 16) + (p[1] << 8) + p[2]).toString(16).slice(1)}`;
+          }
+        }
+      }
+    }
+
+    switch (page.paperColor) {
+      case 'cream':
+        return '#fdfbf7';
+      case 'yellow-pad':
+        return '#fef9c3';
+      case 'dark':
+        return '#0f172a';
+      case 'kraft':
+        return '#e7d8c9';
+      default:
+        return '#ffffff';
+    }
+  };
+
+  // Faz 1: Flood Fill Execution
+  const handleFloodFillClick = (x: number, y: number) => {
+    const compCanvas = document.createElement('canvas');
+    compCanvas.width = width * dpr;
+    compCanvas.height = height * dpr;
+    const compCtx = compCanvas.getContext('2d');
+    if (!compCtx) return;
+
+    if (bgCanvasRef.current) compCtx.drawImage(bgCanvasRef.current, 0, 0);
+    if (strokesCanvasRef.current) compCtx.drawImage(strokesCanvasRef.current, 0, 0);
+
+    const tolerance = toolSettings.fillTolerance || 38;
+    const fillItem = performFloodFill(
+      compCanvas,
+      x * dpr,
+      y * dpr,
+      toolSettings.color,
+      toolSettings.opacity || 0.85,
+      tolerance
+    );
+
+    if (fillItem) {
+      const normalizedFill: FillItem = {
+        ...fillItem,
+        x: fillItem.x / dpr,
+        y: fillItem.y / dpr,
+        width: fillItem.width / dpr,
+        height: fillItem.height / dpr,
+        bounds: {
+          minX: fillItem.bounds.minX / dpr,
+          maxX: fillItem.bounds.maxX / dpr,
+          minY: fillItem.bounds.minY / dpr,
+          maxY: fillItem.bounds.maxY / dpr,
+        },
+      };
+
+      addFillToCurrentPage(normalizedFill);
+      setToastMessage('Bölge Dolduruldu ✨');
+      setTimeout(() => setToastMessage(null), 1800);
+    }
+  };
+
+  // Faz 1: Audio Note Tap-to-Seek
+  const handleAudioTapToSeek = (x: number, y: number): boolean => {
+    const hitStroke = page.strokes.find((s) => isPointNearStroke({ x, y }, s, 18));
+    if (hitStroke && hitStroke.audioTimestamp !== undefined) {
+      seekAudioToStroke(hitStroke);
+      setAudioRipple({ x, y });
+      setTimeout(() => setAudioRipple(null), 1200);
+
+      const totalSecs = Math.floor(hitStroke.audioTimestamp / 1000);
+      const m = Math.floor(totalSecs / 60);
+      const s = totalSecs % 60;
+      setToastMessage(`🎵 [${m < 10 ? '0' : ''}${m}:${s < 10 ? '0' : ''}${s}] Sese Atlandı`);
+      setTimeout(() => setToastMessage(null), 2000);
+      return true;
+    }
+    return false;
+  };
+
   // Pointer Down
   const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
     if (activeTool === 'pan') return;
@@ -193,6 +335,30 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
 
     const { x, y } = getCanvasCoords(e);
     const pressure = calculatePressure(x, y, e.pressure);
+
+    // Eyedropper mode: click to pick color
+    if (activeTool === 'eyedropper') {
+      const hex = sampleColorAt(x, y);
+      setToolColor(hex);
+      addFavoriteColor(hex);
+      setEyedropperLoupe(null);
+      setActiveTool(previousTool || 'ballpoint');
+      setToastMessage(`Renk Seçildi: ${hex}`);
+      setTimeout(() => setToastMessage(null), 2000);
+      return;
+    }
+
+    // Flood Fill mode: click to fill enclosed region
+    if (activeTool === 'fill') {
+      handleFloodFillClick(x, y);
+      return;
+    }
+
+    // Audio Scrub mode or direct tap on stroke during audio playback
+    if (activeTool === 'audio-scrub' || (audioPlaying && activeTool !== 'eraser')) {
+      const handled = handleAudioTapToSeek(x, y);
+      if (handled || activeTool === 'audio-scrub') return;
+    }
 
     // Text tool mode: click to add rich text box
     if (activeTool === 'text') {
@@ -248,6 +414,13 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
   // Pointer Move
   const handlePointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
     const { x, y } = getCanvasCoords(e);
+
+    // Eyedropper hovering loupe
+    if (activeTool === 'eyedropper') {
+      const hex = sampleColorAt(x, y);
+      setEyedropperLoupe({ x, y, hex });
+      return;
+    }
 
     // Laser pointer movement
     if (activeTool === 'laser' && isDrawing) {
@@ -308,12 +481,16 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
         timestamp: Date.now(),
       });
     } else {
-      drawStrokeOnCanvas(ctx, {
-        tool: activeTool as any,
-        color: toolSettings.color,
-        size: toolSettings.size,
-        points: currentPointsRef.current,
-      });
+      drawStrokeOnCanvas(
+        ctx,
+        {
+          tool: activeTool as any,
+          color: toolSettings.color,
+          size: toolSettings.size,
+          points: currentPointsRef.current,
+        },
+        toolSettings.streamline
+      );
     }
 
     ctx.restore();
@@ -607,6 +784,15 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
         }
       }
     }
+
+    // Faz 1: Also erase any flood fill if touched
+    if (page.fills && page.fills.length > 0) {
+      for (const fill of page.fills) {
+        if (isPointInsideFill({ x, y }, fill)) {
+          removeFillFromCurrentPage(fill.id);
+        }
+      }
+    }
   };
 
   const isLassoOnThisPage = lassoSelection && lassoSelection.pageId === page.id;
@@ -827,6 +1013,55 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
               İLERLE
             </span>
           </div>
+        </div>
+      )}
+
+      {/* Faz 1: Eyedropper Magnifying Color Loupe */}
+      {eyedropperLoupe && activeTool === 'eyedropper' && (
+        <div
+          className="absolute pointer-events-none z-30 flex flex-col items-center -translate-x-1/2 -translate-y-full pb-3 animate-in fade-in duration-75"
+          style={{
+            left: `${eyedropperLoupe.x * scale}px`,
+            top: `${eyedropperLoupe.y * scale}px`,
+          }}
+        >
+          <div
+            className="w-14 h-14 rounded-full border-4 border-white shadow-2xl flex items-center justify-center relative overflow-hidden"
+            style={{
+              backgroundColor: eyedropperLoupe.hex,
+              boxShadow: '0 10px 25px -3px rgba(0, 0, 0, 0.4), 0 4px 6px -4px rgba(0, 0, 0, 0.3)',
+            }}
+          >
+            {/* Center Crosshair */}
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="w-3 h-0.5 bg-white/90 shadow" />
+              <div className="h-3 w-0.5 bg-white/90 shadow absolute" />
+            </div>
+          </div>
+          <div className="mt-1 px-2 py-0.5 rounded-md bg-slate-900/95 text-[10px] font-mono font-bold text-white border border-slate-750 shadow-md">
+            {eyedropperLoupe.hex}
+          </div>
+        </div>
+      )}
+
+      {/* Faz 1: Audio Note Tap-to-Seek Ripple Indicator */}
+      {audioRipple && (
+        <div
+          className="absolute pointer-events-none z-30 -translate-x-1/2 -translate-y-1/2"
+          style={{
+            left: `${audioRipple.x * scale}px`,
+            top: `${audioRipple.y * scale}px`,
+          }}
+        >
+          <div className="w-14 h-14 rounded-full border-2 border-indigo-500 bg-indigo-500/25 animate-ping" />
+        </div>
+      )}
+
+      {/* Faz 1: Floating Status Toast */}
+      {toastMessage && (
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-40 bg-slate-900/95 text-white border border-slate-700/80 px-3.5 py-1.5 rounded-full text-xs font-semibold shadow-2xl backdrop-blur-md flex items-center gap-2 animate-in fade-in slide-in-from-top-2 duration-150">
+          <Sparkles size={13} className="text-indigo-400" />
+          <span>{toastMessage}</span>
         </div>
       )}
     </div>

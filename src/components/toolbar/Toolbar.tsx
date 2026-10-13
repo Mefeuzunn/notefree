@@ -41,6 +41,10 @@ import {
   Flame,
   Spline,
   Bandage,
+  Pipette,
+  PaintBucket,
+  SlidersHorizontal,
+  Volume2,
 } from 'lucide-react';
 import { PenType, ShapeType, ToolType } from '../../types/notebook';
 import { AudioPlayerBar } from '../audio/AudioPlayerBar';
@@ -103,12 +107,15 @@ export const Toolbar: React.FC = () => {
     setLaserStyle,
     togglePageBookmark,
     invertCurrentPageInks,
+    setStreamline,
+    setFillTolerance,
   } = useNotebookStore();
 
   const [activeColorSlot, setActiveColorSlot] = useState<number | null>(null);
   const [activeSizeSlot, setActiveSizeSlot] = useState<number | null>(null);
   const [eraserMenuOpen, setEraserMenuOpen] = useState(false);
   const [shapeMenuOpen, setShapeMenuOpen] = useState(false);
+  const [artistMenuOpen, setArtistMenuOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
 
   const activeNotebook = notebooks.find((n) => n.id === activeNotebookId);
@@ -533,6 +540,106 @@ export const Toolbar: React.FC = () => {
         >
           <ZoomIn size={16} />
         </button>
+
+        {/* 🎨 Faz 1: Renk Damlalığı (Eyedropper) */}
+        <button
+          onClick={() => setActiveTool('eyedropper')}
+          className={`p-2 rounded-xl transition-all flex items-center justify-center ${
+            activeTool === 'eyedropper'
+              ? 'bg-cyan-600 text-white shadow-md shadow-cyan-600/40 scale-105 ring-1 ring-cyan-300'
+              : 'text-slate-400 hover:text-cyan-300 hover:bg-slate-700/50'
+          }`}
+          title="Renk Damlalığı (Tuvaldeki veya görseldeki herhangi bir piksel rengini seç)"
+        >
+          <Pipette size={16} />
+        </button>
+
+        {/* 🪣 Faz 1: Akıllı Alan Doldurma / Boya Kovası (Flood Fill Bucket) */}
+        <button
+          onClick={() => setActiveTool('fill')}
+          className={`p-2 rounded-xl transition-all flex items-center justify-center ${
+            activeTool === 'fill'
+              ? 'bg-violet-600 text-white shadow-md shadow-violet-600/40 scale-105 ring-1 ring-violet-300'
+              : 'text-slate-400 hover:text-violet-300 hover:bg-slate-700/50'
+          }`}
+          title="Akıllı Alan Doldurma (Kapalı çizim ve şekillerin içini tek tıkla boya)"
+        >
+          <PaintBucket size={16} />
+        </button>
+
+        {/* 🎚️ Faz 1: Çizgi Sabitleyici & Hassasiyet Ayarları (Streamline Stabilizer) */}
+        <div className="relative">
+          <button
+            onClick={() => setArtistMenuOpen(!artistMenuOpen)}
+            className={`p-2 rounded-xl transition-all flex items-center justify-center ${
+              artistMenuOpen
+                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30 ring-1 ring-indigo-300'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
+            }`}
+            title="Çizgi Sabitleyici & Hassasiyet Ayarları (Streamline Stabilizer)"
+          >
+            <SlidersHorizontal size={16} />
+          </button>
+
+          {artistMenuOpen && (
+            <div className="absolute top-12 left-1/2 -translate-x-1/2 bg-slate-900 border border-slate-700 shadow-2xl rounded-2xl p-3.5 w-64 z-50 animate-in fade-in zoom-in-95 backdrop-blur-md">
+              <div className="text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-2.5 flex items-center justify-between">
+                <span>Sanatçı & Çizim Motoru</span>
+                <Sparkles size={12} className="text-indigo-400" />
+              </div>
+
+              {/* Streamline Stabilizer Slider */}
+              <div className="mb-3">
+                <div className="flex items-center justify-between text-xs mb-1">
+                  <span className="text-slate-300 font-medium">Çizgi Sabitleyici</span>
+                  <span className="font-mono text-indigo-400 font-bold">
+                    %{Math.round((toolSettings.streamline ?? 0.55) * 100)}
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max="0.95"
+                  step="0.05"
+                  value={toolSettings.streamline ?? 0.55}
+                  onChange={(e) => setStreamline(parseFloat(e.target.value))}
+                  className="w-full h-1.5 accent-indigo-500 rounded-lg cursor-pointer bg-slate-800"
+                />
+                <p className="text-[10px] text-slate-400 mt-1">
+                  {(toolSettings.streamline ?? 0.55) === 0
+                    ? 'Kapalı (Ham Çizim)'
+                    : (toolSettings.streamline ?? 0.55) < 0.4
+                    ? 'Hafif Yumuşatma'
+                    : (toolSettings.streamline ?? 0.55) < 0.75
+                    ? 'Dengeli Hatlar'
+                    : 'Maksimum Titreme Engelleyici (Kaligrafi)'}
+                </p>
+              </div>
+
+              {/* Flood Fill Tolerance */}
+              <div className="pt-2 border-t border-slate-800">
+                <div className="flex items-center justify-between text-xs mb-1">
+                  <span className="text-slate-300 font-medium">Boya Kovası Toleransı</span>
+                  <span className="font-mono text-violet-400 font-bold">
+                    {toolSettings.fillTolerance ?? 35}
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min="10"
+                  max="80"
+                  step="2"
+                  value={toolSettings.fillTolerance ?? 35}
+                  onChange={(e) => setFillTolerance(parseInt(e.target.value, 10))}
+                  className="w-full h-1.5 accent-violet-500 rounded-lg cursor-pointer bg-slate-800"
+                />
+                <p className="text-[10px] text-slate-400 mt-1">
+                  Çizgileri aşmadan en temiz dolgu derinliği
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
 
         <div className="w-px h-5 bg-slate-700 mx-1" />
 

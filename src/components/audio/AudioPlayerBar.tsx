@@ -65,6 +65,23 @@ export const AudioPlayerBar: React.FC = () => {
     setAudioPlaybackTimeMs(ms);
   };
 
+  // Synchronize audio element currentTime when store audioPlaybackTimeMs changes externally (e.g. from canvas stroke tap-to-seek)
+  useEffect(() => {
+    if (audioRef.current && Math.abs(audioRef.current.currentTime * 1000 - audioPlaybackTimeMs) > 350) {
+      audioRef.current.currentTime = audioPlaybackTimeMs / 1000;
+    }
+  }, [audioPlaybackTimeMs]);
+
+  // Synchronize play/pause state from store
+  useEffect(() => {
+    if (!audioRef.current || !currentRecording?.audioDataUrl) return;
+    if (audioPlaying && audioRef.current.paused) {
+      audioRef.current.play().catch(() => {});
+    } else if (!audioPlaying && !audioRef.current.paused) {
+      audioRef.current.pause();
+    }
+  }, [audioPlaying, currentRecording?.audioDataUrl]);
+
   const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
     const ms = parseInt(e.target.value, 10);
     setAudioPlaybackTimeMs(ms);
@@ -151,6 +168,14 @@ export const AudioPlayerBar: React.FC = () => {
           >
             {playbackRate}x
           </button>
+
+          <span
+            className="hidden md:inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300 text-[10px] font-semibold border border-indigo-500/30"
+            title="Tuvaldeki herhangi bir nota tıklayarak tam o yazılma anına atlayabilirsiniz"
+          >
+            <Sparkles size={10} />
+            <span>Vuruşa Tıkla & Dinle</span>
+          </span>
         </div>
       )}
     </div>
