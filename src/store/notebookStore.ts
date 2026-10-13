@@ -37,6 +37,9 @@ interface YouTubeState {
   isPlaying: boolean;
   splitRatio: number;
   mode: 'split' | 'floating';
+  searchQuery?: string;
+  videoTitle?: string;
+  channelName?: string;
 }
 
 interface LaserPoint {
@@ -207,6 +210,9 @@ interface NotebookStoreState {
   // YouTube Actions
   toggleYouTube: () => void;
   setYouTubeUrl: (url: string) => void;
+  setYouTubeVideo: (videoId: string, title?: string, channel?: string) => void;
+  setYouTubeSearchQuery: (query: string) => void;
+  clearYouTubeSearch: () => void;
   setYouTubeCurrentTime: (seconds: number) => void;
   setYouTubePlaying: (isPlaying: boolean) => void;
   setYouTubeSplitRatio: (ratio: number) => void;
@@ -295,12 +301,15 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
 
   youtube: {
     isOpen: true,
-    url: 'https://www.youtube.com/watch?v=aircAruvnKk',
-    videoId: 'aircAruvnKk',
+    url: 'https://www.youtube.com/watch?v=jfKfPfyJRdk',
+    videoId: 'jfKfPfyJRdk',
+    videoTitle: 'Lofi Girl - Beats to relax/study to (7/24 Kesintisiz)',
+    channelName: 'Lofi Girl',
     currentTime: 0,
     isPlaying: false,
     splitRatio: 0.36,
     mode: 'split',
+    searchQuery: '',
   },
 
   templateModalOpen: false,
@@ -1253,7 +1262,49 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
       if (target) saveNotebookToDB(target);
     }
     set((state) => ({
-      youtube: { ...state.youtube, url, videoId },
+      youtube: { ...state.youtube, url, videoId, searchQuery: '' },
+    }));
+  },
+
+  setYouTubeVideo: (videoId: string, title?: string, channel?: string) => {
+    const url = `https://www.youtube.com/watch?v=${videoId}`;
+    const { activeNotebookId, notebooks } = get();
+    if (activeNotebookId) {
+      const updated = notebooks.map((nb) =>
+        nb.id === activeNotebookId ? { ...nb, youtubeUrl: url } : nb
+      );
+      set({ notebooks: updated });
+      const target = updated.find((n) => n.id === activeNotebookId);
+      if (target) saveNotebookToDB(target);
+    }
+    set((state) => ({
+      youtube: {
+        ...state.youtube,
+        url,
+        videoId,
+        videoTitle: title || '',
+        channelName: channel || '',
+        searchQuery: '',
+      },
+    }));
+  },
+
+  setYouTubeSearchQuery: (query: string) => {
+    set((state) => ({
+      youtube: {
+        ...state.youtube,
+        searchQuery: query,
+        videoId: null,
+      },
+    }));
+  },
+
+  clearYouTubeSearch: () => {
+    set((state) => ({
+      youtube: {
+        ...state.youtube,
+        searchQuery: '',
+      },
     }));
   },
 
