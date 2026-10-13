@@ -28,6 +28,7 @@ import {
   isStrokeCapturedByLasso,
 } from '../../engine/lassoHelper';
 import { TextBoxOverlay } from './TextBoxOverlay';
+import { collaborationService } from '../../services/collaborationService';
 import {
   Move,
   RotateCw,
@@ -106,6 +107,9 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
     openMathModal,
     layers,
     layerLocks,
+    collaboration,
+    remoteLiveStrokes,
+    updateMyCursor,
   } = useNotebookStore();
 
   const [isDrawing, setIsDrawing] = useState(false);
@@ -523,6 +527,19 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
 
     const pressure = calculatePressure(x, y, e.pressure);
     currentPointsRef.current.push({ x, y, pressure, timestamp: Date.now() });
+
+    // Live Collaboration: Broadcast cursor and stroke points
+    if (collaboration.isConnected) {
+      updateMyCursor(x, y);
+      if (activeTool !== 'laser' && activeTool !== 'pan') {
+        collaborationService.broadcastLiveStrokePoints(
+          currentPointsRef.current,
+          activeTool,
+          toolSettings.color,
+          toolSettings.size
+        );
+      }
+    }
 
     const liveCanvas = liveCanvasRef.current;
     if (!liveCanvas) return;
@@ -1177,6 +1194,61 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
           <span>{toastMessage}</span>
         </div>
       )}
+
+      {/* Faz 4: Remote Live Strokes in Collaborative Session */}
+      {collaboration.isConnected && (
+        <svg className="absolute inset-0 pointer-events-none w-full h-full">
+          <g transform={`scale(${scale})`}>
+            {Object.entries(remoteLiveStrokes).map(([peerId, remote]) => {
+              if (!remote.points || remote.points.length < 2) return null;
+              const d = remote.points.reduce((acc, p, idx) => {
+                return idx === 0 ? `M ${p.x} ${p.y}` : `${acc} L ${p.x} ${p.y}`;
+              }, '');
+              return (
+                <path
+                  key={peerId}
+                  d={d}
+                  fill="none"
+                  stroke={remote.color || '#6366f1'}
+                  strokeWidth={remote.size || 3}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  opacity={0.85}
+                />
+              );
+            })}
+          </g>
+        </svg>
+      )}
+
+      {/* Faz 4: Remote Peer Cursors in Collaborative Session */}
+      {collaboration.isConnected &&
+        collaboration.peers.map((peer) => {
+          if (!peer.cursor) return null;
+          return (
+            <div
+              key={peer.id}
+              className="absolute pointer-events-none transition-all duration-75 flex items-center gap-1.5 z-40"
+              style={{
+                left: `${peer.cursor.x * scale}px`,
+                top: `${peer.cursor.y * scale}px`,
+                transform: 'translate(-2px, -2px)',
+              }}
+            >
+              <div
+                className="w-3.5 h-3.5 rounded-full ring-2 ring-white shadow-lg animate-pulse"
+                style={{ backgroundColor: peer.color }}
+              />
+              <div
+                className="px-2 py-0.5 rounded-full text-[10px] font-bold text-white shadow-md flex items-center gap-1"
+                style={{ backgroundColor: peer.color }}
+              >
+                <span>{peer.name}</span>
+                <span className="text-[9px] opacity-80">✏️</span>
+              </div>
+            </div>
+          );
+        })}
     </div>
   );
 };

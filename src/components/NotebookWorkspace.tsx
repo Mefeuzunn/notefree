@@ -3,6 +3,7 @@ import { useNotebookStore } from '../store/notebookStore';
 import { CanvasPage } from './canvas/CanvasPage';
 import { YouTubePanel } from './youtube/YouTubePanel';
 import { Ruler } from './canvas/Ruler';
+import { InfiniteCanvas } from './canvas/InfiniteCanvas';
 import {
   ZoomIn,
   ZoomOut,
@@ -18,6 +19,7 @@ import {
   ArrowLeftRight,
   Book,
   GripVertical,
+  Infinity,
 } from 'lucide-react';
 
 export const NotebookWorkspace: React.FC = () => {
@@ -40,6 +42,8 @@ export const NotebookWorkspace: React.FC = () => {
     setSecondaryPageIndex,
     openDualNotebook,
     setActiveNotebook,
+    canvasMode,
+    setCanvasMode,
   } = useNotebookStore();
 
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -127,7 +131,11 @@ export const NotebookWorkspace: React.FC = () => {
           style={{
             width: isSplit && secondaryNotebook ? `${splitNotebook.splitRatio * 100}%` : '100%',
           }}
-          className="h-full overflow-y-auto overflow-x-hidden flex flex-col items-center justify-start py-8 px-4 relative select-none scroll-smooth"
+          className={`h-full relative select-none ${
+            canvasMode === 'infinite'
+              ? 'overflow-hidden flex flex-col'
+              : 'overflow-y-auto overflow-x-hidden flex flex-col items-center justify-start py-8 px-4 scroll-smooth'
+          }`}
         >
           {isSplit && secondaryNotebook && (
             <div className="w-full max-w-2xl mb-4 px-2 flex items-center justify-between text-xs text-slate-400">
@@ -143,7 +151,9 @@ export const NotebookWorkspace: React.FC = () => {
             </div>
           )}
 
-          {pages.length === 0 ? (
+          {canvasMode === 'infinite' ? (
+            <InfiniteCanvas />
+          ) : pages.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-slate-500">
               <AlertCircle size={32} className="mb-2 text-slate-600" />
               <p className="text-sm">Görüntülenecek sayfa bulunamadı</p>
@@ -331,25 +341,47 @@ export const NotebookWorkspace: React.FC = () => {
 
         <div className="w-px h-4 bg-slate-800 mx-1" />
 
-        {/* Continuous Scroll vs Single Page Toggle */}
+        {/* Continuous Scroll vs Single Page Toggle (only in paged mode) */}
+        {canvasMode === 'paged' && (
+          <button
+            onClick={() =>
+              setViewMode(viewMode === 'continuous' ? 'single' : 'continuous')
+            }
+            className={`p-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1 ${
+              viewMode === 'continuous'
+                ? 'bg-indigo-600/30 text-indigo-300 border border-indigo-500/30'
+                : 'text-slate-400 hover:text-white'
+            }`}
+            title={
+              viewMode === 'continuous'
+                ? 'Dikey Kesintisiz Akış Modu Açık (GoodNotes Stili)'
+                : 'Tek Sayfa Modu'
+            }
+          >
+            {viewMode === 'continuous' ? <Columns size={14} /> : <Square size={14} />}
+            <span className="text-[10px] hidden sm:inline">
+              {viewMode === 'continuous' ? 'Kesintisiz' : 'Tek Sayfa'}
+            </span>
+          </button>
+        )}
+
+        {/* Infinite Canvas vs Paged Mode Toggle */}
         <button
-          onClick={() =>
-            setViewMode(viewMode === 'continuous' ? 'single' : 'continuous')
-          }
-          className={`p-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1 ${
-            viewMode === 'continuous'
-              ? 'bg-indigo-600/30 text-indigo-300 border border-indigo-500/30'
-              : 'text-slate-400 hover:text-white'
+          onClick={() => setCanvasMode(canvasMode === 'infinite' ? 'paged' : 'infinite')}
+          className={`p-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5 ${
+            canvasMode === 'infinite'
+              ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 font-semibold shadow-sm'
+              : 'text-slate-400 hover:text-white hover:bg-slate-800'
           }`}
           title={
-            viewMode === 'continuous'
-              ? 'Dikey Kesintisiz Akış Modu Açık (GoodNotes Stili)'
-              : 'Tek Sayfa Modu'
+            canvasMode === 'infinite'
+              ? 'Sonsuz Tuval Modu Açık (Concepts & Freeform Stili Sınırsız Düzlem)'
+              : 'Standart Sayfalı Mod'
           }
         >
-          {viewMode === 'continuous' ? <Columns size={14} /> : <Square size={14} />}
+          <Infinity size={15} className={canvasMode === 'infinite' ? 'text-amber-400' : ''} />
           <span className="text-[10px] hidden sm:inline">
-            {viewMode === 'continuous' ? 'Kesintisiz' : 'Tek Sayfa'}
+            {canvasMode === 'infinite' ? 'Sonsuz Tuval' : 'Sayfalı Mod'}
           </span>
         </button>
       </div>

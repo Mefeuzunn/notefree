@@ -22,6 +22,7 @@ import {
   Palette,
   Layers,
   LayoutTemplate,
+  Users,
   Menu,
   Sparkles,
   Zap,
@@ -124,6 +125,8 @@ export const Toolbar: React.FC = () => {
     setLayersDrawerOpen,
     toggleAngleSnap,
     toggleGridSnap,
+    collaboration,
+    setCollaborationModalOpen,
   } = useNotebookStore();
 
   const [activeColorSlot, setActiveColorSlot] = useState<number | null>(null);
@@ -852,6 +855,26 @@ export const Toolbar: React.FC = () => {
           title="Katmanlar Yöneticisi (Çizim, Fosfor, Metin, Çıkartma, Bant Katmanları)"
         >
           <Layers size={17} />
+        </button>
+
+        {/* CollaNote Style Live WebRTC Collaboration */}
+        <button
+          onClick={() => setCollaborationModalOpen(true)}
+          className={`p-2 rounded-xl transition-all relative ${
+            collaboration.isConnected
+              ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/30 ring-1 ring-emerald-400'
+              : 'text-slate-400 hover:text-emerald-400 hover:bg-slate-800'
+          }`}
+          title={
+            collaboration.isConnected
+              ? `Canlı Oturum Aktif (${collaboration.roomId}) - ${collaboration.peers.length + 1} Katılımcı`
+              : 'Canlı Birlikte Çizim (CollaNote Stili P2P Oda Kodu)'
+          }
+        >
+          <Users size={17} />
+          {collaboration.isConnected && (
+            <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-emerald-300 ring-2 ring-slate-900 animate-ping" />
+          )}
         </button>
 
         {/* Template Selector */}

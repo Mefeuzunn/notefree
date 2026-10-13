@@ -240,6 +240,44 @@ export interface Notebook {
   audioRecordings?: AudioNoteRecording[];
   flashcards?: Flashcard[];
   pdfOutline?: PdfOutlineItem[];
+  canvasMode?: CanvasMode;
+}
+
+export type CanvasMode = 'paged' | 'infinite';
+
+export interface PeerUser {
+  id: string;
+  name: string;
+  color: string;
+  cursor?: { x: number; y: number };
+  lastSeen: number;
+}
+
+export interface CollaborationSession {
+  isConnected: boolean;
+  roomId: string | null;
+  isHost: boolean;
+  peers: PeerUser[];
+  myName: string;
+  myColor: string;
+}
+
+export interface CollabMessage {
+  type:
+    | 'JOIN'
+    | 'LEAVE'
+    | 'CURSOR'
+    | 'STROKE_START'
+    | 'STROKE_POINTS'
+    | 'STROKE_END'
+    | 'STROKE_ERASE'
+    | 'STATE_SYNC';
+  roomId: string;
+  senderId: string;
+  senderName: string;
+  senderColor: string;
+  timestamp: number;
+  payload?: any;
 }
 
 export interface ToolSettings {

@@ -22,7 +22,11 @@ import {
   PdfOutlineItem,
   LayerVisibilitySettings,
   LayerLockSettings,
+  CanvasMode,
+  PeerUser,
+  CollaborationSession,
 } from '../types/notebook';
+import { collaborationService } from '../services/collaborationService';
 import { db, initStorage, saveNotebookToDB, importNotebookFromNotefree } from '../services/storage';
 import {
   computeGroupBounds,
@@ -126,6 +130,23 @@ interface NotebookStoreState {
   layersDrawerOpen: boolean;
   layers: LayerVisibilitySettings;
   layerLocks: LayerLockSettings;
+
+  // Faz 4: Infinite Canvas & Live Collaboration
+  canvasMode: CanvasMode;
+  infinitePan: { x: number; y: number };
+  collaborationModalOpen: boolean;
+  collaboration: CollaborationSession;
+  remoteLiveStrokes: { [senderId: string]: { points: any[]; tool: string; color: string; size: number } };
+  setCanvasMode: (mode: CanvasMode) => void;
+  setInfinitePan: (pan: { x: number; y: number }) => void;
+  resetInfinitePan: () => void;
+  setCollaborationModalOpen: (open: boolean) => void;
+  startCollaborationRoom: (roomId?: string, userName?: string) => string;
+  joinCollaborationRoom: (roomId: string, userName?: string) => void;
+  leaveCollaborationRoom: () => void;
+  updateMyCursor: (x: number, y: number) => void;
+  setRemotePeers: (peers: PeerUser[]) => void;
+  setRemoteLiveStroke: (senderId: string, strokeData: { points: any[]; tool: string; color: string; size: number } | null) => void;
 
   // Core Actions
   initialize: () => Promise<void>;
@@ -299,6 +320,130 @@ export function extractYouTubeId(url: string): string | null {
   return match && match[2].length === 11 ? match[2] : null;
 }
 
+let collabUnsub: (() => void) | null = null;
+
+function setupCollaborationListener(set: any, get: any) {
+  if (collabUnsub) collabUnsub();
+  collabUnsub = collaborationService.subscribe((msg) => {
+    const { collaboration, notebooks, activeNotebookId, activePageIndex } = get();
+    if (!collaboration.isConnected || msg.roomId !== collaboration.roomId) return;
+
+    if (msg.type === 'JOIN') {
+      const now = Date.now();
+      const existing = collaboration.peers.find((p: PeerUser) => p.id === msg.senderId);
+      let updatedPeers: PeerUser[];
+      if (existing) {
+        updatedPeers = collaboration.peers.map((p: PeerUser) =>
+          p.id === msg.senderId ? { ...p, name: msg.senderName, color: msg.senderColor, lastSeen: now } : p
+        );
+      } else {
+        updatedPeers = [
+          ...collaboration.peers,
+          { id: msg.senderId, name: msg.senderName, color: msg.senderColor, lastSeen: now },
+        ];
+      }
+      set({
+        collaboration: {
+          ...collaboration,
+          peers: updatedPeers,
+        },
+      });
+
+      // If host, send full notebook state to newly joined participant
+      if (collaboration.isHost && activeNotebookId) {
+        const curNb = notebooks.find((n: Notebook) => n.id === activeNotebookId);
+        if (curNb) {
+          collaborationService.broadcastStateSync({ notebook: curNb });
+        }
+      }
+    } else if (msg.type === 'LEAVE') {
+      set({
+        collaboration: {
+          ...collaboration,
+          peers: collaboration.peers.filter((p: PeerUser) => p.id !== msg.senderId),
+        },
+      });
+    } else if (msg.type === 'CURSOR') {
+      const { x, y } = msg.payload || {};
+      const now = Date.now();
+      set({
+        collaboration: {
+          ...collaboration,
+          peers: collaboration.peers.map((p: PeerUser) =>
+            p.id === msg.senderId ? { ...p, cursor: { x, y }, lastSeen: now } : p
+          ),
+        },
+      });
+    } else if (msg.type === 'STROKE_POINTS') {
+      const { points, tool, color, size } = msg.payload || {};
+      set((state: any) => ({
+        remoteLiveStrokes: {
+          ...state.remoteLiveStrokes,
+          [msg.senderId]: { points, tool, color, size },
+        },
+      }));
+    } else if (msg.type === 'STROKE_END') {
+      const { stroke, pageIndex } = msg.payload || {};
+      if (stroke && activeNotebookId) {
+        set((state: any) => {
+          const nextLive = { ...state.remoteLiveStrokes };
+          delete nextLive[msg.senderId];
+          const curNb = state.notebooks.find((n: any) => n.id === activeNotebookId);
+          if (!curNb) return { remoteLiveStrokes: nextLive };
+          const targetIndex = pageIndex !== undefined ? pageIndex : state.activePageIndex;
+          const targetPage = curNb.pages[targetIndex];
+          if (!targetPage) return { remoteLiveStrokes: nextLive };
+
+          const updatedStrokes = [...targetPage.strokes, stroke];
+          const updatedPages = curNb.pages.map((p: any, idx: number) =>
+            idx === targetIndex ? { ...p, strokes: updatedStrokes } : p
+          );
+          const updatedNb = { ...curNb, pages: updatedPages, updatedAt: Date.now() };
+          db.pages.update(targetPage.id, { strokes: updatedStrokes });
+          return {
+            remoteLiveStrokes: nextLive,
+            notebooks: state.notebooks.map((n: any) => (n.id === activeNotebookId ? updatedNb : n)),
+          };
+        });
+      }
+    } else if (msg.type === 'STROKE_ERASE') {
+      const { strokeIds, pageIndex } = msg.payload || {};
+      if (strokeIds && strokeIds.length > 0 && activeNotebookId) {
+        set((state: any) => {
+          const curNb = state.notebooks.find((n: any) => n.id === activeNotebookId);
+          if (!curNb) return {};
+          const targetIndex = pageIndex !== undefined ? pageIndex : state.activePageIndex;
+          const targetPage = curNb.pages[targetIndex];
+          if (!targetPage) return {};
+          const idSet = new Set(strokeIds);
+          const filteredStrokes = targetPage.strokes.filter((s: any) => !idSet.has(s.id));
+          const updatedPages = curNb.pages.map((p: any, idx: number) =>
+            idx === targetIndex ? { ...p, strokes: filteredStrokes } : p
+          );
+          const updatedNb = { ...curNb, pages: updatedPages, updatedAt: Date.now() };
+          db.pages.update(targetPage.id, { strokes: filteredStrokes });
+          return {
+            notebooks: state.notebooks.map((n: any) => (n.id === activeNotebookId ? updatedNb : n)),
+          };
+        });
+      }
+    } else if (msg.type === 'STATE_SYNC') {
+      const { notebook: hostNb } = msg.payload || {};
+      if (hostNb && !collaboration.isHost && activeNotebookId) {
+        set((state: any) => {
+          const curNb = state.notebooks.find((n: any) => n.id === activeNotebookId);
+          if (!curNb) return {};
+          const updatedNb = { ...curNb, pages: hostNb.pages, updatedAt: Date.now() };
+          saveNotebookToDB(updatedNb);
+          return {
+            notebooks: state.notebooks.map((n: any) => (n.id === activeNotebookId ? updatedNb : n)),
+          };
+        });
+      }
+    }
+  });
+}
+
 export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
   notebooks: [],
   activeNotebookId: null,
@@ -409,6 +554,20 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
     tapes: false,
     fills: false,
   },
+
+  // Faz 4 Initial State: Infinite Canvas & Realtime Collaboration
+  canvasMode: 'paged',
+  infinitePan: { x: 0, y: 0 },
+  collaborationModalOpen: false,
+  collaboration: {
+    isConnected: false,
+    roomId: null,
+    isHost: false,
+    peers: [],
+    myName: 'Öğrenci',
+    myColor: '#6366f1',
+  },
+  remoteLiveStrokes: {},
 
   initialize: async () => {
     try {
@@ -800,6 +959,12 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
     });
 
     db.pages.update(currentPage.id, { strokes: updatedStrokes });
+
+    // Live Collaboration: Broadcast to peers
+    const { collaboration } = get();
+    if (collaboration.isConnected) {
+      collaborationService.broadcastAddStroke(strokeWithAudio, activePageIndex);
+    }
   },
 
   eraseStrokesOnCurrentPage: (strokeIds: string[]) => {
@@ -811,6 +976,7 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
       undoStack,
       toolSettings,
       previousTool,
+      collaboration,
     } = get();
     if (!activeNotebookId) return;
     const currentNb = notebooks.find((n) => n.id === activeNotebookId);
@@ -843,6 +1009,13 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
       undoStack: newUndoStack,
       redoStack: [],
     });
+
+    db.pages.update(currentPage.id, { strokes: filteredStrokes });
+
+    // Live Collaboration: Broadcast erase to peers
+    if (collaboration.isConnected) {
+      collaborationService.broadcastEraseStrokes(strokeIds, activePageIndex);
+    }
 
     db.pages.update(currentPage.id, { strokes: filteredStrokes });
 
@@ -2123,5 +2296,112 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
       notebooks: notebooks.map((n) => (n.id === activeNotebookId ? updatedNb : n)),
     });
     saveNotebookToDB(updatedNb);
+  },
+
+  // Faz 4: Infinite Canvas Mode Actions
+  setCanvasMode: (mode: CanvasMode) => {
+    set({ canvasMode: mode });
+  },
+
+  setInfinitePan: (pan: { x: number; y: number }) => {
+    set({ infinitePan: pan });
+  },
+
+  resetInfinitePan: () => {
+    set({ infinitePan: { x: 0, y: 0 }, zoom: 1.0 });
+  },
+
+  // Faz 4: WebRTC & P2P Live Collaboration Actions
+  setCollaborationModalOpen: (open: boolean) => {
+    set({ collaborationModalOpen: open });
+  },
+
+  startCollaborationRoom: (roomId?: string, userName?: string) => {
+    const finalRoomId = roomId || collaborationService.generateRoomCode();
+    const finalName = userName || 'Oda Kurucu (Host)';
+    collaborationService.setMyProfile(finalName);
+    collaborationService.joinRoom(finalRoomId, finalName);
+
+    set({
+      collaboration: {
+        isConnected: true,
+        roomId: finalRoomId,
+        isHost: true,
+        peers: [],
+        myName: finalName,
+        myColor: collaborationService.getMyColor(),
+      },
+      collaborationModalOpen: false,
+    });
+
+    setupCollaborationListener(set, get);
+    return finalRoomId;
+  },
+
+  joinCollaborationRoom: (roomId: string, userName?: string) => {
+    const finalName = userName || 'Katılımcı';
+    collaborationService.setMyProfile(finalName);
+    collaborationService.joinRoom(roomId, finalName);
+
+    set({
+      collaboration: {
+        isConnected: true,
+        roomId: roomId.trim().toUpperCase(),
+        isHost: false,
+        peers: [],
+        myName: finalName,
+        myColor: collaborationService.getMyColor(),
+      },
+      collaborationModalOpen: false,
+    });
+
+    setupCollaborationListener(set, get);
+  },
+
+  leaveCollaborationRoom: () => {
+    collaborationService.leaveRoom();
+    if (collabUnsub) {
+      collabUnsub();
+      collabUnsub = null;
+    }
+    set({
+      collaboration: {
+        isConnected: false,
+        roomId: null,
+        isHost: false,
+        peers: [],
+        myName: 'Öğrenci',
+        myColor: '#6366f1',
+      },
+      remoteLiveStrokes: {},
+    });
+  },
+
+  updateMyCursor: (x: number, y: number) => {
+    const { collaboration } = get();
+    if (collaboration.isConnected) {
+      collaborationService.broadcastCursor(x, y);
+    }
+  },
+
+  setRemotePeers: (peers: PeerUser[]) => {
+    set((state) => ({
+      collaboration: {
+        ...state.collaboration,
+        peers,
+      },
+    }));
+  },
+
+  setRemoteLiveStroke: (senderId: string, strokeData: { points: any[]; tool: string; color: string; size: number } | null) => {
+    set((state) => {
+      const next = { ...state.remoteLiveStrokes };
+      if (strokeData) {
+        next[senderId] = strokeData;
+      } else {
+        delete next[senderId];
+      }
+      return { remoteLiveStrokes: next };
+    });
   },
 }));

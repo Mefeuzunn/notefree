@@ -14,6 +14,7 @@ import { StudySetsModal } from './components/flashcards/StudySetsModal';
 import { MathSolverModal } from './components/modals/MathSolverModal';
 import { SearchModal } from './components/modals/SearchModal';
 import { LayersDrawer } from './components/modals/LayersDrawer';
+import { CollaborationModal } from './components/modals/CollaborationModal';
 import {
   BookOpen,
   Loader2,
@@ -162,6 +163,7 @@ export const App: React.FC = () => {
       <StudySetsModal />
       <MathSolverModal />
       <SearchModal />
+      <CollaborationModal />
       <LibraryView isOpen={libraryViewOpen} onClose={() => setLibraryViewOpen(false)} />
       <PageManagerModal
         isOpen={pageManagerModalOpen}
