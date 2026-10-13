@@ -1,5 +1,5 @@
 import { getStroke } from 'perfect-freehand';
-import { PenType, Stroke, StrokeBounds, StrokePoint } from '../types/notebook';
+import { PenType, Stroke, StrokeBounds, StrokePoint, TapeItem } from '../types/notebook';
 
 export function getStrokeOptions(tool: PenType, size: number) {
   switch (tool) {
@@ -36,6 +36,51 @@ export function getStrokeOptions(tool: PenType, size: number) {
         thinning: 0,
         smoothing: 0.5,
         streamline: 0.45,
+        start: { taper: 0, cap: true },
+        end: { taper: 0, cap: true },
+      };
+    case 'pencil':
+      return {
+        size: size * 1.1,
+        thinning: 0.35,
+        smoothing: 0.55,
+        streamline: 0.4,
+        start: { taper: size * 1.2, cap: true },
+        end: { taper: size * 1.2, cap: true },
+      };
+    case 'fineliner':
+      return {
+        size,
+        thinning: 0,
+        smoothing: 0.85,
+        streamline: 0.75,
+        start: { taper: 0, cap: true },
+        end: { taper: 0, cap: true },
+      };
+    case 'neon':
+      return {
+        size: size * 1.3,
+        thinning: 0.1,
+        smoothing: 0.7,
+        streamline: 0.6,
+        start: { taper: size, cap: true },
+        end: { taper: size, cap: true },
+      };
+    case 'dashed':
+      return {
+        size,
+        thinning: 0,
+        smoothing: 0.6,
+        streamline: 0.5,
+        start: { taper: 0, cap: true },
+        end: { taper: 0, cap: true },
+      };
+    case 'tape':
+      return {
+        size: size * 4.5,
+        thinning: 0,
+        smoothing: 0.7,
+        streamline: 0.6,
         start: { taper: 0, cap: true },
         end: { taper: 0, cap: true },
       };
@@ -96,6 +141,25 @@ export function drawStrokeOnCanvas(
 ) {
   if (!stroke.points || stroke.points.length === 0) return;
 
+  // Handle Dashed Pen as a clean dashed stroke path
+  if (stroke.tool === 'dashed') {
+    if (stroke.points.length < 2) return;
+    ctx.save();
+    ctx.strokeStyle = stroke.color;
+    ctx.lineWidth = stroke.size;
+    ctx.setLineDash([stroke.size * 3, stroke.size * 2]);
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    ctx.moveTo(stroke.points[0].x, stroke.points[0].y);
+    for (let i = 1; i < stroke.points.length; i++) {
+      ctx.lineTo(stroke.points[i].x, stroke.points[i].y);
+    }
+    ctx.stroke();
+    ctx.restore();
+    return;
+  }
+
   const options = getStrokeOptions(stroke.tool, stroke.size);
   const rawPoints = stroke.points.map((pt) => [pt.x, pt.y, pt.pressure]);
   const outline = getStroke(rawPoints, options);
@@ -107,6 +171,16 @@ export function drawStrokeOnCanvas(
   if (stroke.tool === 'highlighter') {
     ctx.globalCompositeOperation = 'multiply';
     ctx.globalAlpha = 0.45;
+  } else if (stroke.tool === 'pencil') {
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.globalAlpha = 0.82;
+  } else if (stroke.tool === 'neon') {
+    // Neon aura glow pass
+    ctx.shadowColor = stroke.color;
+    ctx.shadowBlur = stroke.size * 3.8;
+    ctx.globalAlpha = 1.0;
+  } else if (stroke.tool === 'tape') {
+    ctx.globalAlpha = 0.95;
   } else {
     ctx.globalCompositeOperation = 'source-over';
     ctx.globalAlpha = 1.0;
@@ -125,7 +199,99 @@ export function drawStrokeOnCanvas(
   ctx.closePath();
   ctx.fill();
 
+  // Neon bright inner core
+  if (stroke.tool === 'neon') {
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = '#ffffff';
+    ctx.globalAlpha = 0.65;
+    ctx.fill();
+  }
+
   ctx.restore();
+}
+
+/**
+ * Draws a GoodNotes 6 style Tape strip on canvas
+ */
+export function drawTapeOnCanvas(ctx: CanvasRenderingContext2D, tape: TapeItem) {
+  if (!tape.points || tape.points.length < 2) return;
+
+  ctx.save();
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.lineWidth = tape.width;
+
+  if (tape.isRevealed) {
+    // Revealed state: transparent with dashed outline
+    ctx.strokeStyle = tape.color;
+    ctx.globalAlpha = 0.15;
+    ctx.beginPath();
+    ctx.moveTo(tape.points[0].x, tape.points[0].y);
+    for (let i = 1; i < tape.points.length; i++) {
+      ctx.lineTo(tape.points[i].x, tape.points[i].y);
+    }
+    ctx.stroke();
+
+    // Subtle dashed border
+    ctx.globalAlpha = 0.6;
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([4, 4]);
+    ctx.stroke();
+  } else {
+    // Concealed state: opaque pastel tape
+    ctx.globalAlpha = 0.96;
+    ctx.strokeStyle = tape.color;
+    ctx.shadowColor = 'rgba(0,0,0,0.15)';
+    ctx.shadowBlur = 4;
+    ctx.beginPath();
+    ctx.moveTo(tape.points[0].x, tape.points[0].y);
+    for (let i = 1; i < tape.points.length; i++) {
+      ctx.lineTo(tape.points[i].x, tape.points[i].y);
+    }
+    ctx.stroke();
+  }
+
+  ctx.restore();
+}
+
+/**
+ * Detects scratch-out gesture (rapid zig-zag reversals over an area)
+ */
+export function detectScratchOutGesture(
+  points: StrokePoint[]
+): { isScratch: boolean; bounds?: StrokeBounds } {
+  if (points.length < 10) return { isScratch: false };
+
+  const duration = (points[points.length - 1].timestamp || 0) - (points[0].timestamp || 0);
+  if (duration > 1500) return { isScratch: false };
+
+  // Count horizontal direction changes
+  let directionChanges = 0;
+  let lastDirection = 0;
+
+  for (let i = 2; i < points.length; i++) {
+    const dx = points[i].x - points[i - 1].x;
+    if (Math.abs(dx) > 3) {
+      const dir = dx > 0 ? 1 : -1;
+      if (lastDirection !== 0 && dir !== lastDirection) {
+        directionChanges++;
+      }
+      lastDirection = dir;
+    }
+  }
+
+  // If there are at least 4 rapid zig-zags in a compact box
+  if (directionChanges >= 4) {
+    const bounds = calculateStrokeBounds(points, 15);
+    const width = bounds.maxX - bounds.minX;
+    const height = bounds.maxY - bounds.minY;
+
+    if (width < 320 && height < 180) {
+      return { isScratch: true, bounds };
+    }
+  }
+
+  return { isScratch: false };
 }
 
 /**

@@ -13,6 +13,7 @@ import {
   ShapeType,
   StickerItem,
   Stroke,
+  TapeItem,
   TextAnnotation,
   ToolSettings,
   ToolType,
@@ -169,6 +170,11 @@ interface NotebookStoreState {
   setStickersDrawerOpen: (open: boolean) => void;
   addStickerToCurrentPage: (sticker: StickerItem) => void;
   removeStickerFromCurrentPage: (pageStickerId: string) => void;
+
+  // GoodNotes 6 Tape Actions
+  toggleTapeReveal: (pageIndex: number, tapeId: string) => void;
+  addTapeToCurrentPage: (tape: TapeItem) => void;
+  removeTapeFromCurrentPage: (tapeId: string) => void;
 
   // Text Annotations
   addTextAnnotation: (
@@ -1614,5 +1620,62 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
       undoStack: [],
       redoStack: [],
     });
+  },
+
+  // GoodNotes 6 Tape Actions
+  toggleTapeReveal: (pageIndex: number, tapeId: string) => {
+    const { notebooks, activeNotebookId } = get();
+    const nb = notebooks.find((n) => n.id === activeNotebookId);
+    if (!nb || !nb.pages[pageIndex]) return;
+
+    const targetPage = nb.pages[pageIndex];
+    const updatedTapes = (targetPage.tapes || []).map((t) =>
+      t.id === tapeId ? { ...t, isRevealed: !t.isRevealed } : t
+    );
+
+    const updatedPages = [...nb.pages];
+    updatedPages[pageIndex] = { ...targetPage, tapes: updatedTapes };
+    const updatedNotebook = { ...nb, pages: updatedPages, updatedAt: Date.now() };
+
+    set({
+      notebooks: notebooks.map((n) => (n.id === activeNotebookId ? updatedNotebook : n)),
+    });
+    saveNotebookToDB(updatedNotebook);
+  },
+
+  addTapeToCurrentPage: (tape: TapeItem) => {
+    const { notebooks, activeNotebookId, activePageIndex } = get();
+    const nb = notebooks.find((n) => n.id === activeNotebookId);
+    if (!nb || !nb.pages[activePageIndex]) return;
+
+    const currentPage = nb.pages[activePageIndex];
+    const updatedTapes = [...(currentPage.tapes || []), tape];
+
+    const updatedPages = [...nb.pages];
+    updatedPages[activePageIndex] = { ...currentPage, tapes: updatedTapes };
+    const updatedNotebook = { ...nb, pages: updatedPages, updatedAt: Date.now() };
+
+    set({
+      notebooks: notebooks.map((n) => (n.id === activeNotebookId ? updatedNotebook : n)),
+    });
+    saveNotebookToDB(updatedNotebook);
+  },
+
+  removeTapeFromCurrentPage: (tapeId: string) => {
+    const { notebooks, activeNotebookId, activePageIndex } = get();
+    const nb = notebooks.find((n) => n.id === activeNotebookId);
+    if (!nb || !nb.pages[activePageIndex]) return;
+
+    const currentPage = nb.pages[activePageIndex];
+    const updatedTapes = (currentPage.tapes || []).filter((t) => t.id !== tapeId);
+
+    const updatedPages = [...nb.pages];
+    updatedPages[activePageIndex] = { ...currentPage, tapes: updatedTapes };
+    const updatedNotebook = { ...nb, pages: updatedPages, updatedAt: Date.now() };
+
+    set({
+      notebooks: notebooks.map((n) => (n.id === activeNotebookId ? updatedNotebook : n)),
+    });
+    saveNotebookToDB(updatedNotebook);
   },
 }));

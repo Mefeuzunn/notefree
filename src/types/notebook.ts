@@ -1,4 +1,13 @@
-export type PenType = 'ballpoint' | 'fountain' | 'brush' | 'highlighter';
+export type PenType =
+  | 'ballpoint'
+  | 'fountain'
+  | 'brush'
+  | 'highlighter'
+  | 'pencil'
+  | 'fineliner'
+  | 'neon'
+  | 'dashed'
+  | 'tape';
 
 export type ToolType =
   | PenType
@@ -25,7 +34,12 @@ export type PageTemplate =
   | 'planner-weekly'
   | 'planner-daily'
   | 'music'
-  | 'hexagonal';
+  | 'hexagonal'
+  | 'chemistry-hex'
+  | 'engineering-1mm'
+  | 'language-vocab'
+  | 'guitar-tab'
+  | 'planner-habit';
 
 export type PaperColor = 'white' | 'cream' | 'yellow-pad' | 'dark' | 'kraft';
 
@@ -101,6 +115,15 @@ export interface PageImage {
   timestamp?: number;
 }
 
+export interface TapeItem {
+  id: string;
+  points: StrokePoint[];
+  color: string;
+  width: number;
+  isRevealed: boolean;
+  timestamp: number;
+}
+
 export interface Page {
   id: string;
   pageNumber: number;
@@ -110,6 +133,7 @@ export interface Page {
   images?: PageImage[];
   texts?: TextAnnotation[];
   stickers?: PageSticker[];
+  tapes?: TapeItem[];
   backgroundImageUrl?: string; // Rendered PDF or Word page
   width: number;
   height: number;

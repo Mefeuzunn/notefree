@@ -1,9 +1,11 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
-import { LassoSelection, Page, PageSticker, Stroke, StrokePoint } from '../../types/notebook';
+import { LassoSelection, Page, PageSticker, Stroke, StrokePoint, TapeItem } from '../../types/notebook';
 import { useNotebookStore } from '../../store/notebookStore';
 import {
   calculateStrokeBounds,
   drawStrokeOnCanvas,
+  drawTapeOnCanvas,
+  detectScratchOutGesture,
   isPointNearStroke,
 } from '../../engine/strokeRenderer';
 import { drawPaperTemplate } from '../../engine/paperTemplates';
@@ -77,6 +79,9 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
     setZoomWindowPos,
     zoomBoxWidth,
     zoomBoxHeight,
+    toggleTapeReveal,
+    addTapeToCurrentPage,
+    removeTapeFromCurrentPage,
   } = useNotebookStore();
 
   const [isDrawing, setIsDrawing] = useState(false);
@@ -138,8 +143,15 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
       drawStrokeOnCanvas(ctx, stroke);
     }
 
+    // Draw GoodNotes 6 Tape Strips
+    if (page.tapes) {
+      for (const tape of page.tapes) {
+        drawTapeOnCanvas(ctx, tape);
+      }
+    }
+
     ctx.restore();
-  }, [page.strokes, dpr, audioPlaying, audioPlaybackTimeMs]);
+  }, [page.strokes, page.tapes, dpr, audioPlaying, audioPlaybackTimeMs]);
 
   useEffect(() => {
     redrawCommittedStrokes();
@@ -193,6 +205,19 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
       setIsDrawing(true);
       addLaserPoint(x, y);
       return;
+    }
+
+    // Check if user clicked on a GoodNotes Tape strip to reveal/conceal
+    if (page.tapes && page.tapes.length > 0 && activeTool !== 'tape' && activeTool !== 'eraser') {
+      const hitTape = page.tapes.find((tape) => {
+        return tape.points.some(
+          (pt) => Math.hypot(pt.x - x, pt.y - y) <= Math.max(16, tape.width / 1.8)
+        );
+      });
+      if (hitTape) {
+        toggleTapeReveal(pageIndex, hitTape.id);
+        return;
+      }
     }
 
     // Check if user clicked inside existing lasso selection to drag it
@@ -273,6 +298,15 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
       ctx.stroke();
     } else if (activeTool === 'shape') {
       renderShapePreview(ctx, currentPointsRef.current);
+    } else if (activeTool === 'tape') {
+      drawTapeOnCanvas(ctx, {
+        id: 'live_tape',
+        points: currentPointsRef.current,
+        color: toolSettings.color === '#0f172a' ? '#fed7aa' : toolSettings.color,
+        width: Math.max(24, toolSettings.size * 5.5),
+        isRevealed: false,
+        timestamp: Date.now(),
+      });
     } else {
       drawStrokeOnCanvas(ctx, {
         tool: activeTool as any,
@@ -448,6 +482,44 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
       return;
     }
 
+    // Handle Tape tool creation
+    if (activeTool === 'tape') {
+      if (currentPointsRef.current.length >= 2) {
+        const newTape: TapeItem = {
+          id: `tape_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+          points: [...currentPointsRef.current],
+          color: toolSettings.color === '#0f172a' ? '#fed7aa' : toolSettings.color,
+          width: Math.max(24, toolSettings.size * 5.5),
+          isRevealed: false,
+          timestamp: Date.now(),
+        };
+        addTapeToCurrentPage(newTape);
+      }
+      currentPointsRef.current = [];
+      return;
+    }
+
+    // Smart Gesture: Scratch-out to Erase
+    if (activeTool !== 'shape') {
+      const scratch = detectScratchOutGesture(currentPointsRef.current);
+      if (scratch.isScratch && scratch.bounds) {
+        const sb = scratch.bounds;
+        const strokesToErase = page.strokes.filter((s) => {
+          return (
+            s.bounds.maxX >= sb.minX &&
+            s.bounds.minX <= sb.maxX &&
+            s.bounds.maxY >= sb.minY &&
+            s.bounds.minY <= sb.maxY
+          );
+        });
+        if (strokesToErase.length > 0) {
+          eraseStrokesOnCurrentPage(strokesToErase.map((s) => s.id));
+          currentPointsRef.current = [];
+          return;
+        }
+      }
+    }
+
     let finalPoints = [...currentPointsRef.current];
 
     // Explicit shape mode vs auto-detection
@@ -522,6 +594,18 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
 
     if (hitIds.length > 0) {
       eraseStrokesOnCurrentPage(hitIds);
+    }
+
+    // Also erase any tape if touched
+    if (page.tapes && page.tapes.length > 0) {
+      for (const tape of page.tapes) {
+        const isHit = tape.points.some(
+          (pt) => Math.hypot(pt.x - x, pt.y - y) <= Math.max(18, tape.width / 1.5)
+        );
+        if (isHit) {
+          removeTapeFromCurrentPage(tape.id);
+        }
+      }
     }
   };
 

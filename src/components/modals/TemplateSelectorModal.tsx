@@ -4,18 +4,37 @@ import { PageTemplate, PaperColor } from '../../types/notebook';
 import { PAPER_COLORS } from '../../engine/paperTemplates';
 import { X, Check } from 'lucide-react';
 
-const TEMPLATES: Array<{ id: PageTemplate; name: string; desc: string; icon: string }> = [
-  { id: 'lined', name: 'Çizgili Notluk', desc: 'Klasik defter çizgileri', icon: '📝' },
-  { id: 'lined-margin', name: 'Çizgili & Kenar Çizgili', desc: 'Sol kırmızı marjinli okul defteri', icon: '📖' },
-  { id: 'grid-5mm', name: 'Kareli Kağıt (5mm)', desc: 'Matematik ve sayısal dersler', icon: '📐' },
-  { id: 'dots', name: 'Noktalı (Bullet Journal)', desc: 'Bullet journal ve serbest şablon', icon: '⁖' },
-  { id: 'cornell', name: 'Cornell Not Metodu', desc: 'İpucu, not ve özet sütunları', icon: '🎓' },
-  { id: 'planner-weekly', name: 'Haftalık Ajanda', desc: 'Pazartesi-Pazar zaman blokları', icon: '📅' },
-  { id: 'planner-daily', name: 'Günlük Planlayıcı', desc: 'Saatlik ajanda & Yapılacaklar', icon: '⏱️' },
-  { id: 'isometric', name: 'İzometrik 3D Çizim', desc: 'Perspektif ve şematik çizimler', icon: '🎲' },
-  { id: 'hexagonal', name: 'Hekzagonal (Kimya)', desc: 'Organik kimya ve formül çizimi', icon: '⬡' },
-  { id: 'music', name: 'Müzik Portesi (Dizek)', desc: 'Nota ve beste yazımı için', icon: '🎵' },
-  { id: 'blank', name: 'Düz Beyaz', desc: 'Tamamen boş serbest tuval', icon: '📄' },
+interface TemplateItem {
+  id: PageTemplate;
+  name: string;
+  desc: string;
+  icon: string;
+  category: 'classic' | 'stem' | 'plan' | 'creative';
+}
+
+const TEMPLATES: TemplateItem[] = [
+  { id: 'lined', name: 'Çizgili Notluk', desc: 'Klasik defter çizgileri', icon: '📝', category: 'classic' },
+  { id: 'lined-margin', name: 'Çizgili & Kenar Çizgili', desc: 'Sol kırmızı marjinli okul defteri', icon: '📖', category: 'classic' },
+  { id: 'grid-5mm', name: 'Kareli Kağıt (5mm)', desc: 'Matematik ve sayısal dersler', icon: '📐', category: 'classic' },
+  { id: 'dots', name: 'Noktalı (Bullet Journal)', desc: 'Bullet journal ve serbest şablon', icon: '⁖', category: 'classic' },
+  { id: 'cornell', name: 'Cornell Not Metodu', desc: 'İpucu, not ve özet sütunları', icon: '🎓', category: 'classic' },
+  { id: 'blank', name: 'Düz Beyaz', desc: 'Tamamen boş serbest tuval', icon: '📄', category: 'classic' },
+
+  // STEM & Engineering
+  { id: 'chemistry-hex', name: 'Organik Kimya & Benzen', desc: 'Benzen halkaları ve moleküler şablon', icon: '⚗️', category: 'stem' },
+  { id: 'engineering-1mm', name: 'Mühendislik Paftası (1mm)', desc: 'Milimetrik teknik CAD ve mimari pafta', icon: '📐', category: 'stem' },
+  { id: 'isometric', name: 'İzometrik 3D Çizim', desc: 'Perspektif ve şematik çizimler', icon: '🎲', category: 'stem' },
+  { id: 'hexagonal', name: 'Hekzagonal Petek', desc: 'Petek desenli geometri şablonu', icon: '⬡', category: 'stem' },
+
+  // Planner & Productivity
+  { id: 'planner-weekly', name: 'Haftalık Ajanda', desc: 'Pazartesi-Pazar zaman blokları', icon: '📅', category: 'plan' },
+  { id: 'planner-daily', name: 'Günlük Planlayıcı', desc: 'Saatlik ajanda & Yapılacaklar', icon: '⏱️', category: 'plan' },
+  { id: 'planner-habit', name: 'Alışkanlık & Hedef Takibi', desc: 'Aylık 31 günlük habit tracker matrisi', icon: '🎯', category: 'plan' },
+
+  // Language & Creative
+  { id: 'language-vocab', name: 'Dil & Kelime Defteri', desc: '3 sütunlu Kelime | Anlam | Cümle şablonu', icon: '🌍', category: 'creative' },
+  { id: 'guitar-tab', name: 'Gitar Tablatür (TAB)', desc: '6 telli gitar ve bas nota portesi', icon: '🎸', category: 'creative' },
+  { id: 'music', name: 'Müzik Portesi (Dizek)', desc: 'Klasik 5 çizgili nota ve beste yazımı', icon: '🎵', category: 'creative' },
 ];
 
 const COLORS: Array<{ id: PaperColor; name: string; bg: string }> = [
@@ -44,6 +63,13 @@ export const TemplateSelectorModal: React.FC = () => {
   );
   const [selectedColor, setSelectedColor] = useState<PaperColor>(
     currentPage?.paperColor || 'white'
+  );
+  const [activeCategory, setActiveCategory] = useState<
+    'all' | 'classic' | 'stem' | 'plan' | 'creative'
+  >('all');
+
+  const filteredTemplates = TEMPLATES.filter(
+    (t) => activeCategory === 'all' || t.category === activeCategory
   );
 
   if (!templateModalOpen) return null;
@@ -109,11 +135,37 @@ export const TemplateSelectorModal: React.FC = () => {
 
           {/* Template Style Selection */}
           <div>
-            <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider block mb-3">
-              Defter Şablonu
-            </label>
+            <div className="flex items-center justify-between mb-3">
+              <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider block">
+                Defter Şablonu ({filteredTemplates.length})
+              </label>
+
+              {/* Category Filter Pills */}
+              <div className="flex items-center gap-1 bg-slate-800/80 p-0.5 rounded-xl text-[11px] font-medium">
+                {[
+                  { id: 'all', label: 'Tümü' },
+                  { id: 'classic', label: 'Klasik' },
+                  { id: 'stem', label: 'STEM' },
+                  { id: 'plan', label: 'Ajanda' },
+                  { id: 'creative', label: 'Dil & Müzik' },
+                ].map((cat) => (
+                  <button
+                    key={cat.id}
+                    onClick={() => setActiveCategory(cat.id as any)}
+                    className={`px-2.5 py-1 rounded-lg transition-colors ${
+                      activeCategory === cat.id
+                        ? 'bg-indigo-600 text-white shadow-sm'
+                        : 'text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    {cat.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {TEMPLATES.map((tmpl) => (
+              {filteredTemplates.map((tmpl) => (
                 <button
                   key={tmpl.id}
                   onClick={() => setSelectedTemplate(tmpl.id)}

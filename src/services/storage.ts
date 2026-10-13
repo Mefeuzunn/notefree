@@ -27,6 +27,7 @@ export interface DBPage {
   height: number;
   title?: string;
   isBookmarked?: boolean;
+  tapes?: any[];
 }
 
 class NotFreeDatabase extends Dexie {
@@ -187,6 +188,7 @@ export async function loadAllNotebooksWithPages(): Promise<Notebook[]> {
         strokes: p.strokes || [],
         images: p.images || [],
         texts: p.texts || [],
+        tapes: p.tapes || [],
         backgroundImageUrl: p.backgroundImageUrl,
         width: p.width || 800,
         height: p.height || 1130,
@@ -236,6 +238,7 @@ export async function saveNotebookToDB(notebook: Notebook): Promise<void> {
       strokes: page.strokes,
       images: page.images,
       texts: page.texts,
+      tapes: page.tapes,
       backgroundImageUrl: page.backgroundImageUrl,
       width: page.width,
       height: page.height,

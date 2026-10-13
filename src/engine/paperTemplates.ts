@@ -342,6 +342,219 @@ export function drawPaperTemplate(
       ctx.restore();
       break;
     }
+
+    case 'chemistry-hex': {
+      // Organic chemistry benzene rings
+      const radius = 18;
+      const a = (2 * Math.PI) / 6;
+      const w = Math.sqrt(3) * radius;
+      const h = 2 * radius;
+
+      ctx.save();
+      ctx.strokeStyle = palette.line;
+      ctx.lineWidth = 1;
+
+      // Header title
+      ctx.font = 'bold 12px Inter, sans-serif';
+      ctx.fillText('⚗️ ORGANİK KİMYA & BENZEN ŞABLONU', 40, 42);
+
+      for (let y = 70; y < height - 30; y += h * 1.5) {
+        const row = Math.floor((y - 70) / (h * 1.5));
+        const offset = row % 2 === 0 ? 0 : w * 0.75;
+        for (let x = 45; x < width - 40; x += w * 1.5) {
+          drawHexagon(ctx, x + offset, y, radius, a);
+        }
+      }
+      ctx.restore();
+      break;
+    }
+
+    case 'engineering-1mm': {
+      // 3-tier Precision Millimeter Graph Paper
+      ctx.save();
+      const originX = 35;
+      const originY = 35;
+      const endX = width - 35;
+      const endY = height - 70;
+
+      // Major 10mm lines
+      ctx.strokeStyle = palette.line;
+      ctx.lineWidth = 1.2;
+      for (let x = originX; x <= endX; x += 38) {
+        ctx.beginPath();
+        ctx.moveTo(x, originY);
+        ctx.lineTo(x, endY);
+        ctx.stroke();
+      }
+      for (let y = originY; y <= endY; y += 38) {
+        ctx.beginPath();
+        ctx.moveTo(originX, y);
+        ctx.lineTo(endX, y);
+        ctx.stroke();
+      }
+
+      // Medium 5mm lines
+      ctx.lineWidth = 0.6;
+      for (let x = originX; x <= endX; x += 19) {
+        if ((x - originX) % 38 !== 0) {
+          ctx.beginPath();
+          ctx.moveTo(x, originY);
+          ctx.lineTo(x, endY);
+          ctx.stroke();
+        }
+      }
+      for (let y = originY; y <= endY; y += 19) {
+        if ((y - originY) % 38 !== 0) {
+          ctx.beginPath();
+          ctx.moveTo(originX, y);
+          ctx.lineTo(endX, y);
+          ctx.stroke();
+        }
+      }
+
+      // Border and Engineering Title Block
+      ctx.lineWidth = 2;
+      ctx.strokeRect(originX, originY, endX - originX, endY - originY);
+
+      // Title block box at bottom
+      const tbX = endX - 240;
+      const tbY = endY + 8;
+      ctx.strokeRect(tbX, tbY, 240, 50);
+      ctx.font = '10px Inter, monospace';
+      ctx.fillText('MÜHENDİSLİK TEKNİK ÇİZİM', tbX + 10, tbY + 20);
+      ctx.fillText('ÖLÇEK: 1:1  |  NOTFREE CAD', tbX + 10, tbY + 38);
+
+      ctx.restore();
+      break;
+    }
+
+    case 'language-vocab': {
+      // 3-Column Vocabulary Study Template
+      const topY = 60;
+      const col1Width = (width - 70) * 0.28;
+      const col2Width = (width - 70) * 0.36;
+      const col3Width = (width - 70) * 0.36;
+
+      ctx.save();
+      // Column Header Bars
+      ctx.fillStyle = palette.line;
+      ctx.fillRect(35, topY, width - 70, 32);
+
+      ctx.fillStyle = palette.text;
+      ctx.font = 'bold 11px Inter, sans-serif';
+      ctx.fillText('KELİME / VOCABULARY', 45, topY + 20);
+      ctx.fillText('ANLAMI / MEANING', 45 + col1Width, topY + 20);
+      ctx.fillText('ÖRNEK CÜMLE / SENTENCE', 45 + col1Width + col2Width, topY + 20);
+
+      // Vertical separators
+      ctx.strokeStyle = palette.line;
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.moveTo(35 + col1Width, topY);
+      ctx.lineTo(35 + col1Width, height - 30);
+      ctx.moveTo(35 + col1Width + col2Width, topY);
+      ctx.lineTo(35 + col1Width + col2Width, height - 30);
+      ctx.stroke();
+
+      // Horizontal writing rows
+      ctx.lineWidth = 0.8;
+      for (let y = topY + 32; y < height - 30; y += 34) {
+        ctx.beginPath();
+        ctx.moveTo(35, y);
+        ctx.lineTo(width - 35, y);
+        ctx.stroke();
+      }
+      ctx.restore();
+      break;
+    }
+
+    case 'guitar-tab': {
+      // 6-string Guitar Tablature
+      const staveSpacing = 11;
+      const groupSpacing = 55;
+      const strings = ['e', 'B', 'G', 'D', 'A', 'E'];
+      let y = 80;
+
+      ctx.save();
+      ctx.font = 'bold 11px Inter, monospace';
+      ctx.fillText('🎸 GİTAR TABLATÜR (TAB)', 40, 45);
+
+      while (y + 5 * staveSpacing < height - 40) {
+        ctx.lineWidth = 1.1;
+        for (let i = 0; i < 6; i++) {
+          const lineY = y + i * staveSpacing;
+          // String label
+          ctx.fillStyle = palette.text;
+          ctx.fillText(strings[i], 38, lineY + 3);
+
+          ctx.beginPath();
+          ctx.moveTo(56, lineY);
+          ctx.lineTo(width - 40, lineY);
+          ctx.stroke();
+        }
+
+        // Measure / bar lines
+        const barSpacing = (width - 96) / 4;
+        for (let b = 0; b <= 4; b++) {
+          const bx = 56 + b * barSpacing;
+          ctx.beginPath();
+          ctx.moveTo(bx, y);
+          ctx.lineTo(bx, y + 5 * staveSpacing);
+          ctx.stroke();
+        }
+
+        y += 5 * staveSpacing + groupSpacing;
+      }
+      ctx.restore();
+      break;
+    }
+
+    case 'planner-habit': {
+      // Monthly 31-day Habit Tracking Grid
+      const topY = 70;
+      const leftColWidth = 180;
+      const dayCellWidth = (width - 80 - leftColWidth) / 31;
+
+      ctx.save();
+      ctx.font = 'bold 13px Inter, sans-serif';
+      ctx.fillText('🎯 ALIŞKANLIK VE HEDEF TAKİP ÇİZELGESİ (HABIT TRACKER)', 40, 45);
+
+      // Header row
+      ctx.font = 'bold 9px Inter, monospace';
+      ctx.fillStyle = palette.text;
+      ctx.fillText('ALIŞKANLIK / HEDEF', 45, topY + 18);
+      for (let day = 1; day <= 31; day++) {
+        ctx.fillText(
+          day.toString(),
+          40 + leftColWidth + (day - 1) * dayCellWidth + 2,
+          topY + 18
+        );
+      }
+
+      // Grid rows
+      ctx.strokeStyle = palette.line;
+      ctx.lineWidth = 0.8;
+      let rowY = topY + 28;
+      for (let r = 0; r < 20; r++) {
+        ctx.beginPath();
+        ctx.moveTo(40, rowY);
+        ctx.lineTo(width - 40, rowY);
+        ctx.stroke();
+
+        // Vertical day dividers
+        for (let day = 0; day <= 31; day++) {
+          const dx = 40 + leftColWidth + day * dayCellWidth;
+          ctx.beginPath();
+          ctx.moveTo(dx, topY);
+          ctx.lineTo(dx, topY + 28 + 20 * 30);
+          ctx.stroke();
+        }
+
+        rowY += 30;
+      }
+      ctx.restore();
+      break;
+    }
   }
 
   ctx.restore();

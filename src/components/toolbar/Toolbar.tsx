@@ -36,6 +36,11 @@ import {
   Presentation,
   Sun,
   FolderDown,
+  Pencil,
+  PenLine,
+  Flame,
+  Spline,
+  Bandage,
 } from 'lucide-react';
 import { PenType, ShapeType, ToolType } from '../../types/notebook';
 import { AudioPlayerBar } from '../audio/AudioPlayerBar';
@@ -249,6 +254,32 @@ export const Toolbar: React.FC = () => {
           <PenTool size={16} />
         </button>
 
+        {/* Pencil / Graphite */}
+        <button
+          onClick={() => setActiveTool('pencil')}
+          className={`p-2 rounded-xl transition-all flex items-center justify-center ${
+            activeTool === 'pencil'
+              ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30 scale-105'
+              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
+          }`}
+          title="Kurşun Kalem & Karakalem (Doğal grafit dokusu)"
+        >
+          <Pencil size={16} />
+        </button>
+
+        {/* Fineliner / Technical Pen */}
+        <button
+          onClick={() => setActiveTool('fineliner')}
+          className={`p-2 rounded-xl transition-all flex items-center justify-center ${
+            activeTool === 'fineliner'
+              ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30 scale-105'
+              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
+          }`}
+          title="Teknik Çizim Kalemi / Fineliner (Titreşimsiz mikron hassasiyet)"
+        >
+          <PenLine size={16} />
+        </button>
+
         {/* Brush Pen */}
         <button
           onClick={() => setActiveTool('brush')}
@@ -273,6 +304,45 @@ export const Toolbar: React.FC = () => {
           title="Fosforlu Kalem (Multiply blend mode)"
         >
           <Highlighter size={16} />
+        </button>
+
+        {/* Neon Glow Pen */}
+        <button
+          onClick={() => setActiveTool('neon')}
+          className={`p-2 rounded-xl transition-all flex items-center justify-center ${
+            activeTool === 'neon'
+              ? 'bg-fuchsia-600 text-white shadow-md shadow-fuchsia-600/40 scale-105 ring-1 ring-fuchsia-400'
+              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
+          }`}
+          title="Neon Parıltı Kalemi (Koyu kağıtlarda parıldayan neon aurası)"
+        >
+          <Flame size={16} />
+        </button>
+
+        {/* Dashed / Spline Pen */}
+        <button
+          onClick={() => setActiveTool('dashed')}
+          className={`p-2 rounded-xl transition-all flex items-center justify-center ${
+            activeTool === 'dashed'
+              ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30 scale-105'
+              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
+          }`}
+          title="Kesikli Çizgi Kalemi (Geometri ve grafik diyagramları)"
+        >
+          <Spline size={16} />
+        </button>
+
+        {/* GoodNotes 6 Tape Tool */}
+        <button
+          onClick={() => setActiveTool('tape')}
+          className={`p-2 rounded-xl transition-all flex items-center justify-center ${
+            activeTool === 'tape'
+              ? 'bg-amber-600 text-white shadow-md shadow-amber-600/30 scale-105 ring-1 ring-amber-400'
+              : 'text-amber-400 hover:text-amber-200 hover:bg-slate-700/50'
+          }`}
+          title="Gizleme Bandı (Tape Tool - Tıklayınca açılıp kapanan çalışma bandı)"
+        >
+          <Bandage size={16} />
         </button>
 
         {/* Eraser with Dropdown Settings */}
