@@ -50,6 +50,8 @@ import {
   Calculator,
   Split,
   Search,
+  StickyNote,
+  Disc,
 } from 'lucide-react';
 import { PenType, ShapeType, ToolType } from '../../types/notebook';
 import { AudioPlayerBar } from '../audio/AudioPlayerBar';
@@ -129,6 +131,9 @@ export const Toolbar: React.FC = () => {
     toggleTiltShading,
     collaboration,
     setCollaborationModalOpen,
+    protractorVisible,
+    toggleProtractor,
+    addStickyNoteToCurrentPage,
   } = useNotebookStore();
 
   const [activeColorSlot, setActiveColorSlot] = useState<number | null>(null);
@@ -592,6 +597,47 @@ export const Toolbar: React.FC = () => {
           title="İnteraktif Cetvel (GoodNotes Stili Dönen Milimetrik Cetvel)"
         >
           <Compass size={16} />
+        </button>
+
+        {/* 🌟 Faz B: 360° İletki / Açıölçer (Protractor) */}
+        <button
+          onClick={toggleProtractor}
+          className={`p-2 rounded-xl transition-all flex items-center justify-center ${
+            protractorVisible
+              ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30 scale-105 ring-1 ring-indigo-400'
+              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
+          }`}
+          title="360° İletki / Açıölçer (Dönen Akrilik Açıölçer)"
+        >
+          <Disc size={16} />
+        </button>
+
+        {/* 📌 Faz B: Yapışkan Notlar (3D Post-it Sticky Notes) */}
+        <button
+          onClick={() => {
+            if (activeTool === 'sticky-note') {
+              addStickyNoteToCurrentPage({
+                id: `sn_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+                x: 180,
+                y: 200,
+                width: 210,
+                height: 180,
+                color: 'yellow',
+                text: '',
+                createdAt: Date.now(),
+              });
+            } else {
+              setActiveTool('sticky-note');
+            }
+          }}
+          className={`p-2 rounded-xl transition-all flex items-center justify-center ${
+            activeTool === 'sticky-note'
+              ? 'bg-amber-400 text-amber-950 shadow-md shadow-amber-400/40 scale-105 ring-1 ring-amber-300 font-bold'
+              : 'text-slate-400 hover:text-amber-300 hover:bg-slate-700/50'
+          }`}
+          title="Yapışkan Not (Post-It - Sayfaya tıklayarak veya basarak 3D renkli yapışkan not ekle)"
+        >
+          <StickyNote size={16} />
         </button>
 
         {/* GoodNotes Handwriting Zoom Window Box */}

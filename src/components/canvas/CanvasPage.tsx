@@ -28,6 +28,7 @@ import {
   isStrokeCapturedByLasso,
 } from '../../engine/lassoHelper';
 import { TextBoxOverlay } from './TextBoxOverlay';
+import { StickyNoteOverlay } from './StickyNoteOverlay';
 import { collaborationService } from '../../services/collaborationService';
 import { HandwritingOcrModal } from '../modals/HandwritingOcrModal';
 import {
@@ -112,6 +113,7 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
     collaboration,
     remoteLiveStrokes,
     updateMyCursor,
+    addStickyNoteToCurrentPage,
   } = useNotebookStore();
 
   const [isDrawing, setIsDrawing] = useState(false);
@@ -435,6 +437,22 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
         return;
       }
       addTextAnnotation(pageIndex, x, y, '');
+      return;
+    }
+
+    // Faz B: Sticky Note tool mode: click to drop a new sticky note
+    if (activeTool === 'sticky-note') {
+      addStickyNoteToCurrentPage({
+        id: `sn_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+        x: Math.max(10, x - 100),
+        y: Math.max(10, y - 40),
+        width: 210,
+        height: 180,
+        color: 'yellow',
+        text: '',
+        createdAt: Date.now(),
+      });
+      setActiveTool(previousTool || 'pen');
       return;
     }
 
@@ -1004,6 +1022,16 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
             scale={scale}
             onUpdate={(partial) => !layerLocks.texts && updateTextAnnotation(pageIndex, txt.id, partial)}
             onDelete={() => !layerLocks.texts && deleteTextAnnotation(pageIndex, txt.id)}
+          />
+        ))}
+
+      {/* Layer 0.7: Faz B Sticky Notes (Yapışkan Notlar) */}
+      {page.stickyNotes &&
+        page.stickyNotes.map((note) => (
+          <StickyNoteOverlay
+            key={note.id}
+            note={note}
+            scale={scale}
           />
         ))}
 

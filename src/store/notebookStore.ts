@@ -25,6 +25,7 @@ import {
   CanvasMode,
   PeerUser,
   CollaborationSession,
+  StickyNoteItem,
 } from '../types/notebook';
 import { collaborationService } from '../services/collaborationService';
 import { db, initStorage, saveNotebookToDB, importNotebookFromNotefree } from '../services/storage';
@@ -169,6 +170,10 @@ interface NotebookStoreState {
   togglePageBookmark: (pageIndex: number) => void;
   setPageTitle: (pageIndex: number, title: string) => void;
   invertCurrentPageInks: () => void;
+  reorderPages: (fromIndex: number, toIndex: number) => Promise<void>;
+  movePageLeft: (index: number) => Promise<void>;
+  movePageRight: (index: number) => Promise<void>;
+  insertPageAt: (index: number, template?: PageTemplate, paperColor?: PaperColor) => Promise<void>;
 
   // Drawing & Strokes Actions
   setActiveTool: (tool: ToolType) => void;
@@ -257,6 +262,15 @@ interface NotebookStoreState {
   toggleGridSnap: () => void;
   addOutlineItem: (title: string, pageIndex: number) => void;
   deleteOutlineItem: (outlineId: string) => void;
+
+  // Faz B: Protractor & Sticky Notes
+  protractorVisible: boolean;
+  protractorAngle: number;
+  toggleProtractor: () => void;
+  setProtractorAngle: (angle: number) => void;
+  addStickyNoteToCurrentPage: (note: StickyNoteItem) => void;
+  updateStickyNoteOnCurrentPage: (noteId: string, partial: Partial<StickyNoteItem>) => void;
+  removeStickyNoteFromCurrentPage: (noteId: string) => void;
 
   // Text Annotations
   addTextAnnotation: (
@@ -490,6 +504,8 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
 
   rulerVisible: false,
   rulerAngle: 0,
+  protractorVisible: false,
+  protractorAngle: 0,
   laserPoints: [],
 
   zoomWindowOpen: false,
@@ -796,6 +812,121 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
     await saveNotebookToDB(updatedNotebook);
   },
 
+  reorderPages: async (fromIndex: number, toIndex: number) => {
+    const { activeNotebookId, notebooks, activePageIndex } = get();
+    if (!activeNotebookId) return;
+    const currentNb = notebooks.find((n) => n.id === activeNotebookId);
+    if (!currentNb) return;
+    if (
+      fromIndex === toIndex ||
+      fromIndex < 0 ||
+      toIndex < 0 ||
+      fromIndex >= currentNb.pages.length ||
+      toIndex >= currentNb.pages.length
+    )
+      return;
+
+    const newPages = [...currentNb.pages];
+    const [movedPage] = newPages.splice(fromIndex, 1);
+    newPages.splice(toIndex, 0, movedPage);
+
+    // Re-index all pages sequentially
+    const reindexedPages = newPages.map((p, idx) => ({
+      ...p,
+      pageNumber: idx + 1,
+    }));
+
+    // If active page moved, track it
+    let newActiveIndex = activePageIndex;
+    if (activePageIndex === fromIndex) {
+      newActiveIndex = toIndex;
+    } else if (fromIndex < activePageIndex && toIndex >= activePageIndex) {
+      newActiveIndex = activePageIndex - 1;
+    } else if (fromIndex > activePageIndex && toIndex <= activePageIndex) {
+      newActiveIndex = activePageIndex + 1;
+    }
+
+    const updatedNotebook: Notebook = {
+      ...currentNb,
+      pages: reindexedPages,
+      activePageIndex: newActiveIndex,
+      updatedAt: Date.now(),
+    };
+
+    const updatedNotebooks = notebooks.map((n) =>
+      n.id === activeNotebookId ? updatedNotebook : n
+    );
+
+    set({
+      notebooks: updatedNotebooks,
+      activePageIndex: newActiveIndex,
+    });
+
+    await saveNotebookToDB(updatedNotebook);
+  },
+
+  movePageLeft: async (index: number) => {
+    if (index <= 0) return;
+    await get().reorderPages(index, index - 1);
+  },
+
+  movePageRight: async (index: number) => {
+    const { activeNotebookId, notebooks } = get();
+    const currentNb = notebooks.find((n) => n.id === activeNotebookId);
+    if (!currentNb || index >= currentNb.pages.length - 1) return;
+    await get().reorderPages(index, index + 1);
+  },
+
+  insertPageAt: async (index: number, template?: PageTemplate, paperColor?: PaperColor) => {
+    const { activeNotebookId, notebooks } = get();
+    if (!activeNotebookId) return;
+    const currentNb = notebooks.find((n) => n.id === activeNotebookId);
+    if (!currentNb) return;
+
+    const insertIdx = Math.max(0, Math.min(index, currentNb.pages.length));
+    const refPage = currentNb.pages[Math.max(0, insertIdx - 1)] || currentNb.pages[0];
+
+    const newPage: Page = {
+      id: `pg_${Date.now()}_${insertIdx + 1}`,
+      pageNumber: insertIdx + 1,
+      template: template || refPage?.template || 'lined',
+      paperColor: paperColor || refPage?.paperColor || 'white',
+      strokes: [],
+      width: 800,
+      height: 1130,
+      title: `Sayfa ${insertIdx + 1}`,
+    };
+
+    const newPages = [...currentNb.pages];
+    newPages.splice(insertIdx, 0, newPage);
+
+    // Re-index all pages
+    const reindexedPages = newPages.map((p, idx) => ({
+      ...p,
+      pageNumber: idx + 1,
+    }));
+
+    const updatedNotebook: Notebook = {
+      ...currentNb,
+      pages: reindexedPages,
+      activePageIndex: insertIdx,
+      updatedAt: Date.now(),
+    };
+
+    const updatedNotebooks = notebooks.map((n) =>
+      n.id === activeNotebookId ? updatedNotebook : n
+    );
+
+    set({
+      notebooks: updatedNotebooks,
+      activePageIndex: insertIdx,
+      undoStack: [],
+      redoStack: [],
+    });
+
+    await saveNotebookToDB(updatedNotebook);
+  },
+
   setViewMode: (mode: 'continuous' | 'single') => {
     set({ viewMode: mode });
   },
@@ -803,6 +934,10 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
   setActiveTool: (tool: ToolType) => {
     if (tool === 'ruler') {
       get().toggleRuler();
+      return;
+    }
+    if (tool === 'protractor') {
+      get().toggleProtractor();
       return;
     }
     set((state) => ({
@@ -1508,6 +1643,83 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
 
   setRulerAngle: (angle: number) => {
     set({ rulerAngle: angle });
+  },
+
+  // Faz B: Protractor & Sticky Notes
+  toggleProtractor: () => {
+    set((state) => ({ protractorVisible: !state.protractorVisible }));
+  },
+
+  setProtractorAngle: (angle: number) => {
+    set({ protractorAngle: angle });
+  },
+
+  addStickyNoteToCurrentPage: (note: StickyNoteItem) => {
+    const { activeNotebookId, notebooks, activePageIndex } = get();
+    if (!activeNotebookId) return;
+    const currentNb = notebooks.find((n) => n.id === activeNotebookId);
+    if (!currentNb) return;
+    const targetPage = currentNb.pages[activePageIndex];
+    if (!targetPage) return;
+
+    const updatedStickyNotes = [...(targetPage.stickyNotes || []), note];
+    const updatedPages = currentNb.pages.map((p, idx) =>
+      idx === activePageIndex ? { ...p, stickyNotes: updatedStickyNotes } : p
+    );
+
+    const updatedNotebook = { ...currentNb, pages: updatedPages, updatedAt: Date.now() };
+    set({
+      notebooks: notebooks.map((n) =>
+        n.id === activeNotebookId ? updatedNotebook : n
+      ),
+    });
+    saveNotebookToDB(updatedNotebook);
+  },
+
+  updateStickyNoteOnCurrentPage: (noteId: string, partial: Partial<StickyNoteItem>) => {
+    const { activeNotebookId, notebooks, activePageIndex } = get();
+    if (!activeNotebookId) return;
+    const currentNb = notebooks.find((n) => n.id === activeNotebookId);
+    if (!currentNb) return;
+    const targetPage = currentNb.pages[activePageIndex];
+    if (!targetPage) return;
+
+    const updatedStickyNotes = (targetPage.stickyNotes || []).map((sn) =>
+      sn.id === noteId ? { ...sn, ...partial } : sn
+    );
+    const updatedPages = currentNb.pages.map((p, idx) =>
+      idx === activePageIndex ? { ...p, stickyNotes: updatedStickyNotes } : p
+    );
+
+    const updatedNotebook = { ...currentNb, pages: updatedPages, updatedAt: Date.now() };
+    set({
+      notebooks: notebooks.map((n) =>
+        n.id === activeNotebookId ? updatedNotebook : n
+      ),
+    });
+    saveNotebookToDB(updatedNotebook);
+  },
+
+  removeStickyNoteFromCurrentPage: (noteId: string) => {
+    const { activeNotebookId, notebooks, activePageIndex } = get();
+    if (!activeNotebookId) return;
+    const currentNb = notebooks.find((n) => n.id === activeNotebookId);
+    if (!currentNb) return;
+    const targetPage = currentNb.pages[activePageIndex];
+    if (!targetPage) return;
+
+    const updatedStickyNotes = (targetPage.stickyNotes || []).filter((sn) => sn.id !== noteId);
+    const updatedPages = currentNb.pages.map((p, idx) =>
+      idx === activePageIndex ? { ...p, stickyNotes: updatedStickyNotes } : p
+    );
+
+    const updatedNotebook = { ...currentNb, pages: updatedPages, updatedAt: Date.now() };
+    set({
+      notebooks: notebooks.map((n) =>
+        n.id === activeNotebookId ? updatedNotebook : n
+      ),
+    });
+    saveNotebookToDB(updatedNotebook);
   },
 
   addLaserPoint: (x: number, y: number) => {

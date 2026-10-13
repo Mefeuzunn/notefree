@@ -23,6 +23,7 @@ import {
 } from '../../engine/shapeDetector';
 import { collaborationService } from '../../services/collaborationService';
 import { Minimap } from './Minimap';
+import { StickyNoteOverlay } from './StickyNoteOverlay';
 import { Compass, Move, Users, Maximize2, Sparkles } from 'lucide-react';
 
 export const InfiniteCanvas: React.FC = () => {
@@ -46,6 +47,9 @@ export const InfiniteCanvas: React.FC = () => {
     collaboration,
     remoteLiveStrokes,
     updateMyCursor,
+    addStickyNoteToCurrentPage,
+    setActiveTool,
+    previousTool,
   } = useNotebookStore();
 
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -316,6 +320,21 @@ export const InfiniteCanvas: React.FC = () => {
       return;
     }
 
+    if (activeTool === 'sticky-note') {
+      addStickyNoteToCurrentPage({
+        id: `sn_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+        x: Math.round(x - 100),
+        y: Math.round(y - 40),
+        width: 210,
+        height: 180,
+        color: 'yellow',
+        text: '',
+        createdAt: Date.now(),
+      });
+      setActiveTool(previousTool || 'pen');
+      return;
+    }
+
     setIsDrawing(true);
     const pt: StrokePoint = {
       x,
@@ -550,6 +569,22 @@ export const InfiniteCanvas: React.FC = () => {
         onPointerUp={handlePointerUp}
         className="absolute inset-0 touch-none"
       />
+
+      {/* Layer 2.5: Sticky Notes Overlay in Infinite Canvas */}
+      <div
+        className="absolute inset-0 pointer-events-none z-20"
+        style={{
+          transform: `translate(${infinitePan.x * zoom}px, ${infinitePan.y * zoom}px) scale(${zoom})`,
+          transformOrigin: '0 0',
+        }}
+      >
+        <div className="relative w-full h-full pointer-events-auto">
+          {currentPage?.stickyNotes &&
+            currentPage.stickyNotes.map((note) => (
+              <StickyNoteOverlay key={note.id} note={note} scale={zoom} />
+            ))}
+        </div>
+      </div>
 
       {/* Layer 3: Remote Active Live Strokes from Peers */}
       {collaboration.isConnected && (

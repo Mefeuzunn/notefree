@@ -20,7 +20,9 @@ export type ToolType =
   | 'pan'
   | 'eyedropper'
   | 'fill'
-  | 'audio-scrub';
+  | 'audio-scrub'
+  | 'sticky-note'
+  | 'protractor';
 
 export type EraserMode = 'stroke' | 'pixel';
 
@@ -180,11 +182,27 @@ export interface Page {
   stickers?: PageSticker[];
   tapes?: TapeItem[];
   fills?: FillItem[];
+  stickyNotes?: StickyNoteItem[];
   backgroundImageUrl?: string; // Rendered PDF or Word page
   width: number;
   height: number;
   title?: string;
   isBookmarked?: boolean;
+}
+
+export type StickyNoteColor = 'yellow' | 'pink' | 'mint' | 'blue' | 'purple';
+
+export interface StickyNoteItem {
+  id: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  color: StickyNoteColor;
+  text: string;
+  isFolded?: boolean;
+  rotation?: number;
+  createdAt: number;
 }
 
 export interface Flashcard {

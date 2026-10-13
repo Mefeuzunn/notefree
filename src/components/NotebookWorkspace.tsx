@@ -3,6 +3,7 @@ import { useNotebookStore } from '../store/notebookStore';
 import { CanvasPage } from './canvas/CanvasPage';
 import { YouTubePanel } from './youtube/YouTubePanel';
 import { Ruler } from './canvas/Ruler';
+import { Protractor } from './canvas/Protractor';
 import { InfiniteCanvas } from './canvas/InfiniteCanvas';
 import {
   ZoomIn,
@@ -398,6 +399,9 @@ export const NotebookWorkspace: React.FC = () => {
 
       {/* 🌟 Interactive GoodNotes Floating Ruler */}
       <Ruler scale={zoom} />
+
+      {/* 🌟 Interactive Protractor (360° Açıölçer) */}
+      <Protractor scale={zoom} />
 
       {/* 3. Floating Picture-in-Picture YouTube Panel */}
       {youtube.isOpen && youtube.mode === 'floating' && <YouTubePanel />}
