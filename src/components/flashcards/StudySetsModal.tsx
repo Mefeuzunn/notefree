@@ -15,6 +15,7 @@ import {
   X,
   Layers,
   BookOpen,
+  Bandage,
 } from 'lucide-react';
 
 export const StudySetsModal: React.FC = () => {
@@ -26,6 +27,7 @@ export const StudySetsModal: React.FC = () => {
     addFlashcard,
     deleteFlashcard,
     rateFlashcard,
+    generateFlashcardsFromTapes,
   } = useNotebookStore();
 
   const activeNotebook = notebooks.find((n) => n.id === activeNotebookId);
@@ -41,6 +43,26 @@ export const StudySetsModal: React.FC = () => {
   const [frontText, setFrontText] = useState('');
   const [backText, setBackText] = useState('');
   const [showAddForm, setShowAddForm] = useState(false);
+  const [feedbackMsg, setFeedbackMsg] = useState<{ text: string; success: boolean } | null>(null);
+
+  const handleGenerateFromTapes = () => {
+    if (!activeNotebookId) return;
+    const count = generateFlashcardsFromTapes(activeNotebookId);
+    if (count > 0) {
+      setFeedbackMsg({
+        text: `${count} adet ezber bandı başarıyla çalışma kartına dönüştürüldü! 🎉`,
+        success: true,
+      });
+      setActiveTab('study');
+      restartSession();
+    } else {
+      setFeedbackMsg({
+        text: 'Bu defterdeki sayfalarda henüz gizleme bandı bulunamadı. Bant (Tape) aracını kullanarak notlarınızın üzerini kapatın.',
+        success: false,
+      });
+    }
+    setTimeout(() => setFeedbackMsg(null), 4500);
+  };
 
   if (!studySetsModalOpen) return null;
 
@@ -135,30 +157,59 @@ export const StudySetsModal: React.FC = () => {
           </div>
         </div>
 
+        {/* Feedback Alert Toast */}
+        {feedbackMsg && (
+          <div
+            className={`px-6 py-2.5 text-xs font-medium flex items-center justify-between border-b animate-in fade-in duration-200 ${
+              feedbackMsg.success
+                ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-300'
+                : 'bg-amber-500/10 border-amber-500/20 text-amber-300'
+            }`}
+          >
+            <span>{feedbackMsg.text}</span>
+            <button
+              onClick={() => setFeedbackMsg(null)}
+              className="p-1 hover:opacity-75 rounded"
+            >
+              <X size={13} />
+            </button>
+          </div>
+        )}
+
         {/* Tab 1: Interactive Study Mode */}
         {activeTab === 'study' && (
           <div className="flex-1 p-6 flex flex-col items-center justify-center overflow-y-auto">
             {flashcards.length === 0 ? (
-              <div className="text-center py-12 px-4">
+              <div className="text-center py-12 px-4 max-w-md mx-auto">
                 <div className="w-14 h-14 rounded-2xl bg-slate-800 flex items-center justify-center text-slate-400 mx-auto mb-3">
                   <Brain size={28} />
                 </div>
                 <h4 className="text-sm font-semibold text-slate-200 mb-1">
                   Bu defterde henüz çalışma kartı yok
                 </h4>
-                <p className="text-xs text-slate-400 max-w-sm mb-4">
-                  Ders notlarınızdan aktif hatırlama (active recall) yapmak için ilk çalışma kartınızı ekleyin.
+                <p className="text-xs text-slate-400 max-w-sm mb-5">
+                  Ders notlarınızdan aktif hatırlama (active recall) yapmak için kart ekleyin veya gizleme bantlarından otomatik üretin.
                 </p>
-                <button
-                  onClick={() => {
-                    setActiveTab('manage');
-                    setShowAddForm(true);
-                  }}
-                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-xl transition-colors flex items-center gap-1.5 mx-auto"
-                >
-                  <Plus size={15} />
-                  <span>İlk Kartı Ekle</span>
-                </button>
+                <div className="flex flex-wrap items-center justify-center gap-2.5">
+                  <button
+                    onClick={() => {
+                      setActiveTab('manage');
+                      setShowAddForm(true);
+                    }}
+                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-xl transition-colors flex items-center gap-1.5 shadow-sm"
+                  >
+                    <Plus size={15} />
+                    <span>İlk Kartı Ekle</span>
+                  </button>
+                  <button
+                    onClick={handleGenerateFromTapes}
+                    className="px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-semibold rounded-xl transition-all flex items-center gap-1.5 shadow-md shadow-emerald-600/20"
+                    title="Sayfalardaki gizleme bantlarını tek tıkla çalışma kartlarına çevirir"
+                  >
+                    <Bandage size={15} />
+                    <span>Bantlardan Kart Üret</span>
+                  </button>
+                </div>
               </div>
             ) : sessionCompleted ? (
               /* Session Congratulations Screen */
@@ -316,13 +367,23 @@ export const StudySetsModal: React.FC = () => {
               <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider">
                 Kayıtlı Çalışma Kartları ({flashcards.length})
               </h4>
-              <button
-                onClick={() => setShowAddForm(!showAddForm)}
-                className="px-3 py-1.5 bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/30 text-xs font-semibold rounded-xl transition-colors flex items-center gap-1.5"
-              >
-                <Plus size={14} />
-                <span>{showAddForm ? 'İptal' : 'Yeni Kart Ekle'}</span>
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleGenerateFromTapes}
+                  className="px-3 py-1.5 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 text-xs font-semibold rounded-xl transition-colors flex items-center gap-1.5"
+                  title="Tüm gizleme bantlarını tek tıkla çalışma kartına çevirir"
+                >
+                  <Bandage size={14} />
+                  <span>Bantlardan Üret</span>
+                </button>
+                <button
+                  onClick={() => setShowAddForm(!showAddForm)}
+                  className="px-3 py-1.5 bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/30 text-xs font-semibold rounded-xl transition-colors flex items-center gap-1.5"
+                >
+                  <Plus size={14} />
+                  <span>{showAddForm ? 'İptal' : 'Yeni Kart Ekle'}</span>
+                </button>
+              </div>
             </div>
 
             {/* Create Card Form */}

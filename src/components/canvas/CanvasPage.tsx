@@ -39,6 +39,7 @@ import {
   PaintBucket,
   Volume2,
   Check,
+  Calculator,
 } from 'lucide-react';
 
 interface CanvasPageProps {
@@ -46,6 +47,8 @@ interface CanvasPageProps {
   pageIndex: number;
   scale?: number;
   isCurrent?: boolean;
+  readOnly?: boolean;
+  onActivate?: () => void;
 }
 
 export const CanvasPage: React.FC<CanvasPageProps> = ({
@@ -53,6 +56,8 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
   pageIndex,
   scale = 1.0,
   isCurrent = true,
+  readOnly = false,
+  onActivate,
 }) => {
   const bgCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const strokesCanvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -97,6 +102,7 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
     addFillToCurrentPage,
     removeFillFromCurrentPage,
     seekAudioToStroke,
+    openMathModal,
   } = useNotebookStore();
 
   const [isDrawing, setIsDrawing] = useState(false);
@@ -335,6 +341,23 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
 
     const { x, y } = getCanvasCoords(e);
     const pressure = calculatePressure(x, y, e.pressure);
+
+    // ReadOnly Mode (e.g. Secondary Split Notebook)
+    if (readOnly) {
+      if (page.tapes && page.tapes.length > 0) {
+        const hitTape = page.tapes.find((tape) => {
+          return tape.points.some(
+            (pt) => Math.hypot(pt.x - x, pt.y - y) <= Math.max(16, tape.width / 1.8)
+          );
+        });
+        if (hitTape) {
+          toggleTapeReveal(pageIndex, hitTape.id);
+          return;
+        }
+      }
+      onActivate?.();
+      return;
+    }
 
     // Eyedropper mode: click to pick color
     if (activeTool === 'eyedropper') {
@@ -921,6 +944,18 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
               title="Çıkartma Olarak Kaydet (Add to Elements)"
             >
               <BookmarkPlus size={14} />
+            </button>
+
+            {/* Faz 2: Math AI Denklem Çözücü */}
+            <button
+              onClick={() => {
+                openMathModal('2x + 6 = 18');
+              }}
+              className="px-2 py-1 hover:bg-slate-800 text-cyan-300 rounded-lg transition-colors flex items-center gap-1 text-[11px] font-semibold border border-cyan-500/30 bg-cyan-950/40"
+              title="Formülü Çöz (GoodNotes Math AI)"
+            >
+              <Calculator size={13} />
+              <span>Çöz</span>
             </button>
 
             <div className="w-px h-4 bg-slate-750" />

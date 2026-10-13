@@ -45,6 +45,9 @@ import {
   PaintBucket,
   SlidersHorizontal,
   Volume2,
+  Calculator,
+  Split,
+  Search,
 } from 'lucide-react';
 import { PenType, ShapeType, ToolType } from '../../types/notebook';
 import { AudioPlayerBar } from '../audio/AudioPlayerBar';
@@ -109,6 +112,13 @@ export const Toolbar: React.FC = () => {
     invertCurrentPageInks,
     setStreamline,
     setFillTolerance,
+    searchModalOpen,
+    setSearchModalOpen,
+    mathModalOpen,
+    openMathModal,
+    splitNotebook,
+    openDualNotebook,
+    closeDualNotebook,
   } = useNotebookStore();
 
   const [activeColorSlot, setActiveColorSlot] = useState<number | null>(null);
@@ -164,6 +174,16 @@ export const Toolbar: React.FC = () => {
         >
           <Library size={18} />
           <span className="text-xs font-semibold hidden md:inline">Kütüphane</span>
+        </button>
+
+        {/* Global Search Button */}
+        <button
+          onClick={() => setSearchModalOpen(true)}
+          className="p-2 rounded-xl text-slate-400 hover:text-indigo-400 hover:bg-slate-800 transition-colors flex items-center gap-1.5"
+          title="Küresel Arama & İndeks (Cmd+K / Ctrl+K)"
+        >
+          <Search size={18} />
+          <span className="text-xs font-semibold hidden xl:inline">Ara</span>
         </button>
 
         <div className="hidden lg:flex items-center gap-2">
@@ -818,6 +838,47 @@ export const Toolbar: React.FC = () => {
           {activeNotebook?.flashcards && activeNotebook.flashcards.length > 0 && (
             <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
           )}
+        </button>
+
+        {/* 🧠 GoodNotes 6 Math AI & Equation Solver */}
+        <button
+          onClick={() => openMathModal()}
+          className={`p-2 rounded-xl transition-all ${
+            mathModalOpen
+              ? 'bg-purple-600 text-white shadow-md shadow-purple-600/30 ring-1 ring-purple-400'
+              : 'text-slate-400 hover:text-purple-400 hover:bg-slate-800'
+          }`}
+          title="Yapay Zeka Matematik & Denklem Çözücü (GoodNotes 6 Math AI)"
+        >
+          <Calculator size={17} />
+        </button>
+
+        {/* 📖 Dual Notebook Split-Screen Mode */}
+        <button
+          onClick={() => {
+            if (splitNotebook.isOpen) {
+              closeDualNotebook();
+            } else {
+              const other = notebooks.find((n) => n.id !== activeNotebookId);
+              if (other) {
+                openDualNotebook(other.id);
+              } else {
+                openDualNotebook(activeNotebookId || '');
+              }
+            }
+          }}
+          className={`p-2 rounded-xl transition-all ${
+            splitNotebook.isOpen
+              ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30 ring-1 ring-indigo-400'
+              : 'text-slate-400 hover:text-indigo-400 hover:bg-slate-800'
+          }`}
+          title={
+            splitNotebook.isOpen
+              ? 'Çift Defter Görünümünü Kapat'
+              : 'Çift Defter Yan Yana Aç (Dual Notebook Split-Screen)'
+          }
+        >
+          <Split size={17} />
         </button>
 
         {/* Presentation Mode Toggle */}

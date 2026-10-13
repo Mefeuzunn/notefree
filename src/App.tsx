@@ -11,6 +11,8 @@ import { LibraryView } from './components/library/LibraryView';
 import { PageManagerModal } from './components/modals/PageManagerModal';
 import { ZoomWindow } from './components/canvas/ZoomWindow';
 import { StudySetsModal } from './components/flashcards/StudySetsModal';
+import { MathSolverModal } from './components/modals/MathSolverModal';
+import { SearchModal } from './components/modals/SearchModal';
 import {
   BookOpen,
   Loader2,
@@ -156,6 +158,8 @@ export const App: React.FC = () => {
       <NewNotebookModal />
       <StickersDrawer />
       <StudySetsModal />
+      <MathSolverModal />
+      <SearchModal />
       <LibraryView isOpen={libraryViewOpen} onClose={() => setLibraryViewOpen(false)} />
       <PageManagerModal
         isOpen={pageManagerModalOpen}

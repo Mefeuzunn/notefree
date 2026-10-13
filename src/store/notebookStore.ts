@@ -43,6 +43,13 @@ interface YouTubeState {
   channelName?: string;
 }
 
+interface SplitNotebookState {
+  isOpen: boolean;
+  secondaryNotebookId: string | null;
+  secondaryPageIndex: number;
+  splitRatio: number;
+}
+
 interface LaserPoint {
   x: number;
   y: number;
@@ -105,6 +112,12 @@ interface NotebookStoreState {
   newNotebookModalOpen: boolean;
   pageManagerModalOpen: boolean;
   studySetsModalOpen: boolean;
+  searchModalOpen: boolean;
+
+  // Faz 2: AI & Dual Multitasking
+  mathModalOpen: boolean;
+  mathInputEquation: string;
+  splitNotebook: SplitNotebookState;
 
   // Core Actions
   initialize: () => Promise<void>;
@@ -166,6 +179,7 @@ interface NotebookStoreState {
 
   // Study Sets / Flashcards Actions
   setStudySetsModalOpen: (open: boolean) => void;
+  setSearchModalOpen: (open: boolean) => void;
   addFlashcard: (frontText: string, backText: string) => void;
   deleteFlashcard: (cardId: string) => void;
   rateFlashcard: (cardId: string, rating: 'again' | 'hard' | 'good' | 'easy') => void;
@@ -187,6 +201,20 @@ interface NotebookStoreState {
   addFillToCurrentPage: (fill: FillItem) => void;
   removeFillFromCurrentPage: (fillId: string) => void;
   seekAudioToStroke: (stroke: Stroke) => void;
+
+  // Faz 2: Math AI Solver Actions
+  openMathModal: (initialEquation?: string) => void;
+  closeMathModal: () => void;
+  addMathSolutionToCanvas: (equation: string, result: string) => void;
+
+  // Faz 2: Dual Notebook Split Screen Actions
+  openDualNotebook: (secondaryNotebookId: string) => void;
+  closeDualNotebook: () => void;
+  setDualNotebookRatio: (ratio: number) => void;
+  setSecondaryPageIndex: (index: number) => void;
+
+  // Faz 2: Tape to Flashcard Auto Generator
+  generateFlashcardsFromTapes: (notebookId: string) => number;
 
   // Text Annotations
   addTextAnnotation: (
@@ -328,6 +356,17 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
   newNotebookModalOpen: false,
   pageManagerModalOpen: false,
   studySetsModalOpen: false,
+  searchModalOpen: false,
+
+  // Faz 2 Initial State
+  mathModalOpen: false,
+  mathInputEquation: '',
+  splitNotebook: {
+    isOpen: false,
+    secondaryNotebookId: null,
+    secondaryPageIndex: 0,
+    splitRatio: 0.5,
+  },
 
   initialize: async () => {
     try {
@@ -1454,6 +1493,10 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
     set({ pageManagerModalOpen: open });
   },
 
+  setSearchModalOpen: (open: boolean) => {
+    set({ searchModalOpen: open });
+  },
+
   importPagesAsNotebook: async (pages: Page[], title: string) => {
     const newId = `nb_doc_${Date.now()}`;
     const newNotebook: Notebook = {
@@ -1824,5 +1867,117 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
         }
       }
     }
+  },
+
+  // Faz 2: Math AI Solver Actions
+  openMathModal: (initialEquation?: string) => {
+    set({
+      mathModalOpen: true,
+      mathInputEquation: initialEquation || '',
+    });
+  },
+
+  closeMathModal: () => {
+    set({ mathModalOpen: false });
+  },
+
+  addMathSolutionToCanvas: (equation: string, result: string) => {
+    const { activePageIndex, addTextAnnotation } = get();
+    addTextAnnotation(activePageIndex, 120, 220, `∑ Math AI:\n${equation}\n➔ ${result}`);
+  },
+
+  // Faz 2: Dual Notebook Split Screen Actions
+  openDualNotebook: (secondaryNotebookId: string) => {
+    const { notebooks } = get();
+    const secNb = notebooks.find((n) => n.id === secondaryNotebookId);
+    set({
+      splitNotebook: {
+        isOpen: true,
+        secondaryNotebookId,
+        secondaryPageIndex: secNb ? secNb.activePageIndex || 0 : 0,
+        splitRatio: 0.5,
+      },
+    });
+  },
+
+  closeDualNotebook: () => {
+    set((state) => ({
+      splitNotebook: {
+        ...state.splitNotebook,
+        isOpen: false,
+        secondaryNotebookId: null,
+      },
+    }));
+  },
+
+  setDualNotebookRatio: (ratio: number) => {
+    const clamped = Math.max(0.25, Math.min(0.75, ratio));
+    set((state) => ({
+      splitNotebook: {
+        ...state.splitNotebook,
+        splitRatio: clamped,
+      },
+    }));
+  },
+
+  setSecondaryPageIndex: (index: number) => {
+    const { splitNotebook, notebooks } = get();
+    if (!splitNotebook.secondaryNotebookId) return;
+    const secNb = notebooks.find((n) => n.id === splitNotebook.secondaryNotebookId);
+    if (!secNb) return;
+    const clamped = Math.max(0, Math.min(secNb.pages.length - 1, index));
+    set((state) => ({
+      splitNotebook: {
+        ...state.splitNotebook,
+        secondaryPageIndex: clamped,
+      },
+    }));
+  },
+
+  // Faz 2: Tape to Flashcard Auto Generator
+  generateFlashcardsFromTapes: (notebookId: string) => {
+    const { notebooks } = get();
+    const nb = notebooks.find((n) => n.id === notebookId);
+    if (!nb) return 0;
+
+    let generatedCount = 0;
+    const newCards: Flashcard[] = [];
+
+    nb.pages.forEach((page) => {
+      if (page.tapes && page.tapes.length > 0) {
+        page.tapes.forEach((_tape, index) => {
+          generatedCount++;
+          const frontQuestion = `Sayfa ${page.pageNumber} (${page.title || 'Ders Notu'}) - Gizlenen Kısım #${index + 1}`;
+          const backAnswer = `Bu bant Sayfa ${page.pageNumber} üzerinde bulunmaktadır. Notu inceleyin ve cevabı hatırlamaya çalışın.`;
+
+          newCards.push({
+            id: `fc_tape_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+            notebookId: nb.id,
+            pageId: page.id,
+            frontText: frontQuestion,
+            backText: backAnswer,
+            difficulty: 'again',
+            reviewCount: 0,
+            createdAt: Date.now(),
+          });
+        });
+      }
+    });
+
+    if (newCards.length > 0) {
+      const existingCards = nb.flashcards || [];
+      const updatedNotebook = {
+        ...nb,
+        flashcards: [...existingCards, ...newCards],
+        updatedAt: Date.now(),
+      };
+      set({
+        notebooks: notebooks.map((n) => (n.id === notebookId ? updatedNotebook : n)),
+        studySetsModalOpen: true,
+      });
+      saveNotebookToDB(updatedNotebook);
+    }
+
+    return generatedCount;
   },
 }));
