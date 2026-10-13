@@ -8,10 +8,18 @@ import { DocImportModal } from './components/modals/DocImportModal';
 import { NewNotebookModal } from './components/modals/NewNotebookModal';
 import { StickersDrawer } from './components/modals/StickersDrawer';
 import { LibraryView } from './components/library/LibraryView';
+import { PageManagerModal } from './components/modals/PageManagerModal';
 import { BookOpen, Loader2 } from 'lucide-react';
 
 export const App: React.FC = () => {
-  const { initialize, isLoading, libraryViewOpen, setLibraryViewOpen } = useNotebookStore();
+  const {
+    initialize,
+    isLoading,
+    libraryViewOpen,
+    setLibraryViewOpen,
+    pageManagerModalOpen,
+    setPageManagerModalOpen,
+  } = useNotebookStore();
 
   useEffect(() => {
     initialize();
@@ -49,6 +57,10 @@ export const App: React.FC = () => {
       <NewNotebookModal />
       <StickersDrawer />
       <LibraryView isOpen={libraryViewOpen} onClose={() => setLibraryViewOpen(false)} />
+      <PageManagerModal
+        isOpen={pageManagerModalOpen}
+        onClose={() => setPageManagerModalOpen(false)}
+      />
     </div>
   );
 };

@@ -28,6 +28,7 @@ import {
   Type,
   Compass,
   Library,
+  Grid,
 } from 'lucide-react';
 import { PenType, ShapeType, ToolType } from '../../types/notebook';
 import { AudioPlayerBar } from '../audio/AudioPlayerBar';
@@ -78,6 +79,7 @@ export const Toolbar: React.FC = () => {
     sidebarOpen,
     setSidebarOpen,
     setLibraryViewOpen,
+    setPageManagerModalOpen,
     rulerVisible,
     toggleRuler,
     viewMode,
@@ -506,6 +508,15 @@ export const Toolbar: React.FC = () => {
           title="Öğeler & Çıkartmalar (Stickers Drawer)"
         >
           <Sparkles size={17} />
+        </button>
+
+        {/* Page Manager Grid View */}
+        <button
+          onClick={() => setPageManagerModalOpen(true)}
+          className="p-2 text-slate-400 hover:text-indigo-400 hover:bg-slate-800 rounded-xl transition-colors"
+          title="Sayfa Düzenleyici & Küçük Resim Izgarası (GoodNotes Grid)"
+        >
+          <Grid size={17} />
         </button>
 
         {/* Template Selector */}

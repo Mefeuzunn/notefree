@@ -90,6 +90,7 @@ interface NotebookStoreState {
   templateModalOpen: boolean;
   docImportModalOpen: boolean;
   newNotebookModalOpen: boolean;
+  pageManagerModalOpen: boolean;
 
   // Core Actions
   initialize: () => Promise<void>;
@@ -189,6 +190,7 @@ interface NotebookStoreState {
   setTemplateModalOpen: (open: boolean) => void;
   setDocImportModalOpen: (open: boolean) => void;
   setNewNotebookModalOpen: (open: boolean) => void;
+  setPageManagerModalOpen: (open: boolean) => void;
 
   // Document Import
   importPagesAsNotebook: (pages: Page[], title: string) => Promise<void>;
@@ -263,6 +265,7 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
   templateModalOpen: false,
   docImportModalOpen: false,
   newNotebookModalOpen: false,
+  pageManagerModalOpen: false,
 
   initialize: async () => {
     try {
@@ -1341,6 +1344,10 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
 
   setNewNotebookModalOpen: (open: boolean) => {
     set({ newNotebookModalOpen: open });
+  },
+
+  setPageManagerModalOpen: (open: boolean) => {
+    set({ pageManagerModalOpen: open });
   },
 
   importPagesAsNotebook: async (pages: Page[], title: string) => {
