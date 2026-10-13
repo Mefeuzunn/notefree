@@ -87,10 +87,37 @@ export interface TextAnnotation {
   bg?: string;
 }
 
+export interface PdfOutlineItem {
+  id: string;
+  title: string;
+  pageIndex: number;
+  level: number;
+}
+
+export interface LayerVisibilitySettings {
+  background: boolean;
+  strokes: boolean;
+  highlighters: boolean;
+  texts: boolean;
+  stickers: boolean;
+  tapes: boolean;
+  fills: boolean;
+}
+
+export interface LayerLockSettings {
+  background: boolean;
+  strokes: boolean;
+  highlighters: boolean;
+  texts: boolean;
+  stickers: boolean;
+  tapes: boolean;
+  fills: boolean;
+}
+
 export interface StickerItem {
   id: string;
   name: string;
-  category: 'sticky' | 'tape' | 'icon' | 'custom';
+  category: string; // 'sticky' | 'tape' | 'icon' | 'custom' | custom collections
   content: string; // SVG string, emoji, or dataUrl
   width: number;
   height: number;
@@ -212,6 +239,7 @@ export interface Notebook {
   youtubeBookmarks?: YouTubeBookmark[];
   audioRecordings?: AudioNoteRecording[];
   flashcards?: Flashcard[];
+  pdfOutline?: PdfOutlineItem[];
 }
 
 export interface ToolSettings {
@@ -227,6 +255,8 @@ export interface ToolSettings {
   selectedShape: ShapeType;
   autoDetectShape: boolean;
   shapeFillColor?: string;
+  angleSnap?: boolean; // Snap to 0°, 15°, 30°, 45°, 90°
+  gridSnap?: boolean; // Magnetic snap to paper grid intersections
   // GoodNotes style quick favorite slots
   favoriteColors: string[];
   favoriteSizes: number[];

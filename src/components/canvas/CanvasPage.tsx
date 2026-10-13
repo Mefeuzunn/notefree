@@ -21,6 +21,7 @@ import {
   generateRectanglePoints,
   generateTrianglePoints,
   interpolateLine,
+  applyPrecisionSnapping,
 } from '../../engine/shapeDetector';
 import {
   computeGroupBounds,
@@ -103,6 +104,8 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
     removeFillFromCurrentPage,
     seekAudioToStroke,
     openMathModal,
+    layers,
+    layerLocks,
   } = useNotebookStore();
 
   const [isDrawing, setIsDrawing] = useState(false);
@@ -129,6 +132,9 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    if (!layers.background) return;
+
     ctx.save();
     ctx.scale(dpr, dpr);
 
@@ -143,7 +149,7 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
     }
 
     ctx.restore();
-  }, [page.template, page.paperColor, page.backgroundImageUrl, width, height, dpr]);
+  }, [page.template, page.paperColor, page.backgroundImageUrl, width, height, dpr, layers.background]);
 
   // 2. Draw Committed Strokes Layer & Fills
   const redrawCommittedStrokes = useCallback(() => {
@@ -157,14 +163,17 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
     ctx.scale(dpr, dpr);
 
     // 1. Draw Flood Fills Layer (beneath ink strokes)
-    if (page.fills) {
+    if (page.fills && layers.fills) {
       for (const fill of page.fills) {
         drawFillOnCanvas(ctx, fill);
       }
     }
 
-    // 2. Draw Committed Ink Strokes
+    // 2. Draw Committed Ink Strokes & Highlighters
     for (const stroke of page.strokes) {
+      if (stroke.tool === 'highlighter' && !layers.highlighters) continue;
+      if (stroke.tool !== 'highlighter' && !layers.strokes) continue;
+
       if (audioPlaying && stroke.audioTimestamp !== undefined) {
         if (stroke.audioTimestamp > audioPlaybackTimeMs) {
           ctx.save();
@@ -186,14 +195,26 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
     }
 
     // 3. Draw GoodNotes 6 Tape Strips
-    if (page.tapes) {
+    if (page.tapes && layers.tapes) {
       for (const tape of page.tapes) {
         drawTapeOnCanvas(ctx, tape);
       }
     }
 
     ctx.restore();
-  }, [page.strokes, page.tapes, page.fills, dpr, audioPlaying, audioPlaybackTimeMs, toolSettings.streamline]);
+  }, [
+    page.strokes,
+    page.tapes,
+    page.fills,
+    dpr,
+    audioPlaying,
+    audioPlaybackTimeMs,
+    toolSettings.streamline,
+    layers.fills,
+    layers.highlighters,
+    layers.strokes,
+    layers.tapes,
+  ]);
 
   useEffect(() => {
     redrawCommittedStrokes();
@@ -373,6 +394,11 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
 
     // Flood Fill mode: click to fill enclosed region
     if (activeTool === 'fill') {
+      if (layerLocks.fills) {
+        setToastMessage('🔒 Dolgu katmanı kilitli');
+        setTimeout(() => setToastMessage(null), 1500);
+        return;
+      }
       handleFloodFillClick(x, y);
       return;
     }
@@ -385,7 +411,34 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
 
     // Text tool mode: click to add rich text box
     if (activeTool === 'text') {
+      if (layerLocks.texts) {
+        setToastMessage('🔒 Metin katmanı kilitli');
+        setTimeout(() => setToastMessage(null), 1500);
+        return;
+      }
       addTextAnnotation(pageIndex, x, y, '');
+      return;
+    }
+
+    // Tape tool mode lock check
+    if (activeTool === 'tape' && layerLocks.tapes) {
+      setToastMessage('🔒 Ezber bandı katmanı kilitli');
+      setTimeout(() => setToastMessage(null), 1500);
+      return;
+    }
+
+    // Highlighter lock check
+    if (activeTool === 'highlighter' && layerLocks.highlighters) {
+      setToastMessage('🔒 Fosforlu kalem katmanı kilitli');
+      setTimeout(() => setToastMessage(null), 1500);
+      return;
+    }
+
+    // Strokes lock check (pen, fountain, brush, ballpoint, shape, etc.)
+    const isInkTool = !['highlighter', 'laser', 'pan', 'eyedropper', 'audio-scrub', 'eraser', 'lasso', 'tape', 'text', 'fill'].includes(activeTool);
+    if (isInkTool && layerLocks.strokes) {
+      setToastMessage('🔒 Çizim katmanı kilitli');
+      setTimeout(() => setToastMessage(null), 1500);
       return;
     }
 
@@ -582,8 +635,14 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
   // Shape Preview Helper
   const renderShapePreview = (ctx: CanvasRenderingContext2D, points: StrokePoint[]) => {
     if (points.length < 2) return;
-    const start = points[0];
-    const end = points[points.length - 1];
+    let start = points[0];
+    let end = points[points.length - 1];
+
+    if (toolSettings.angleSnap || toolSettings.gridSnap) {
+      const snapped = applyPrecisionSnapping(start, end, toolSettings.angleSnap, toolSettings.gridSnap);
+      start = snapped.start;
+      end = snapped.end;
+    }
 
     let shapePoints: StrokePoint[] = [];
     switch (toolSettings.selectedShape) {
@@ -724,8 +783,15 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
 
     // Explicit shape mode vs auto-detection
     if (activeTool === 'shape') {
-      const start = finalPoints[0];
-      const end = finalPoints[finalPoints.length - 1];
+      let start = finalPoints[0];
+      let end = finalPoints[finalPoints.length - 1];
+
+      if (toolSettings.angleSnap || toolSettings.gridSnap) {
+        const snapped = applyPrecisionSnapping(start, end, toolSettings.angleSnap, toolSettings.gridSnap);
+        start = snapped.start;
+        end = snapped.end;
+      }
+
       switch (toolSettings.selectedShape) {
         case 'line':
           finalPoints = interpolateLine(start, end);
@@ -757,7 +823,10 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
           break;
       }
     } else if (toolSettings.autoDetectShape) {
-      const detected = detectGeometricShape(finalPoints);
+      const detected = detectGeometricShape(finalPoints, {
+        angleSnap: toolSettings.angleSnap,
+        gridSnap: toolSettings.gridSnap,
+      });
       if (detected) {
         finalPoints = detected.replacementPoints;
       }
@@ -781,12 +850,17 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
     currentPointsRef.current = [];
   };
 
-  // Eraser handler with highlighter-only filtering
+  // Eraser handler respecting Layer Locks and element boundaries
   const handleEraser = (x: number, y: number) => {
     const threshold = toolSettings.eraserSize;
     const hitIds: string[] = [];
 
     for (const stroke of page.strokes) {
+      // Respect layer locks
+      const isHighlighter = stroke.tool === 'highlighter';
+      if (isHighlighter && layerLocks.highlighters) continue;
+      if (!isHighlighter && layerLocks.strokes) continue;
+
       if (isPointNearStroke({ x, y }, stroke, threshold)) {
         hitIds.push(stroke.id);
       }
@@ -796,8 +870,8 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
       eraseStrokesOnCurrentPage(hitIds);
     }
 
-    // Also erase any tape if touched
-    if (page.tapes && page.tapes.length > 0) {
+    // Also erase any tape if touched (unless tape layer is locked)
+    if (page.tapes && page.tapes.length > 0 && !layerLocks.tapes) {
       for (const tape of page.tapes) {
         const isHit = tape.points.some(
           (pt) => Math.hypot(pt.x - x, pt.y - y) <= Math.max(18, tape.width / 1.5)
@@ -808,8 +882,8 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
       }
     }
 
-    // Faz 1: Also erase any flood fill if touched
-    if (page.fills && page.fills.length > 0) {
+    // Also erase any flood fill if touched (unless fill layer is locked)
+    if (page.fills && page.fills.length > 0 && !layerLocks.fills) {
       for (const fill of page.fills) {
         if (isPointInsideFill({ x, y }, fill)) {
           removeFillFromCurrentPage(fill.id);
@@ -844,7 +918,8 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
       />
 
       {/* Layer 0.5: Stickers */}
-      {page.stickers &&
+      {layers.stickers &&
+        page.stickers &&
         page.stickers.map((stk) => (
           <div
             key={stk.id}
@@ -860,25 +935,28 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
               className="w-full h-full"
               dangerouslySetInnerHTML={{ __html: stk.content }}
             />
-            <button
-              onClick={() => removeStickerFromCurrentPage(stk.id)}
-              className="absolute -top-2 -right-2 bg-rose-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 shadow transition-opacity"
-              title="Sticker'ı Kaldır"
-            >
-              <X size={12} />
-            </button>
+            {!layerLocks.stickers && (
+              <button
+                onClick={() => removeStickerFromCurrentPage(stk.id)}
+                className="absolute -top-2 -right-2 bg-rose-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 shadow transition-opacity"
+                title="Sticker'ı Kaldır"
+              >
+                <X size={12} />
+              </button>
+            )}
           </div>
         ))}
 
       {/* Layer 0.6: Text Annotations */}
-      {page.texts &&
+      {layers.texts &&
+        page.texts &&
         page.texts.map((txt) => (
           <TextBoxOverlay
             key={txt.id}
             annotation={txt}
             scale={scale}
-            onUpdate={(partial) => updateTextAnnotation(pageIndex, txt.id, partial)}
-            onDelete={() => deleteTextAnnotation(pageIndex, txt.id)}
+            onUpdate={(partial) => !layerLocks.texts && updateTextAnnotation(pageIndex, txt.id, partial)}
+            onDelete={() => !layerLocks.texts && deleteTextAnnotation(pageIndex, txt.id)}
           />
         ))}
 

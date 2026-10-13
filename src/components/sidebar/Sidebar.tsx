@@ -33,12 +33,16 @@ export const Sidebar: React.FC = () => {
     removeCurrentPage,
     togglePageBookmark,
     setPageTitle,
+    addOutlineItem,
+    deleteOutlineItem,
   } = useNotebookStore();
 
   const [activeTab, setActiveTab] = useState<'notebooks' | 'pages' | 'bookmarks' | 'outline'>('notebooks');
   const [searchQuery, setSearchQuery] = useState('');
   const [editingTitlePageIndex, setEditingTitlePageIndex] = useState<number | null>(null);
   const [tempTitle, setTempTitle] = useState('');
+  const [showAddChapter, setShowAddChapter] = useState(false);
+  const [newChapterTitle, setNewChapterTitle] = useState('');
 
   const activeNotebook = notebooks.find((n) => n.id === activeNotebookId);
 
@@ -351,79 +355,178 @@ export const Sidebar: React.FC = () => {
 
         {/* 4. Outline (Table of Contents) Tab */}
         {activeTab === 'outline' && (
-          <div className="space-y-2">
-            {(activeNotebook?.pages || []).map((pg, idx) => {
-              const isCurrent = idx === activePageIndex;
-              const isEditing = editingTitlePageIndex === idx;
-
-              return (
-                <div
-                  key={pg.id}
-                  onClick={() => setActivePageIndex(idx)}
-                  className={`p-2.5 rounded-xl border flex items-center justify-between gap-2 cursor-pointer transition-all ${
-                    isCurrent
-                      ? 'bg-indigo-600/15 border-indigo-500/60 text-white ring-1 ring-indigo-500/20'
-                      : 'bg-slate-850/50 border-slate-800 text-slate-300 hover:bg-slate-800'
-                  }`}
-                >
-                  <div className="flex items-center gap-2.5 flex-1 overflow-hidden">
-                    <span className="w-6 h-6 rounded-lg bg-slate-800 flex items-center justify-center text-[10px] font-mono text-slate-400 shrink-0">
-                      {idx + 1}
-                    </span>
-
-                    {isEditing ? (
-                      <div className="flex items-center gap-1 flex-1" onClick={(e) => e.stopPropagation()}>
-                        <input
-                          type="text"
-                          value={tempTitle}
-                          onChange={(e) => setTempTitle(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              setPageTitle(idx, tempTitle.trim() || `Sayfa ${idx + 1}`);
-                              setEditingTitlePageIndex(null);
-                            }
-                          }}
-                          className="w-full bg-slate-900 border border-indigo-500 rounded px-2 py-1 text-xs text-slate-100 focus:outline-none"
-                          autoFocus
-                        />
+          <div className="space-y-3">
+            {/* 4.1 PDF Hierarchical Outline / Bookmarks Tree (if present) */}
+            {activeNotebook?.pdfOutline && activeNotebook.pdfOutline.length > 0 && (
+              <div className="space-y-1.5 pb-2 border-b border-slate-800">
+                <div className="flex items-center justify-between text-[11px] font-bold text-indigo-400 uppercase tracking-wider px-1">
+                  <span>Doküman İçindekiler ({activeNotebook.pdfOutline.length})</span>
+                </div>
+                {activeNotebook.pdfOutline.map((item) => {
+                  const isCurrent = item.pageIndex === activePageIndex;
+                  return (
+                    <div
+                      key={item.id}
+                      onClick={() => setActivePageIndex(item.pageIndex)}
+                      style={{ paddingLeft: `${Math.min(item.level * 12 + 10, 40)}px` }}
+                      className={`py-2 pr-2.5 rounded-xl border flex items-center justify-between gap-2 cursor-pointer transition-all ${
+                        isCurrent
+                          ? 'bg-indigo-600/20 border-indigo-500/50 text-white shadow-sm'
+                          : 'bg-slate-850/60 border-slate-800 text-slate-300 hover:bg-slate-800 hover:border-slate-700'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 overflow-hidden flex-1">
+                        <ChevronRight size={13} className="text-indigo-400 shrink-0" />
+                        <span className="text-xs font-medium truncate">{item.title}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <span className="text-[10px] font-mono text-slate-400 bg-slate-800 px-1.5 py-0.5 rounded border border-slate-700">
+                          s. {item.pageIndex + 1}
+                        </span>
                         <button
-                          onClick={() => {
-                            setPageTitle(idx, tempTitle.trim() || `Sayfa ${idx + 1}`);
-                            setEditingTitlePageIndex(null);
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            deleteOutlineItem(item.id);
                           }}
-                          className="p-1 text-emerald-400 hover:bg-slate-750 rounded"
+                          className="p-1 text-slate-500 hover:text-rose-400 rounded hover:bg-slate-750 transition-colors"
+                          title="Bölümü Sil"
                         >
-                          <Check size={13} />
+                          <Trash2 size={11} />
                         </button>
                       </div>
-                    ) : (
-                      <div className="truncate flex-1">
-                        <h4 className="text-xs font-semibold truncate">
-                          {pg.title || `Bölüm / Sayfa ${idx + 1}`}
-                        </h4>
-                        <p className="text-[10px] text-slate-500">
-                          {pg.strokes.length} çizgi • {pg.texts?.length || 0} metin
-                        </p>
-                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* 4.2 Add New Outline Chapter Button & Form */}
+            <div className="pt-1">
+              {showAddChapter ? (
+                <div className="p-2.5 rounded-xl bg-slate-850 border border-indigo-500/50 space-y-2 mb-2">
+                  <div className="text-[11px] font-semibold text-slate-300">
+                    Mevcut Sayfaya Bölüm Başlığı Ekle (Sayfa {activePageIndex + 1})
+                  </div>
+                  <input
+                    type="text"
+                    value={newChapterTitle}
+                    onChange={(e) => setNewChapterTitle(e.target.value)}
+                    placeholder="Örn: Bölüm 3: İntegral ve Alan Hesabı"
+                    className="w-full bg-slate-900 border border-slate-750 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+                    autoFocus
+                  />
+                  <div className="flex justify-end gap-1.5">
+                    <button
+                      onClick={() => {
+                        setShowAddChapter(false);
+                        setNewChapterTitle('');
+                      }}
+                      className="px-2.5 py-1 text-xs text-slate-400 hover:text-slate-200"
+                    >
+                      Vazgeç
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (!newChapterTitle.trim()) return;
+                        addOutlineItem(newChapterTitle.trim(), activePageIndex);
+                        setNewChapterTitle('');
+                        setShowAddChapter(false);
+                      }}
+                      className="px-3 py-1 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-lg"
+                    >
+                      Ekle
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setShowAddChapter(true)}
+                  className="w-full py-2 px-3 rounded-xl border border-dashed border-indigo-500/40 text-indigo-400 hover:bg-indigo-500/10 text-xs font-semibold transition-all flex items-center justify-center gap-1.5 mb-2"
+                >
+                  <Plus size={14} />
+                  <span>Bu Sayfayı İçindekilere Ekle</span>
+                </button>
+              )}
+            </div>
+
+            {/* 4.3 Page-by-Page Titles List */}
+            <div className="space-y-1.5">
+              <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider px-1">
+                Sayfa Başlıkları
+              </div>
+              {(activeNotebook?.pages || []).map((pg, idx) => {
+                const isCurrent = idx === activePageIndex;
+                const isEditing = editingTitlePageIndex === idx;
+
+                return (
+                  <div
+                    key={pg.id}
+                    onClick={() => setActivePageIndex(idx)}
+                    className={`p-2.5 rounded-xl border flex items-center justify-between gap-2 cursor-pointer transition-all ${
+                      isCurrent
+                        ? 'bg-indigo-600/15 border-indigo-500/60 text-white ring-1 ring-indigo-500/20'
+                        : 'bg-slate-850/50 border-slate-800 text-slate-300 hover:bg-slate-800'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5 flex-1 overflow-hidden">
+                      <span className="w-6 h-6 rounded-lg bg-slate-800 flex items-center justify-center text-[10px] font-mono text-slate-400 shrink-0">
+                        {idx + 1}
+                      </span>
+
+                      {isEditing ? (
+                        <div className="flex items-center gap-1 flex-1" onClick={(e) => e.stopPropagation()}>
+                          <input
+                            type="text"
+                            value={tempTitle}
+                            onChange={(e) => setTempTitle(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                setPageTitle(idx, tempTitle.trim() || `Sayfa ${idx + 1}`);
+                                setEditingTitlePageIndex(null);
+                              }
+                            }}
+                            className="w-full bg-slate-900 border border-indigo-500 rounded px-2 py-1 text-xs text-slate-100 focus:outline-none"
+                            autoFocus
+                          />
+                          <button
+                            onClick={() => {
+                              setPageTitle(idx, tempTitle.trim() || `Sayfa ${idx + 1}`);
+                              setEditingTitlePageIndex(null);
+                            }}
+                            className="p-1 text-emerald-400 hover:bg-slate-750 rounded"
+                          >
+                            <Check size={13} />
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="truncate flex-1">
+                          <h4 className="text-xs font-semibold truncate">
+                            {pg.title || `Bölüm / Sayfa ${idx + 1}`}
+                          </h4>
+                          <p className="text-[10px] text-slate-500">
+                            {pg.strokes.length} çizgi • {pg.texts?.length || 0} metin
+                          </p>
+                        </div>
+                      )}
+                    </div>
+
+                    {!isEditing && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditingTitlePageIndex(idx);
+                          setTempTitle(pg.title || `Sayfa ${idx + 1}`);
+                        }}
+                        className="p-1 text-slate-500 hover:text-indigo-400 rounded hover:bg-slate-750 transition-colors"
+                        title="Bölüm Başlığını Değiştir"
+                      >
+                        <Edit2 size={12} />
+                      </button>
                     )}
                   </div>
-
-                  {!isEditing && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setEditingTitlePageIndex(idx);
-                        setTempTitle(pg.title || `Sayfa ${idx + 1}`);
-                      }}
-                      className="p-1 text-slate-500 hover:text-indigo-400 rounded hover:bg-slate-750 transition-colors"
-                      title="Bölüm Başlığını Değiştir"
-                    >
-                      <Edit2 size={12} />
-                    </button>
-                  )}
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
         )}
       </div>

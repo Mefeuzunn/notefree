@@ -1,6 +1,6 @@
 import * as pdfjsLib from 'pdfjs-dist';
 import { PDFDocument, rgb } from 'pdf-lib';
-import { Page, Stroke } from '../types/notebook';
+import { Page, Stroke, PdfOutlineItem } from '../types/notebook';
 import { getStrokeOptions, getSvgPathFromStroke } from '../engine/strokeRenderer';
 import { getStroke } from 'perfect-freehand';
 
@@ -9,10 +9,16 @@ if (typeof window !== 'undefined') {
   pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
 }
 
+export interface PdfImportResult {
+  pages: Page[];
+  outline: PdfOutlineItem[];
+}
+
 /**
- * Loads a PDF file and converts all its pages into NotFree Page objects
+ * Loads a PDF file and converts all its pages into NotFree Page objects,
+ * while extracting the hierarchical table of contents (bookmarks / outline).
  */
-export async function convertPdfToPages(file: File): Promise<Page[]> {
+export async function convertPdfToPages(file: File): Promise<PdfImportResult> {
   const arrayBuffer = await file.arrayBuffer();
   const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
   const pdfDoc = await loadingTask.promise;
@@ -48,7 +54,48 @@ export async function convertPdfToPages(file: File): Promise<Page[]> {
     }
   }
 
-  return pages;
+  // Extract PDF Table of Contents (Outline)
+  const outline: PdfOutlineItem[] = [];
+  try {
+    const rawOutline = await pdfDoc.getOutline();
+    if (rawOutline && Array.isArray(rawOutline)) {
+      const processItems = async (items: any[], level = 0) => {
+        for (const it of items) {
+          let pageIdx = 0;
+          if (it.dest) {
+            try {
+              let destRef = it.dest;
+              if (typeof destRef === 'string') {
+                destRef = await pdfDoc.getDestination(destRef);
+              }
+              if (Array.isArray(destRef) && destRef[0]) {
+                const resolvedIdx = await pdfDoc.getPageIndex(destRef[0]);
+                if (typeof resolvedIdx === 'number' && resolvedIdx >= 0) {
+                  pageIdx = resolvedIdx;
+                }
+              }
+            } catch (destErr) {
+              // ignore dest resolution failure
+            }
+          }
+          outline.push({
+            id: `toc_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+            title: it.title || `Bölüm`,
+            pageIndex: pageIdx,
+            level,
+          });
+          if (it.items && Array.isArray(it.items) && it.items.length > 0) {
+            await processItems(it.items, level + 1);
+          }
+        }
+      };
+      await processItems(rawOutline, 0);
+    }
+  } catch (err) {
+    console.warn('PDF Outline extraction skipped:', err);
+  }
+
+  return { pages, outline };
 }
 
 /**

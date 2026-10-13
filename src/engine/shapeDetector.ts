@@ -1,9 +1,58 @@
 import { ShapeType, StrokePoint } from '../types/notebook';
 
 /**
- * Attempts to detect if a drawn series of points resembles a geometric shape
+ * Applies magnetic angle locking (0°, 15°, 30°, 45°, 90°) and paper grid snapping
  */
-export function detectGeometricShape(points: StrokePoint[]): {
+export function applyPrecisionSnapping(
+  start: StrokePoint,
+  end: StrokePoint,
+  angleSnap: boolean = true,
+  gridSnap: boolean = false,
+  gridSize: number = 20
+): { start: StrokePoint; end: StrokePoint } {
+  const s: StrokePoint = { ...start };
+  const e: StrokePoint = { ...end };
+
+  if (gridSnap) {
+    s.x = Math.round(s.x / gridSize) * gridSize;
+    s.y = Math.round(s.y / gridSize) * gridSize;
+    e.x = Math.round(e.x / gridSize) * gridSize;
+    e.y = Math.round(e.y / gridSize) * gridSize;
+  }
+
+  if (angleSnap) {
+    const dx = e.x - s.x;
+    const dy = e.y - s.y;
+    const length = Math.hypot(dx, dy);
+    if (length > 12) {
+      let deg = (Math.atan2(dy, dx) * 180) / Math.PI;
+      if (deg < 0) deg += 360;
+
+      // Snapping points: 0, 15, 30, 45, 60, 75, 90...
+      const snapInterval = 15;
+      const nearestSnap = Math.round(deg / snapInterval) * snapInterval;
+      const diff = Math.abs(deg - nearestSnap);
+
+      // 7.5 degree lock tolerance
+      if (diff <= 7.5 || diff >= 360 - 7.5) {
+        const snappedRad = (nearestSnap * Math.PI) / 180;
+        e.x = s.x + length * Math.cos(snappedRad);
+        e.y = s.y + length * Math.sin(snappedRad);
+      }
+    }
+  }
+
+  return { start: s, end: e };
+}
+
+/**
+ * Attempts to detect if a drawn series of points resembles a geometric shape,
+ * with optional angle locking and magnetic grid snapping.
+ */
+export function detectGeometricShape(
+  points: StrokePoint[],
+  options?: { angleSnap?: boolean; gridSnap?: boolean; gridSize?: number }
+): {
   type: ShapeType;
   replacementPoints: StrokePoint[];
 } | null {
@@ -24,15 +73,22 @@ export function detectGeometricShape(points: StrokePoint[]): {
 
   // 1. Straight Line Check
   const straightness = directDist / totalLength;
-  if (straightness > 0.9) {
+  if (straightness > 0.88) {
+    const snapped = applyPrecisionSnapping(
+      start,
+      end,
+      options?.angleSnap ?? true,
+      options?.gridSnap ?? false,
+      options?.gridSize ?? 20
+    );
     return {
       type: 'line',
-      replacementPoints: interpolateLine(start, end),
+      replacementPoints: interpolateLine(snapped.start, snapped.end),
     };
   }
 
   // 2. Closed Loop Check (Circle or Rectangle)
-  const isClosed = directDist / totalLength < 0.2;
+  const isClosed = directDist / totalLength < 0.22;
   if (isClosed) {
     // Calculate bounding box and centroid
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
@@ -161,25 +217,38 @@ export function generateTrianglePoints(minX: number, minY: number, maxX: number,
   return pts;
 }
 
-export function generateArrowPoints(start: StrokePoint, end: StrokePoint): StrokePoint[] {
-  const pts = interpolateLine(start, end, 20);
-  const angle = Math.atan2(end.y - start.y, end.x - start.x);
+export function generateArrowPoints(
+  start: StrokePoint,
+  end: StrokePoint,
+  options?: { angleSnap?: boolean; gridSnap?: boolean; gridSize?: number }
+): StrokePoint[] {
+  const snapped = applyPrecisionSnapping(
+    start,
+    end,
+    options?.angleSnap ?? true,
+    options?.gridSnap ?? false,
+    options?.gridSize ?? 20
+  );
+  const s = snapped.start;
+  const e = snapped.end;
+  const pts = interpolateLine(s, e, 20);
+  const angle = Math.atan2(e.y - s.y, e.x - s.x);
   const headLength = 22;
   const headAngle = Math.PI / 6;
 
   // Arrow left barb
   const leftBarb = {
-    x: end.x - headLength * Math.cos(angle - headAngle),
-    y: end.y - headLength * Math.sin(angle - headAngle),
+    x: e.x - headLength * Math.cos(angle - headAngle),
+    y: e.y - headLength * Math.sin(angle - headAngle),
     pressure: 0.5,
   };
   // Arrow right barb
   const rightBarb = {
-    x: end.x - headLength * Math.cos(angle + headAngle),
-    y: end.y - headLength * Math.sin(angle + headAngle),
+    x: e.x - headLength * Math.cos(angle + headAngle),
+    y: e.y - headLength * Math.sin(angle + headAngle),
     pressure: 0.5,
   };
 
-  pts.push(end, leftBarb, end, rightBarb);
+  pts.push(e, leftBarb, e, rightBarb);
   return pts;
 }

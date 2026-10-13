@@ -21,10 +21,10 @@ export const DocImportModal: React.FC = () => {
 
     try {
       if (file.name.toLowerCase().endsWith('.pdf')) {
-        setProgressMsg('PDF Sayfaları yüksek çözünürlükte işleniyor...');
-        const pages = await convertPdfToPages(file);
+        setProgressMsg('PDF Sayfaları ve içindekiler tablosu işleniyor...');
+        const { pages, outline } = await convertPdfToPages(file);
         if (pages.length === 0) throw new Error('PDF içinde sayfa bulunamadı.');
-        await importPagesAsNotebook(pages, `📄 ${file.name.replace(/\.pdf$/i, '')}`);
+        await importPagesAsNotebook(pages, `📄 ${file.name.replace(/\.pdf$/i, '')}`, outline);
       } else if (file.name.toLowerCase().endsWith('.docx')) {
         setProgressMsg('Word belgesi çözümleniyor ve sayfalara bölünüyor...');
         const pages = await convertDocxToPages(file);

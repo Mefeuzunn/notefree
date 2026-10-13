@@ -13,6 +13,7 @@ import { ZoomWindow } from './components/canvas/ZoomWindow';
 import { StudySetsModal } from './components/flashcards/StudySetsModal';
 import { MathSolverModal } from './components/modals/MathSolverModal';
 import { SearchModal } from './components/modals/SearchModal';
+import { LayersDrawer } from './components/modals/LayersDrawer';
 import {
   BookOpen,
   Loader2,
@@ -157,6 +158,7 @@ export const App: React.FC = () => {
       <DocImportModal />
       <NewNotebookModal />
       <StickersDrawer />
+      <LayersDrawer />
       <StudySetsModal />
       <MathSolverModal />
       <SearchModal />

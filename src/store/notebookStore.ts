@@ -19,6 +19,9 @@ import {
   ToolSettings,
   ToolType,
   YouTubeBookmark,
+  PdfOutlineItem,
+  LayerVisibilitySettings,
+  LayerLockSettings,
 } from '../types/notebook';
 import { db, initStorage, saveNotebookToDB, importNotebookFromNotefree } from '../services/storage';
 import {
@@ -119,6 +122,11 @@ interface NotebookStoreState {
   mathInputEquation: string;
   splitNotebook: SplitNotebookState;
 
+  // Faz 3: Multi-Layer & Precision Engine
+  layersDrawerOpen: boolean;
+  layers: LayerVisibilitySettings;
+  layerLocks: LayerLockSettings;
+
   // Core Actions
   initialize: () => Promise<void>;
   setActiveNotebook: (id: string) => void;
@@ -188,6 +196,8 @@ interface NotebookStoreState {
   setStickersDrawerOpen: (open: boolean) => void;
   addStickerToCurrentPage: (sticker: StickerItem) => void;
   removeStickerFromCurrentPage: (pageStickerId: string) => void;
+  addCustomSticker: (sticker: StickerItem) => void;
+  deleteCustomSticker: (stickerId: string) => void;
 
   // GoodNotes 6 Tape Actions
   toggleTapeReveal: (pageIndex: number, tapeId: string) => void;
@@ -215,6 +225,15 @@ interface NotebookStoreState {
 
   // Faz 2: Tape to Flashcard Auto Generator
   generateFlashcardsFromTapes: (notebookId: string) => number;
+
+  // Faz 3: Multi-Layer, Precision & Outline Actions
+  setLayersDrawerOpen: (open: boolean) => void;
+  toggleLayerVisibility: (layer: keyof LayerVisibilitySettings) => void;
+  toggleLayerLock: (layer: keyof LayerLockSettings) => void;
+  toggleAngleSnap: () => void;
+  toggleGridSnap: () => void;
+  addOutlineItem: (title: string, pageIndex: number) => void;
+  deleteOutlineItem: (outlineId: string) => void;
 
   // Text Annotations
   addTextAnnotation: (
@@ -269,7 +288,7 @@ interface NotebookStoreState {
   setPageManagerModalOpen: (open: boolean) => void;
 
   // Document & Notebook Import
-  importPagesAsNotebook: (pages: Page[], title: string) => Promise<void>;
+  importPagesAsNotebook: (pages: Page[], title: string, pdfOutline?: PdfOutlineItem[]) => Promise<void>;
   importNotebook: (jsonString: string) => Promise<void>;
 }
 
@@ -313,6 +332,8 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
     fontFamily: 'Inter',
     fontSize: 18,
     laserStyle: 'trail',
+    angleSnap: true,
+    gridSnap: false,
   },
 
   presentationMode: false,
@@ -366,6 +387,27 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
     secondaryNotebookId: null,
     secondaryPageIndex: 0,
     splitRatio: 0.5,
+  },
+
+  // Faz 3 Initial State
+  layersDrawerOpen: false,
+  layers: {
+    background: true,
+    strokes: true,
+    highlighters: true,
+    texts: true,
+    stickers: true,
+    tapes: true,
+    fills: true,
+  },
+  layerLocks: {
+    background: false,
+    strokes: false,
+    highlighters: false,
+    texts: false,
+    stickers: false,
+    tapes: false,
+    fills: false,
   },
 
   initialize: async () => {
@@ -1120,6 +1162,18 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
     saveNotebookToDB(updatedNotebook);
   },
 
+  addCustomSticker: (sticker: StickerItem) => {
+    set((state) => ({
+      customStickers: [sticker, ...state.customStickers],
+    }));
+  },
+
+  deleteCustomSticker: (stickerId: string) => {
+    set((state) => ({
+      customStickers: state.customStickers.filter((s) => s.id !== stickerId),
+    }));
+  },
+
   // TEXT ANNOTATIONS ACTIONS
   addTextAnnotation: (
     pageIndex: number,
@@ -1497,7 +1551,7 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
     set({ searchModalOpen: open });
   },
 
-  importPagesAsNotebook: async (pages: Page[], title: string) => {
+  importPagesAsNotebook: async (pages: Page[], title: string, pdfOutline?: PdfOutlineItem[]) => {
     const newId = `nb_doc_${Date.now()}`;
     const newNotebook: Notebook = {
       id: newId,
@@ -1510,6 +1564,7 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
       updatedAt: Date.now(),
       youtubeBookmarks: [],
       audioRecordings: [],
+      pdfOutline: pdfOutline || [],
     };
 
     const updatedNotebooks = [newNotebook, ...get().notebooks];
@@ -1979,5 +2034,94 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
     }
 
     return generatedCount;
+  },
+
+  // Faz 3: Multi-Layer, Precision & Outline Actions
+  setLayersDrawerOpen: (open: boolean) => {
+    set({ layersDrawerOpen: open });
+  },
+
+  toggleLayerVisibility: (layer: keyof LayerVisibilitySettings) => {
+    set((state) => ({
+      layers: {
+        ...state.layers,
+        [layer]: !state.layers[layer],
+      },
+    }));
+  },
+
+  toggleLayerLock: (layer: keyof LayerLockSettings) => {
+    set((state) => ({
+      layerLocks: {
+        ...state.layerLocks,
+        [layer]: !state.layerLocks[layer],
+      },
+    }));
+  },
+
+  toggleAngleSnap: () => {
+    set((state) => ({
+      toolSettings: {
+        ...state.toolSettings,
+        angleSnap: !state.toolSettings.angleSnap,
+      },
+    }));
+  },
+
+  toggleGridSnap: () => {
+    set((state) => ({
+      toolSettings: {
+        ...state.toolSettings,
+        gridSnap: !state.toolSettings.gridSnap,
+      },
+    }));
+  },
+
+  addOutlineItem: (title: string, pageIndex: number) => {
+    const { notebooks, activeNotebookId } = get();
+    if (!activeNotebookId) return;
+    const currentNb = notebooks.find((n) => n.id === activeNotebookId);
+    if (!currentNb) return;
+
+    const newItem: PdfOutlineItem = {
+      id: `toc_manual_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+      title,
+      pageIndex,
+      level: 0,
+    };
+
+    const updatedOutline = [...(currentNb.pdfOutline || []), newItem].sort(
+      (a, b) => a.pageIndex - b.pageIndex
+    );
+
+    const updatedNb = {
+      ...currentNb,
+      pdfOutline: updatedOutline,
+      updatedAt: Date.now(),
+    };
+
+    set({
+      notebooks: notebooks.map((n) => (n.id === activeNotebookId ? updatedNb : n)),
+    });
+    saveNotebookToDB(updatedNb);
+  },
+
+  deleteOutlineItem: (outlineId: string) => {
+    const { notebooks, activeNotebookId } = get();
+    if (!activeNotebookId) return;
+    const currentNb = notebooks.find((n) => n.id === activeNotebookId);
+    if (!currentNb || !currentNb.pdfOutline) return;
+
+    const updatedOutline = currentNb.pdfOutline.filter((it) => it.id !== outlineId);
+    const updatedNb = {
+      ...currentNb,
+      pdfOutline: updatedOutline,
+      updatedAt: Date.now(),
+    };
+
+    set({
+      notebooks: notebooks.map((n) => (n.id === activeNotebookId ? updatedNb : n)),
+    });
+    saveNotebookToDB(updatedNb);
   },
 }));

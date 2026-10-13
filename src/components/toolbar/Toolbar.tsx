@@ -21,6 +21,7 @@ import {
   Trash2,
   Palette,
   Layers,
+  LayoutTemplate,
   Menu,
   Sparkles,
   Zap,
@@ -119,6 +120,10 @@ export const Toolbar: React.FC = () => {
     splitNotebook,
     openDualNotebook,
     closeDualNotebook,
+    layersDrawerOpen,
+    setLayersDrawerOpen,
+    toggleAngleSnap,
+    toggleGridSnap,
   } = useNotebookStore();
 
   const [activeColorSlot, setActiveColorSlot] = useState<number | null>(null);
@@ -478,33 +483,69 @@ export const Toolbar: React.FC = () => {
           </button>
 
           {shapeMenuOpen && (
-            <div className="absolute top-12 left-0 bg-slate-800 border border-slate-700 shadow-xl rounded-xl p-1.5 flex gap-1 z-50 animate-in fade-in zoom-in-95">
-              {(['line', 'arrow', 'rectangle', 'circle', 'triangle'] as ShapeType[]).map(
-                (shp) => (
-                  <button
-                    key={shp}
-                    onClick={() => {
-                      setSelectedShape(shp);
-                      setShapeMenuOpen(false);
-                    }}
-                    className={`px-2.5 py-1 text-xs rounded-lg capitalize transition-colors ${
-                      toolSettings.selectedShape === shp
-                        ? 'bg-indigo-600 text-white'
-                        : 'text-slate-300 hover:bg-slate-700'
-                    }`}
-                  >
-                    {shp === 'line'
-                      ? 'Çizgi'
-                      : shp === 'arrow'
-                      ? 'Ok'
-                      : shp === 'rectangle'
-                      ? 'Kare'
-                      : shp === 'circle'
-                      ? 'Daire'
-                      : 'Üçgen'}
-                  </button>
-                )
-              )}
+            <div className="absolute top-12 left-0 bg-slate-800 border border-slate-750 shadow-2xl rounded-2xl p-2 flex flex-col gap-2 z-50 animate-in fade-in zoom-in-95 min-w-[280px]">
+              <div className="text-[11px] font-semibold text-slate-400 px-1 uppercase tracking-wider">Şekil Türü</div>
+              <div className="flex gap-1">
+                {(['line', 'arrow', 'rectangle', 'circle', 'triangle'] as ShapeType[]).map(
+                  (shp) => (
+                    <button
+                      key={shp}
+                      onClick={() => {
+                        setSelectedShape(shp);
+                        setShapeMenuOpen(false);
+                      }}
+                      className={`flex-1 py-1.5 text-xs rounded-lg capitalize transition-colors font-medium text-center ${
+                        toolSettings.selectedShape === shp
+                          ? 'bg-indigo-600 text-white shadow'
+                          : 'text-slate-300 hover:bg-slate-750'
+                      }`}
+                    >
+                      {shp === 'line'
+                        ? 'Çizgi'
+                        : shp === 'arrow'
+                        ? 'Ok'
+                        : shp === 'rectangle'
+                        ? 'Kare'
+                        : shp === 'circle'
+                        ? 'Daire'
+                        : 'Üçgen'}
+                    </button>
+                  )
+                )}
+              </div>
+
+              <div className="h-px bg-slate-700/60 my-0.5" />
+
+              <div className="text-[11px] font-semibold text-slate-400 px-1 uppercase tracking-wider">Hassas Manyetik Hizalama</div>
+              <div className="flex gap-1.5">
+                <button
+                  type="button"
+                  onClick={toggleAngleSnap}
+                  className={`flex-1 px-2.5 py-1.5 rounded-lg text-xs font-medium flex items-center justify-between border transition-all ${
+                    toolSettings.angleSnap
+                      ? 'bg-indigo-600/20 border-indigo-500 text-indigo-300'
+                      : 'bg-slate-750/50 border-slate-700 text-slate-400 hover:text-slate-200'
+                  }`}
+                  title="15° manyetik açı kilitleri (0°, 15°, 30°, 45°, 90°)"
+                >
+                  <span>15° Açı Kilidi</span>
+                  {toolSettings.angleSnap && <Check size={13} className="text-indigo-400" />}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={toggleGridSnap}
+                  className={`flex-1 px-2.5 py-1.5 rounded-lg text-xs font-medium flex items-center justify-between border transition-all ${
+                    toolSettings.gridSnap
+                      ? 'bg-indigo-600/20 border-indigo-500 text-indigo-300'
+                      : 'bg-slate-750/50 border-slate-700 text-slate-400 hover:text-slate-200'
+                  }`}
+                  title="Defter ızgara ve çizgilerine manyetik kenetlenme"
+                >
+                  <span>Izgara Snap</span>
+                  {toolSettings.gridSnap && <Check size={13} className="text-indigo-400" />}
+                </button>
+              </div>
             </div>
           )}
         </div>
@@ -800,13 +841,26 @@ export const Toolbar: React.FC = () => {
           <Grid size={17} />
         </button>
 
+        {/* Multi-Layer Engine Drawer */}
+        <button
+          onClick={() => setLayersDrawerOpen(true)}
+          className={`p-2 rounded-xl transition-all ${
+            layersDrawerOpen
+              ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30 ring-1 ring-indigo-400'
+              : 'text-slate-400 hover:text-indigo-400 hover:bg-slate-800'
+          }`}
+          title="Katmanlar Yöneticisi (Çizim, Fosfor, Metin, Çıkartma, Bant Katmanları)"
+        >
+          <Layers size={17} />
+        </button>
+
         {/* Template Selector */}
         <button
           onClick={() => setTemplateModalOpen(true)}
           className="p-2 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-xl transition-colors"
           title="Defter Şablonunu Değiştir"
         >
-          <Layers size={17} />
+          <LayoutTemplate size={17} />
         </button>
 
         {/* PDF & Word Import */}
