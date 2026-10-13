@@ -29,6 +29,7 @@ import {
 } from '../../engine/lassoHelper';
 import { TextBoxOverlay } from './TextBoxOverlay';
 import { collaborationService } from '../../services/collaborationService';
+import { HandwritingOcrModal } from '../modals/HandwritingOcrModal';
 import {
   Move,
   RotateCw,
@@ -42,6 +43,7 @@ import {
   Volume2,
   Check,
   Calculator,
+  Type,
 } from 'lucide-react';
 
 interface CanvasPageProps {
@@ -116,6 +118,8 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
   const [isDraggingLasso, setIsDraggingLasso] = useState(false);
   const [lassoDragStart, setLassoDragStart] = useState<{ x: number; y: number } | null>(null);
   const [recolorMenuOpen, setRecolorMenuOpen] = useState(false);
+  const [ocrModalOpen, setOcrModalOpen] = useState(false);
+  const hasStylusUsedRef = useRef<boolean>(false);
 
   // Faz 1 interactive states
   const [eyedropperLoupe, setEyedropperLoupe] = useState<{ x: number; y: number; hex: string } | null>(null);
@@ -361,6 +365,16 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
   // Pointer Down
   const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
     if (activeTool === 'pan') return;
+
+    if (e.pointerType === 'pen') {
+      hasStylusUsedRef.current = true;
+    }
+
+    // Smart Palm Rejection: If stylus has been used or palm rejection is enabled, reject single-finger touches
+    if (e.pointerType === 'touch' && (hasStylusUsedRef.current || toolSettings.palmRejection)) {
+      return;
+    }
+
     setActivePageIndex(pageIndex);
     e.currentTarget.setPointerCapture(e.pointerId);
 
@@ -477,7 +491,16 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
     }
 
     setIsDrawing(true);
-    currentPointsRef.current = [{ x, y, pressure, timestamp: Date.now() }];
+    currentPointsRef.current = [
+      {
+        x,
+        y,
+        pressure,
+        timestamp: Date.now(),
+        tiltX: e.tiltX,
+        tiltY: e.tiltY,
+      },
+    ];
 
     if (activeTool === 'eraser') {
       handleEraser(x, y);
@@ -526,7 +549,14 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
     }
 
     const pressure = calculatePressure(x, y, e.pressure);
-    currentPointsRef.current.push({ x, y, pressure, timestamp: Date.now() });
+    currentPointsRef.current.push({
+      x,
+      y,
+      pressure,
+      timestamp: Date.now(),
+      tiltX: e.tiltX,
+      tiltY: e.tiltY,
+    });
 
     // Live Collaboration: Broadcast cursor and stroke points
     if (collaboration.isConnected) {
@@ -1053,6 +1083,16 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
               <span>Çöz</span>
             </button>
 
+            {/* Faz A: El Yazısını Metne Dönüştür (Handwriting-to-Text OCR) */}
+            <button
+              onClick={() => setOcrModalOpen(true)}
+              className="px-2 py-1 hover:bg-slate-800 text-indigo-300 rounded-lg transition-colors flex items-center gap-1 text-[11px] font-semibold border border-indigo-500/30 bg-indigo-950/40"
+              title="El Yazısını Metne Dönüştür (GoodNotes OCR)"
+            >
+              <Type size={13} />
+              <span>Metne Dönüştür</span>
+            </button>
+
             <div className="w-px h-4 bg-slate-750" />
 
             <button
@@ -1249,6 +1289,12 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
             </div>
           );
         })}
+
+      {/* Faz A: Handwriting to Text OCR Modal */}
+      <HandwritingOcrModal
+        isOpen={ocrModalOpen}
+        onClose={() => setOcrModalOpen(false)}
+      />
     </div>
   );
 };

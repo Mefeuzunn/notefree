@@ -64,6 +64,7 @@ export const InfiniteCanvas: React.FC = () => {
   const currentPointsRef = useRef<StrokePoint[]>([]);
   const lastPointRef = useRef<{ x: number; y: number; time: number } | null>(null);
   const spacePressedRef = useRef<boolean>(false);
+  const hasStylusUsedRef = useRef<boolean>(false);
 
   // Track space key for click-to-pan
   useEffect(() => {
@@ -291,6 +292,15 @@ export const InfiniteCanvas: React.FC = () => {
       return;
     }
 
+    if (e.pointerType === 'pen') {
+      hasStylusUsedRef.current = true;
+    }
+
+    // Smart Palm Rejection: If stylus has been used or palm rejection is enabled, reject touch events
+    if (e.pointerType === 'touch' && (hasStylusUsedRef.current || toolSettings.palmRejection)) {
+      return;
+    }
+
     const { x, y } = getWorldCoords(e);
 
     // Check layer locks
@@ -307,7 +317,14 @@ export const InfiniteCanvas: React.FC = () => {
     }
 
     setIsDrawing(true);
-    const pt: StrokePoint = { x, y, pressure: e.pressure || 0.5, timestamp: Date.now() };
+    const pt: StrokePoint = {
+      x,
+      y,
+      pressure: e.pressure || 0.5,
+      timestamp: Date.now(),
+      tiltX: e.tiltX,
+      tiltY: e.tiltY,
+    };
     currentPointsRef.current = [pt];
   };
 
@@ -339,7 +356,14 @@ export const InfiniteCanvas: React.FC = () => {
       return;
     }
 
-    const pt: StrokePoint = { x, y, pressure: e.pressure || 0.5, timestamp: Date.now() };
+    const pt: StrokePoint = {
+      x,
+      y,
+      pressure: e.pressure || 0.5,
+      timestamp: Date.now(),
+      tiltX: e.tiltX,
+      tiltY: e.tiltY,
+    };
     currentPointsRef.current.push(pt);
 
     // Broadcast live stroke points to collaboration peers

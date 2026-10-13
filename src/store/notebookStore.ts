@@ -179,6 +179,8 @@ interface NotebookStoreState {
   toggleAutoDeselectEraser: () => void;
   setSelectedShape: (shape: ShapeType) => void;
   toggleAutoDetectShape: () => void;
+  togglePalmRejection: () => void;
+  toggleTiltShading: () => void;
   addStrokeToCurrentPage: (stroke: Stroke) => void;
   eraseStrokesOnCurrentPage: (strokeIds: string[]) => void;
   undo: () => void;
@@ -479,6 +481,8 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
     laserStyle: 'trail',
     angleSnap: true,
     gridSnap: false,
+    palmRejection: true,
+    tiltShading: true,
   },
 
   presentationMode: false,
@@ -2246,6 +2250,24 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
       toolSettings: {
         ...state.toolSettings,
         gridSnap: !state.toolSettings.gridSnap,
+      },
+    }));
+  },
+
+  togglePalmRejection: () => {
+    set((state) => ({
+      toolSettings: {
+        ...state.toolSettings,
+        palmRejection: !state.toolSettings.palmRejection,
+      },
+    }));
+  },
+
+  toggleTiltShading: () => {
+    set((state) => ({
+      toolSettings: {
+        ...state.toolSettings,
+        tiltShading: !state.toolSettings.tiltShading,
       },
     }));
   },

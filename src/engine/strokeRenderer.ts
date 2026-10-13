@@ -187,6 +187,23 @@ export function drawStrokeOnCanvas(
   }
 
   const options = getStrokeOptions(stroke.tool, stroke.size, customStreamline);
+
+  // Stylus Tilt Shading: Apple Pencil / S-Pen angle recognition
+  let isTilted = false;
+  let tiltFactor = 0;
+  if (stroke.tool === 'pencil' || stroke.tool === 'highlighter') {
+    const validTilts = stroke.points.filter((p) => p.tiltX !== undefined && p.tiltY !== undefined);
+    if (validTilts.length > 0) {
+      const avgTilt =
+        validTilts.reduce((sum, p) => sum + Math.hypot(p.tiltX || 0, p.tiltY || 0), 0) / validTilts.length;
+      if (avgTilt > 22) {
+        isTilted = true;
+        tiltFactor = Math.min(1.8, (avgTilt - 20) / 25);
+        options.size = options.size * (1 + tiltFactor * 1.5);
+      }
+    }
+  }
+
   const rawPoints = stroke.points.map((pt) => [pt.x, pt.y, pt.pressure]);
   const outline = getStroke(rawPoints, options);
 
@@ -196,10 +213,10 @@ export function drawStrokeOnCanvas(
 
   if (stroke.tool === 'highlighter') {
     ctx.globalCompositeOperation = 'multiply';
-    ctx.globalAlpha = 0.45;
+    ctx.globalAlpha = isTilted ? 0.35 : 0.45;
   } else if (stroke.tool === 'pencil') {
     ctx.globalCompositeOperation = 'source-over';
-    ctx.globalAlpha = 0.82;
+    ctx.globalAlpha = isTilted ? Math.max(0.35, 0.82 - tiltFactor * 0.35) : 0.82;
   } else if (stroke.tool === 'neon') {
     // Neon aura glow pass
     ctx.shadowColor = stroke.color;

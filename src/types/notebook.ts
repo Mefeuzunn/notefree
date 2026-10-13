@@ -53,6 +53,8 @@ export interface StrokePoint {
   y: number;
   pressure: number;
   timestamp?: number;
+  tiltX?: number;
+  tiltY?: number;
 }
 
 export interface StrokeBounds {
@@ -306,6 +308,8 @@ export interface ToolSettings {
   // Laser Pointer & Presentation
   laserStyle?: 'trail' | 'spotlight';
   smartInkInversion?: boolean;
+  palmRejection?: boolean; // Reject single finger touches when stylus is active
+  tiltShading?: boolean; // Enable broad graphite pencil shading when stylus is tilted
 }
 
 export interface LassoSelection {

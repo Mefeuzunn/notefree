@@ -125,6 +125,8 @@ export const Toolbar: React.FC = () => {
     setLayersDrawerOpen,
     toggleAngleSnap,
     toggleGridSnap,
+    togglePalmRejection,
+    toggleTiltShading,
     collaboration,
     setCollaborationModalOpen,
   } = useNotebookStore();
@@ -700,6 +702,39 @@ export const Toolbar: React.FC = () => {
                 <p className="text-[10px] text-slate-400 mt-1">
                   Çizgileri aşmadan en temiz dolgu derinliği
                 </p>
+              </div>
+
+              {/* Faz A: Palm Rejection & Tilt Shading Toggles */}
+              <div className="pt-2.5 mt-2.5 border-t border-slate-800 space-y-2">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-slate-300 font-medium">Avuç İçi Reddi (Palm)</span>
+                  <button
+                    type="button"
+                    onClick={togglePalmRejection}
+                    className={`px-2 py-0.5 rounded text-[11px] font-semibold border transition-all ${
+                      toolSettings.palmRejection
+                        ? 'bg-indigo-600/30 border-indigo-500 text-indigo-300'
+                        : 'bg-slate-800 border-slate-700 text-slate-400'
+                    }`}
+                  >
+                    {toolSettings.palmRejection ? 'Aktif' : 'Kapalı'}
+                  </button>
+                </div>
+
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-slate-300 font-medium">Kalem Eğimi (Tilt Shading)</span>
+                  <button
+                    type="button"
+                    onClick={toggleTiltShading}
+                    className={`px-2 py-0.5 rounded text-[11px] font-semibold border transition-all ${
+                      toolSettings.tiltShading
+                        ? 'bg-indigo-600/30 border-indigo-500 text-indigo-300'
+                        : 'bg-slate-800 border-slate-700 text-slate-400'
+                    }`}
+                  >
+                    {toolSettings.tiltShading ? 'Aktif' : 'Kapalı'}
+                  </button>
+                </div>
               </div>
             </div>
           )}
