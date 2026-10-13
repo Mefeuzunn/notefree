@@ -114,6 +114,21 @@ export interface Page {
   width: number;
   height: number;
   title?: string;
+  isBookmarked?: boolean;
+}
+
+export interface Flashcard {
+  id: string;
+  notebookId: string;
+  pageId?: string;
+  frontText: string;
+  frontImage?: string;
+  backText: string;
+  backImage?: string;
+  difficulty?: 'again' | 'hard' | 'good' | 'easy';
+  reviewCount: number;
+  lastReviewed?: number;
+  createdAt: number;
 }
 
 export interface YouTubeBookmark {
@@ -155,6 +170,7 @@ export interface Notebook {
   youtubeUrl?: string;
   youtubeBookmarks?: YouTubeBookmark[];
   audioRecordings?: AudioNoteRecording[];
+  flashcards?: Flashcard[];
 }
 
 export interface ToolSettings {
@@ -176,6 +192,9 @@ export interface ToolSettings {
   // Text tool settings
   fontFamily: 'Inter' | 'Caveat' | 'serif' | 'monospace';
   fontSize: number;
+  // Laser Pointer & Presentation
+  laserStyle?: 'trail' | 'spotlight';
+  smartInkInversion?: boolean;
 }
 
 export interface LassoSelection {

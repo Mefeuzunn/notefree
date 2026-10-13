@@ -11,6 +11,11 @@ import {
   BookOpen,
   Calendar,
   Sparkles,
+  Star,
+  ListTree,
+  Search,
+  Edit2,
+  Check,
 } from 'lucide-react';
 
 export const Sidebar: React.FC = () => {
@@ -26,16 +31,35 @@ export const Sidebar: React.FC = () => {
     setActivePageIndex,
     addPage,
     removeCurrentPage,
+    togglePageBookmark,
+    setPageTitle,
   } = useNotebookStore();
 
-  const [activeTab, setActiveTab] = useState<'notebooks' | 'pages'>('notebooks');
+  const [activeTab, setActiveTab] = useState<'notebooks' | 'pages' | 'bookmarks' | 'outline'>('notebooks');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [editingTitlePageIndex, setEditingTitlePageIndex] = useState<number | null>(null);
+  const [tempTitle, setTempTitle] = useState('');
 
   const activeNotebook = notebooks.find((n) => n.id === activeNotebookId);
 
   if (!sidebarOpen) return null;
 
+  const bookmarkedPages = (activeNotebook?.pages || [])
+    .map((pg, idx) => ({ ...pg, index: idx }))
+    .filter((pg) => pg.isBookmarked);
+
+  const filteredPages = (activeNotebook?.pages || [])
+    .map((pg, idx) => ({ ...pg, index: idx }))
+    .filter((pg) => {
+      if (!searchQuery.trim()) return true;
+      const q = searchQuery.toLowerCase();
+      const matchTitle = (pg.title || '').toLowerCase().includes(q);
+      const matchTexts = (pg.texts || []).some((t) => t.text.toLowerCase().includes(q));
+      return matchTitle || matchTexts;
+    });
+
   return (
-    <aside className="fixed inset-y-0 left-0 w-80 bg-slate-900/95 backdrop-blur-xl border-r border-slate-800 z-40 flex flex-col shadow-2xl animate-in slide-in-from-left duration-200">
+    <aside className="fixed inset-y-0 left-0 w-84 sm:w-96 bg-slate-900/95 backdrop-blur-xl border-r border-slate-800 z-40 flex flex-col shadow-2xl animate-in slide-in-from-left duration-200">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3.5 border-b border-slate-800">
         <div className="flex items-center gap-2">
@@ -44,7 +68,7 @@ export const Sidebar: React.FC = () => {
           </div>
           <div>
             <h2 className="text-sm font-bold text-slate-100 tracking-tight">NotFree</h2>
-            <p className="text-[10px] text-indigo-400 font-medium">Dijital Not Defteri</p>
+            <p className="text-[10px] text-indigo-400 font-medium">Navigasyon & İçerik</p>
           </div>
         </div>
 
@@ -56,38 +80,78 @@ export const Sidebar: React.FC = () => {
         </button>
       </div>
 
-      {/* Navigation Tabs */}
-      <div className="flex border-b border-slate-800 px-3 pt-2 gap-2">
+      {/* Navigation Tabs (GoodNotes / Notability 4-way Drawer) */}
+      <div className="grid grid-cols-4 border-b border-slate-800 px-2 pt-2 text-[11px] font-semibold text-center">
         <button
           onClick={() => setActiveTab('notebooks')}
-          className={`flex-1 pb-2.5 text-xs font-semibold border-b-2 transition-all flex items-center justify-center gap-1.5 ${
+          className={`pb-2.5 border-b-2 transition-all flex flex-col items-center gap-1 ${
             activeTab === 'notebooks'
               ? 'border-indigo-500 text-indigo-400'
               : 'border-transparent text-slate-400 hover:text-slate-300'
           }`}
         >
           <Book size={14} />
-          <span>Defterler ({notebooks.length})</span>
+          <span>Defterler</span>
         </button>
 
         <button
           onClick={() => setActiveTab('pages')}
-          className={`flex-1 pb-2.5 text-xs font-semibold border-b-2 transition-all flex items-center justify-center gap-1.5 ${
+          className={`pb-2.5 border-b-2 transition-all flex flex-col items-center gap-1 ${
             activeTab === 'pages'
               ? 'border-indigo-500 text-indigo-400'
               : 'border-transparent text-slate-400 hover:text-slate-300'
           }`}
         >
           <Layers size={14} />
-          <span>Sayfalar ({activeNotebook?.pages.length || 0})</span>
+          <span>Sayfalar</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('bookmarks')}
+          className={`pb-2.5 border-b-2 transition-all flex flex-col items-center gap-1 ${
+            activeTab === 'bookmarks'
+              ? 'border-indigo-500 text-indigo-400'
+              : 'border-transparent text-slate-400 hover:text-slate-300'
+          }`}
+        >
+          <Star size={14} className={bookmarkedPages.length > 0 ? 'text-amber-400 fill-amber-400' : ''} />
+          <span>Yer İmleri</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('outline')}
+          className={`pb-2.5 border-b-2 transition-all flex flex-col items-center gap-1 ${
+            activeTab === 'outline'
+              ? 'border-indigo-500 text-indigo-400'
+              : 'border-transparent text-slate-400 hover:text-slate-300'
+          }`}
+        >
+          <ListTree size={14} />
+          <span>İçindekiler</span>
         </button>
       </div>
 
+      {/* Search Input for Pages/Bookmarks */}
+      {activeTab !== 'notebooks' && (
+        <div className="p-3 border-b border-slate-800/80">
+          <div className="relative">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Başlık veya metin notu ara..."
+              className="w-full bg-slate-800/60 border border-slate-750 rounded-xl pl-8 pr-3 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+            />
+          </div>
+        </div>
+      )}
+
       {/* Tab Content */}
       <div className="flex-1 overflow-y-auto p-3 space-y-2">
-        {activeTab === 'notebooks' ? (
+        {/* 1. Notebooks Tab */}
+        {activeTab === 'notebooks' && (
           <>
-            {/* Create Notebook Button */}
             <button
               onClick={() => setNewNotebookModalOpen(true)}
               className="w-full flex items-center justify-center gap-2 p-2.5 rounded-xl border border-dashed border-indigo-500/40 text-indigo-400 hover:bg-indigo-500/10 text-xs font-semibold transition-all mb-3"
@@ -96,7 +160,6 @@ export const Sidebar: React.FC = () => {
               <span>Yeni Defter Oluştur</span>
             </button>
 
-            {/* Notebooks List */}
             {notebooks.map((nb) => {
               const isActive = nb.id === activeNotebookId;
               return (
@@ -120,8 +183,11 @@ export const Sidebar: React.FC = () => {
                       </h4>
                       <p className="text-[11px] text-slate-500 mt-0.5">
                         {nb.pages.length} sayfa
+                        {nb.flashcards && nb.flashcards.length > 0
+                          ? ` • 🧠 ${nb.flashcards.length} kart`
+                          : ''}
                         {nb.youtubeBookmarks && nb.youtubeBookmarks.length > 0
-                          ? ` • ⏱️ ${nb.youtubeBookmarks.length} video notu`
+                          ? ` • ⏱️ ${nb.youtubeBookmarks.length} video`
                           : ''}
                       </p>
                     </div>
@@ -145,9 +211,11 @@ export const Sidebar: React.FC = () => {
               );
             })}
           </>
-        ) : (
+        )}
+
+        {/* 2. Pages Thumbnails Tab */}
+        {activeTab === 'pages' && (
           <>
-            {/* Pages Action Row */}
             <div className="flex gap-2 mb-3">
               <button
                 onClick={() => addPage()}
@@ -172,21 +240,36 @@ export const Sidebar: React.FC = () => {
               )}
             </div>
 
-            {/* Page Thumbnails List */}
             <div className="grid grid-cols-2 gap-2.5">
-              {activeNotebook?.pages.map((pg, idx) => {
-                const isCurrent = idx === activePageIndex;
+              {filteredPages.map((pg) => {
+                const isCurrent = pg.index === activePageIndex;
                 return (
                   <div
                     key={pg.id}
-                    onClick={() => setActivePageIndex(idx)}
-                    className={`p-2 rounded-xl border cursor-pointer transition-all flex flex-col items-center ${
+                    onClick={() => setActivePageIndex(pg.index)}
+                    className={`p-2 rounded-xl border cursor-pointer transition-all flex flex-col items-center relative group ${
                       isCurrent
                         ? 'border-indigo-500 bg-indigo-500/15 ring-2 ring-indigo-500/30 shadow-md'
                         : 'border-slate-800 bg-slate-850 hover:border-slate-700 hover:bg-slate-800'
                     }`}
                   >
-                    {/* Simulated Page Thumbnail Box */}
+                    {/* Bookmark Star Toggle Button */}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        togglePageBookmark(pg.index);
+                      }}
+                      className={`absolute top-3 right-3 z-10 p-1 rounded-full backdrop-blur-sm transition-all ${
+                        pg.isBookmarked
+                          ? 'text-amber-400 fill-amber-400 bg-slate-900/80 shadow'
+                          : 'text-slate-400 hover:text-amber-300 bg-slate-900/50 opacity-0 group-hover:opacity-100'
+                      }`}
+                      title={pg.isBookmarked ? 'Yer İmini Kaldır' : 'Yer İmlerine Ekle'}
+                    >
+                      <Star size={13} className={pg.isBookmarked ? 'fill-amber-400' : ''} />
+                    </button>
+
+                    {/* Page Thumbnail */}
                     <div
                       className="w-full aspect-[1/1.3] rounded border border-slate-700/60 shadow-sm mb-1.5 flex flex-col items-center justify-center p-2 text-center text-[10px] text-slate-500 overflow-hidden"
                       style={{
@@ -210,14 +293,138 @@ export const Sidebar: React.FC = () => {
                         <span className="opacity-40">{pg.template}</span>
                       )}
                     </div>
-                    <span className="text-[11px] font-semibold text-slate-300">
-                      Sayfa {idx + 1}
+                    <span className="text-[11px] font-semibold text-slate-300 truncate max-w-full">
+                      {pg.title || `Sayfa ${pg.index + 1}`}
                     </span>
                   </div>
                 );
               })}
             </div>
           </>
+        )}
+
+        {/* 3. Bookmarks Tab */}
+        {activeTab === 'bookmarks' && (
+          <div className="space-y-2">
+            {bookmarkedPages.length === 0 ? (
+              <div className="text-center py-10 px-3 text-slate-400">
+                <Star size={24} className="mx-auto mb-2 opacity-30 text-amber-400" />
+                <p className="text-xs font-medium text-slate-300 mb-1">Henüz yer imi yok</p>
+                <p className="text-[11px] text-slate-500">
+                  Önemli sayfaları kaydetmek için sayfa üzerindeki ⭐ yıldız ikonuna tıklayın.
+                </p>
+              </div>
+            ) : (
+              bookmarkedPages.map((pg) => (
+                <div
+                  key={pg.id}
+                  onClick={() => setActivePageIndex(pg.index)}
+                  className="p-3 rounded-xl bg-slate-850/80 border border-slate-750 hover:border-amber-500/50 cursor-pointer flex items-center justify-between group transition-all"
+                >
+                  <div className="flex items-center gap-2.5 overflow-hidden">
+                    <Star size={16} className="text-amber-400 fill-amber-400 shrink-0" />
+                    <div className="truncate">
+                      <h4 className="text-xs font-semibold text-slate-200 truncate">
+                        {pg.title || `Sayfa ${pg.index + 1}`}
+                      </h4>
+                      <p className="text-[10px] text-slate-400 mt-0.5">
+                        Sayfa #{pg.index + 1} • {pg.strokes.length} çizim
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      togglePageBookmark(pg.index);
+                    }}
+                    className="p-1 text-slate-500 hover:text-rose-400 rounded-lg hover:bg-slate-700/50 opacity-0 group-hover:opacity-100 transition-opacity"
+                    title="Yer iminden çıkar"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
+        )}
+
+        {/* 4. Outline (Table of Contents) Tab */}
+        {activeTab === 'outline' && (
+          <div className="space-y-2">
+            {(activeNotebook?.pages || []).map((pg, idx) => {
+              const isCurrent = idx === activePageIndex;
+              const isEditing = editingTitlePageIndex === idx;
+
+              return (
+                <div
+                  key={pg.id}
+                  onClick={() => setActivePageIndex(idx)}
+                  className={`p-2.5 rounded-xl border flex items-center justify-between gap-2 cursor-pointer transition-all ${
+                    isCurrent
+                      ? 'bg-indigo-600/15 border-indigo-500/60 text-white ring-1 ring-indigo-500/20'
+                      : 'bg-slate-850/50 border-slate-800 text-slate-300 hover:bg-slate-800'
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5 flex-1 overflow-hidden">
+                    <span className="w-6 h-6 rounded-lg bg-slate-800 flex items-center justify-center text-[10px] font-mono text-slate-400 shrink-0">
+                      {idx + 1}
+                    </span>
+
+                    {isEditing ? (
+                      <div className="flex items-center gap-1 flex-1" onClick={(e) => e.stopPropagation()}>
+                        <input
+                          type="text"
+                          value={tempTitle}
+                          onChange={(e) => setTempTitle(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              setPageTitle(idx, tempTitle.trim() || `Sayfa ${idx + 1}`);
+                              setEditingTitlePageIndex(null);
+                            }
+                          }}
+                          className="w-full bg-slate-900 border border-indigo-500 rounded px-2 py-1 text-xs text-slate-100 focus:outline-none"
+                          autoFocus
+                        />
+                        <button
+                          onClick={() => {
+                            setPageTitle(idx, tempTitle.trim() || `Sayfa ${idx + 1}`);
+                            setEditingTitlePageIndex(null);
+                          }}
+                          className="p-1 text-emerald-400 hover:bg-slate-750 rounded"
+                        >
+                          <Check size={13} />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="truncate flex-1">
+                        <h4 className="text-xs font-semibold truncate">
+                          {pg.title || `Bölüm / Sayfa ${idx + 1}`}
+                        </h4>
+                        <p className="text-[10px] text-slate-500">
+                          {pg.strokes.length} çizgi • {pg.texts?.length || 0} metin
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  {!isEditing && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setEditingTitlePageIndex(idx);
+                        setTempTitle(pg.title || `Sayfa ${idx + 1}`);
+                      }}
+                      className="p-1 text-slate-500 hover:text-indigo-400 rounded hover:bg-slate-750 transition-colors"
+                      title="Bölüm Başlığını Değiştir"
+                    >
+                      <Edit2 size={12} />
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         )}
       </div>
     </aside>

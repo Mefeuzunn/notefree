@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useNotebookStore } from '../../store/notebookStore';
 import { CoverStyle, Notebook } from '../../types/notebook';
+import { exportAllNotebooksBackup } from '../../services/storage';
 import {
   Book,
   Plus,
@@ -15,6 +16,8 @@ import {
   ChevronRight,
   BookOpen,
   Sparkles,
+  FolderDown,
+  FileUp,
 } from 'lucide-react';
 
 interface LibraryViewProps {
@@ -30,12 +33,31 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ isOpen, onClose }) => 
     deleteNotebook,
     setNewNotebookModalOpen,
     setDocImportModalOpen,
+    importNotebook,
   } = useNotebookStore();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<'all' | 'favorites'>('all');
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   if (!isOpen) return null;
+
+  const handleFileImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const text = await file.text();
+      await importNotebook(text);
+      alert('Defter başarıyla içe aktarıldı!');
+      onClose();
+    } catch (err: any) {
+      console.error('Import error:', err);
+      alert(`Defter yüklenirken hata oluştu: ${err.message || 'Geçersiz dosya'}`);
+    } finally {
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
 
   const filteredNotebooks = notebooks.filter((nb) => {
     const matchesSearch = nb.title.toLowerCase().includes(searchQuery.toLowerCase());
@@ -118,6 +140,33 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ isOpen, onClose }) => 
 
         {/* Actions */}
         <div className="flex items-center gap-2">
+          {/* Hidden .notefree file input */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".notefree,.json"
+            onChange={handleFileImport}
+            className="hidden"
+          />
+
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="flex items-center gap-1.5 bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/30 px-3 py-2 rounded-xl text-xs font-semibold transition-colors"
+            title=".notefree dosyasını içe aktar"
+          >
+            <FileUp size={15} />
+            <span className="hidden sm:inline">.notefree İçe Aktar</span>
+          </button>
+
+          <button
+            onClick={() => exportAllNotebooksBackup(notebooks)}
+            className="flex items-center gap-1.5 bg-slate-850 hover:bg-slate-800 border border-slate-750 text-slate-300 hover:text-white px-3 py-2 rounded-xl text-xs font-semibold transition-colors"
+            title="Tüm defterleri tek dosya olarak yedekle"
+          >
+            <FolderDown size={15} />
+            <span className="hidden md:inline">Yedekle</span>
+          </button>
+
           <button
             onClick={() => setNewNotebookModalOpen(true)}
             className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-500 text-white px-3.5 py-2 rounded-xl text-xs font-semibold shadow-md transition-colors"
@@ -128,10 +177,10 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ isOpen, onClose }) => 
 
           <button
             onClick={() => setDocImportModalOpen(true)}
-            className="flex items-center gap-1.5 bg-slate-850 hover:bg-slate-800 border border-slate-750 text-slate-300 hover:text-white px-3.5 py-2 rounded-xl text-xs font-semibold transition-colors"
+            className="flex items-center gap-1.5 bg-slate-850 hover:bg-slate-800 border border-slate-750 text-slate-300 hover:text-white px-3 py-2 rounded-xl text-xs font-semibold transition-colors hidden lg:flex"
           >
             <UploadCloud size={15} />
-            <span>İçe Aktar (PDF/Word)</span>
+            <span>PDF/Word</span>
           </button>
 
           <button

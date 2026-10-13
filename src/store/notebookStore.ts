@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import {
   AudioNoteRecording,
   CoverStyle,
+  Flashcard,
   LassoSelection,
   Notebook,
   Page,
@@ -17,7 +18,7 @@ import {
   ToolType,
   YouTubeBookmark,
 } from '../types/notebook';
-import { db, initStorage, saveNotebookToDB } from '../services/storage';
+import { db, initStorage, saveNotebookToDB, importNotebookFromNotefree } from '../services/storage';
 import {
   computeGroupBounds,
   recolorStrokes,
@@ -55,6 +56,7 @@ interface NotebookStoreState {
   panOffset: { x: number; y: number };
   sidebarOpen: boolean;
   libraryViewOpen: boolean;
+  presentationMode: boolean;
 
   // Active Tool & Settings
   activeTool: ToolType;
@@ -68,6 +70,12 @@ interface NotebookStoreState {
   rulerVisible: boolean;
   rulerAngle: number;
   laserPoints: LaserPoint[];
+
+  // Zoom Window Box (GoodNotes Magnifying Area)
+  zoomWindowOpen: boolean;
+  zoomWindowPos: { x: number; y: number };
+  zoomBoxWidth: number;
+  zoomBoxHeight: number;
 
   // Stickers / Elements Drawer
   stickersDrawerOpen: boolean;
@@ -86,11 +94,12 @@ interface NotebookStoreState {
   // YouTube Multitasking
   youtube: YouTubeState;
 
-  // Modals
+  // Modals & Panels
   templateModalOpen: boolean;
   docImportModalOpen: boolean;
   newNotebookModalOpen: boolean;
   pageManagerModalOpen: boolean;
+  studySetsModalOpen: boolean;
 
   // Core Actions
   initialize: () => Promise<void>;
@@ -110,6 +119,9 @@ interface NotebookStoreState {
   removeCurrentPage: () => Promise<void>;
   updateCurrentPageTemplate: (template: PageTemplate, paperColor: PaperColor) => Promise<void>;
   setViewMode: (mode: 'continuous' | 'single') => void;
+  togglePageBookmark: (pageIndex: number) => void;
+  setPageTitle: (pageIndex: number, title: string) => void;
+  invertCurrentPageInks: () => void;
 
   // Drawing & Strokes Actions
   setActiveTool: (tool: ToolType) => void;
@@ -140,6 +152,19 @@ interface NotebookStoreState {
   deleteLassoSelection: () => void;
   saveLassoSelectionAsSticker: (name: string) => void;
 
+  // Zoom Window Controls
+  toggleZoomWindow: () => void;
+  setZoomWindowPos: (pos: { x: number; y: number }) => void;
+  advanceZoomWindow: () => void;
+  rewindZoomWindow: () => void;
+  newLineZoomWindow: () => void;
+
+  // Study Sets / Flashcards Actions
+  setStudySetsModalOpen: (open: boolean) => void;
+  addFlashcard: (frontText: string, backText: string) => void;
+  deleteFlashcard: (cardId: string) => void;
+  rateFlashcard: (cardId: string, rating: 'again' | 'hard' | 'good' | 'easy') => void;
+
   // Stickers Actions
   setStickersDrawerOpen: (open: boolean) => void;
   addStickerToCurrentPage: (sticker: StickerItem) => void;
@@ -165,11 +190,13 @@ interface NotebookStoreState {
   setAudioPlaybackTimeMs: (ms: number) => void;
   setAudioPlaying: (playing: boolean) => void;
 
-  // Ruler & Laser Actions
+  // Ruler, Laser & Presentation Actions
   toggleRuler: () => void;
   setRulerAngle: (angle: number) => void;
   addLaserPoint: (x: number, y: number) => void;
   clearLaserPoints: () => void;
+  setPresentationMode: (enabled: boolean) => void;
+  setLaserStyle: (style: 'trail' | 'spotlight') => void;
 
   // YouTube Actions
   toggleYouTube: () => void;
@@ -192,8 +219,9 @@ interface NotebookStoreState {
   setNewNotebookModalOpen: (open: boolean) => void;
   setPageManagerModalOpen: (open: boolean) => void;
 
-  // Document Import
+  // Document & Notebook Import
   importPagesAsNotebook: (pages: Page[], title: string) => Promise<void>;
+  importNotebook: (jsonString: string) => Promise<void>;
 }
 
 export function extractYouTubeId(url: string): string | null {
@@ -233,13 +261,20 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
     activeSizeIndex: 1,
     fontFamily: 'Inter',
     fontSize: 18,
+    laserStyle: 'trail',
   },
 
+  presentationMode: false,
   lassoSelection: null,
 
   rulerVisible: false,
   rulerAngle: 0,
   laserPoints: [],
+
+  zoomWindowOpen: false,
+  zoomWindowPos: { x: 80, y: 160 },
+  zoomBoxWidth: 280,
+  zoomBoxHeight: 140,
 
   stickersDrawerOpen: false,
   customStickers: [],
@@ -266,6 +301,7 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
   docImportModalOpen: false,
   newNotebookModalOpen: false,
   pageManagerModalOpen: false,
+  studySetsModalOpen: false,
 
   initialize: async () => {
     try {
@@ -1376,5 +1412,207 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
     });
 
     await saveNotebookToDB(newNotebook);
+  },
+
+  // Bookmarks & Page Outline
+  togglePageBookmark: (pageIndex: number) => {
+    const { notebooks, activeNotebookId } = get();
+    const nb = notebooks.find((n) => n.id === activeNotebookId);
+    if (!nb || !nb.pages[pageIndex]) return;
+
+    const updatedPages = [...nb.pages];
+    updatedPages[pageIndex] = {
+      ...updatedPages[pageIndex],
+      isBookmarked: !updatedPages[pageIndex].isBookmarked,
+    };
+
+    const updatedNotebook = { ...nb, pages: updatedPages, updatedAt: Date.now() };
+    set({
+      notebooks: notebooks.map((n) => (n.id === activeNotebookId ? updatedNotebook : n)),
+    });
+    saveNotebookToDB(updatedNotebook);
+  },
+
+  setPageTitle: (pageIndex: number, title: string) => {
+    const { notebooks, activeNotebookId } = get();
+    const nb = notebooks.find((n) => n.id === activeNotebookId);
+    if (!nb || !nb.pages[pageIndex]) return;
+
+    const updatedPages = [...nb.pages];
+    updatedPages[pageIndex] = {
+      ...updatedPages[pageIndex],
+      title,
+    };
+
+    const updatedNotebook = { ...nb, pages: updatedPages, updatedAt: Date.now() };
+    set({
+      notebooks: notebooks.map((n) => (n.id === activeNotebookId ? updatedNotebook : n)),
+    });
+    saveNotebookToDB(updatedNotebook);
+  },
+
+  // Smart Ink Contrast Inversion
+  invertCurrentPageInks: () => {
+    const { notebooks, activeNotebookId, activePageIndex, undoStack } = get();
+    const nb = notebooks.find((n) => n.id === activeNotebookId);
+    if (!nb || !nb.pages[activePageIndex]) return;
+
+    const currentPage = nb.pages[activePageIndex];
+    if (currentPage.strokes.length === 0) return;
+
+    const newUndoStack = [...undoStack, [...currentPage.strokes]];
+
+    const invertedStrokes = currentPage.strokes.map((stroke) => {
+      let newColor = stroke.color;
+      if (['#0f172a', '#000000', '#1e293b', '#181b26', '#334155'].includes(stroke.color.toLowerCase())) {
+        newColor = '#ffffff';
+      } else if (['#ffffff', '#f8fafc', '#f1f5f9'].includes(stroke.color.toLowerCase())) {
+        newColor = '#0f172a';
+      }
+      return { ...stroke, color: newColor };
+    });
+
+    const updatedPages = [...nb.pages];
+    updatedPages[activePageIndex] = {
+      ...currentPage,
+      strokes: invertedStrokes,
+    };
+
+    const updatedNotebook = { ...nb, pages: updatedPages, updatedAt: Date.now() };
+    set({
+      notebooks: notebooks.map((n) => (n.id === activeNotebookId ? updatedNotebook : n)),
+      undoStack: newUndoStack,
+      redoStack: [],
+    });
+    saveNotebookToDB(updatedNotebook);
+  },
+
+  // Zoom Window Controls (GoodNotes Magnifying Box)
+  toggleZoomWindow: () => {
+    set({ zoomWindowOpen: !get().zoomWindowOpen });
+  },
+
+  setZoomWindowPos: (pos: { x: number; y: number }) => {
+    set({ zoomWindowPos: pos });
+  },
+
+  advanceZoomWindow: () => {
+    const { zoomWindowPos, zoomBoxWidth } = get();
+    const nextX = zoomWindowPos.x + zoomBoxWidth * 0.72;
+    if (nextX + zoomBoxWidth > 760) {
+      get().newLineZoomWindow();
+    } else {
+      set({ zoomWindowPos: { ...zoomWindowPos, x: nextX } });
+    }
+  },
+
+  rewindZoomWindow: () => {
+    const { zoomWindowPos, zoomBoxWidth } = get();
+    const prevX = Math.max(50, zoomWindowPos.x - zoomBoxWidth * 0.72);
+    set({ zoomWindowPos: { ...zoomWindowPos, x: prevX } });
+  },
+
+  newLineZoomWindow: () => {
+    const { zoomWindowPos, zoomBoxHeight } = get();
+    const nextY = Math.min(1000, zoomWindowPos.y + zoomBoxHeight * 0.85);
+    set({ zoomWindowPos: { x: 60, y: nextY } });
+  },
+
+  // Study Sets / Flashcards Actions
+  setStudySetsModalOpen: (open: boolean) => {
+    set({ studySetsModalOpen: open });
+  },
+
+  addFlashcard: (frontText: string, backText: string) => {
+    const { notebooks, activeNotebookId } = get();
+    if (!activeNotebookId) return;
+    const nb = notebooks.find((n) => n.id === activeNotebookId);
+    if (!nb) return;
+
+    const newCard: Flashcard = {
+      id: `fc_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      notebookId: activeNotebookId,
+      frontText,
+      backText,
+      reviewCount: 0,
+      createdAt: Date.now(),
+    };
+
+    const updatedFlashcards = [...(nb.flashcards || []), newCard];
+    const updatedNotebook = { ...nb, flashcards: updatedFlashcards, updatedAt: Date.now() };
+
+    set({
+      notebooks: notebooks.map((n) => (n.id === activeNotebookId ? updatedNotebook : n)),
+    });
+    saveNotebookToDB(updatedNotebook);
+  },
+
+  deleteFlashcard: (cardId: string) => {
+    const { notebooks, activeNotebookId } = get();
+    const nb = notebooks.find((n) => n.id === activeNotebookId);
+    if (!nb) return;
+
+    const updatedFlashcards = (nb.flashcards || []).filter((c) => c.id !== cardId);
+    const updatedNotebook = { ...nb, flashcards: updatedFlashcards, updatedAt: Date.now() };
+
+    set({
+      notebooks: notebooks.map((n) => (n.id === activeNotebookId ? updatedNotebook : n)),
+    });
+    saveNotebookToDB(updatedNotebook);
+  },
+
+  rateFlashcard: (cardId: string, rating: 'again' | 'hard' | 'good' | 'easy') => {
+    const { notebooks, activeNotebookId } = get();
+    const nb = notebooks.find((n) => n.id === activeNotebookId);
+    if (!nb) return;
+
+    const updatedFlashcards = (nb.flashcards || []).map((c) => {
+      if (c.id === cardId) {
+        return {
+          ...c,
+          difficulty: rating,
+          reviewCount: c.reviewCount + 1,
+          lastReviewed: Date.now(),
+        };
+      }
+      return c;
+    });
+
+    const updatedNotebook = { ...nb, flashcards: updatedFlashcards, updatedAt: Date.now() };
+
+    set({
+      notebooks: notebooks.map((n) => (n.id === activeNotebookId ? updatedNotebook : n)),
+    });
+    saveNotebookToDB(updatedNotebook);
+  },
+
+  // Presentation & Laser Actions
+  setPresentationMode: (enabled: boolean) => {
+    set({
+      presentationMode: enabled,
+      activeTool: enabled ? 'laser' : get().previousTool || 'ballpoint',
+    });
+  },
+
+  setLaserStyle: (style: 'trail' | 'spotlight') => {
+    set({
+      toolSettings: {
+        ...get().toolSettings,
+        laserStyle: style,
+      },
+    });
+  },
+
+  // Import .notefree Notebook
+  importNotebook: async (jsonString: string) => {
+    const importedNb = await importNotebookFromNotefree(jsonString);
+    const updatedNotebooks = [importedNb, ...get().notebooks];
+    set({
+      notebooks: updatedNotebooks,
+      activeNotebookId: importedNb.id,
+      activePageIndex: 0,
+      undoStack: [],
+      redoStack: [],
+    });
   },
 }));

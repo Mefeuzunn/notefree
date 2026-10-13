@@ -72,6 +72,11 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
     addTextAnnotation,
     updateTextAnnotation,
     deleteTextAnnotation,
+    zoomWindowOpen,
+    zoomWindowPos,
+    setZoomWindowPos,
+    zoomBoxWidth,
+    zoomBoxHeight,
   } = useNotebookStore();
 
   const [isDrawing, setIsDrawing] = useState(false);
@@ -293,6 +298,36 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
 
     const now = Date.now();
     const valid = laserPoints.filter((p) => now - p.time < 1200);
+    if (valid.length === 0) {
+      ctx.restore();
+      return;
+    }
+
+    if (toolSettings.laserStyle === 'spotlight') {
+      const currentPt = valid[valid.length - 1];
+      // Dim entire page
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.72)';
+      ctx.fillRect(0, 0, width, height);
+
+      // Cut out spotlight circular beam
+      ctx.globalCompositeOperation = 'destination-out';
+      ctx.beginPath();
+      ctx.arc(currentPt.x, currentPt.y, 85, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalCompositeOperation = 'source-over';
+
+      // Ring glow
+      ctx.beginPath();
+      ctx.arc(currentPt.x, currentPt.y, 85, 0, Math.PI * 2);
+      ctx.strokeStyle = '#818cf8';
+      ctx.lineWidth = 3;
+      ctx.shadowColor = '#6366f1';
+      ctx.shadowBlur = 16;
+      ctx.stroke();
+
+      ctx.restore();
+      return;
+    }
 
     for (let i = 0; i < valid.length; i++) {
       const pt = valid[i];
@@ -661,6 +696,53 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
           <div className="absolute -top-1.5 -right-1.5 w-3 h-3 bg-white border-2 border-indigo-600 rounded-full" />
           <div className="absolute -bottom-1.5 -left-1.5 w-3 h-3 bg-white border-2 border-indigo-600 rounded-full" />
           <div className="absolute -bottom-1.5 -right-1.5 w-3 h-3 bg-white border-2 border-indigo-600 rounded-full" />
+        </div>
+      )}
+
+      {/* Layer 4: GoodNotes Handwriting Zoom Focus Frame */}
+      {zoomWindowOpen && isCurrent && (
+        <div
+          className="absolute z-20 border-2 border-indigo-500 bg-indigo-500/10 rounded-lg shadow-xl shadow-indigo-500/20 pointer-events-auto cursor-move flex items-start justify-between p-1 select-none animate-in fade-in"
+          style={{
+            left: `${zoomWindowPos.x * scale}px`,
+            top: `${zoomWindowPos.y * scale}px`,
+            width: `${zoomBoxWidth * scale}px`,
+            height: `${zoomBoxHeight * scale}px`,
+          }}
+          onPointerDown={(e) => {
+            e.stopPropagation();
+            const startX = e.clientX;
+            const startY = e.clientY;
+            const origX = zoomWindowPos.x;
+            const origY = zoomWindowPos.y;
+            const handleMove = (moveEv: PointerEvent) => {
+              const dx = (moveEv.clientX - startX) / scale;
+              const dy = (moveEv.clientY - startY) / scale;
+              setZoomWindowPos({
+                x: Math.max(0, Math.min(width - zoomBoxWidth, origX + dx)),
+                y: Math.max(0, Math.min(height - zoomBoxHeight, origY + dy)),
+              });
+            };
+            const handleUp = () => {
+              window.removeEventListener('pointermove', handleMove);
+              window.removeEventListener('pointerup', handleUp);
+            };
+            window.addEventListener('pointermove', handleMove);
+            window.addEventListener('pointerup', handleUp);
+          }}
+        >
+          <span className="text-[10px] font-bold text-indigo-400 bg-slate-900/90 px-1.5 py-0.5 rounded flex items-center gap-1 shadow-sm">
+            <Move size={10} /> Büyüteç Odak Alanı
+          </span>
+          {/* Shaded auto-advance strip on right 22% */}
+          <div
+            className="absolute right-0 top-0 bottom-0 w-[22%] bg-indigo-500/20 border-l border-dashed border-indigo-400/50 pointer-events-none rounded-r-md flex items-center justify-center"
+            title="Otomatik İlerleme Bölgesi"
+          >
+            <span className="text-[9px] text-indigo-300 rotate-90 font-mono tracking-tighter opacity-70">
+              İLERLE
+            </span>
+          </div>
         </div>
       )}
     </div>

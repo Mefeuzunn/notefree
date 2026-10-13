@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNotebookStore } from '../../store/notebookStore';
 import { exportNotebookToPdf } from '../../services/pdfService';
+import { exportNotebookAsNotefree } from '../../services/storage';
 import {
   PenTool,
   Feather,
@@ -29,6 +30,12 @@ import {
   Compass,
   Library,
   Grid,
+  Brain,
+  ZoomIn,
+  Star,
+  Presentation,
+  Sun,
+  FolderDown,
 } from 'lucide-react';
 import { PenType, ShapeType, ToolType } from '../../types/notebook';
 import { AudioPlayerBar } from '../audio/AudioPlayerBar';
@@ -83,6 +90,14 @@ export const Toolbar: React.FC = () => {
     rulerVisible,
     toggleRuler,
     viewMode,
+    zoomWindowOpen,
+    toggleZoomWindow,
+    setStudySetsModalOpen,
+    presentationMode,
+    setPresentationMode,
+    setLaserStyle,
+    togglePageBookmark,
+    invertCurrentPageInks,
   } = useNotebookStore();
 
   const [activeColorSlot, setActiveColorSlot] = useState<number | null>(null);
@@ -144,9 +159,65 @@ export const Toolbar: React.FC = () => {
             className="w-3 h-3 rounded-full shrink-0 shadow-sm"
             style={{ backgroundColor: activeNotebook?.coverColor || '#3b82f6' }}
           />
-          <span className="font-semibold text-xs text-slate-200 max-w-[170px] truncate">
+          <span className="font-semibold text-xs text-slate-200 max-w-[150px] truncate">
             {activeNotebook?.title || 'Defter Seçilmedi'}
           </span>
+        </div>
+
+        {/* Page Stepper & Star Bookmark */}
+        <div className="hidden sm:flex items-center gap-1.5 pl-1 border-l border-slate-800">
+          <button
+            onClick={() => togglePageBookmark(activePageIndex)}
+            className={`p-1.5 rounded-lg transition-all ${
+              activeNotebook?.pages[activePageIndex]?.isBookmarked
+                ? 'text-amber-400 fill-amber-400 bg-amber-400/10'
+                : 'text-slate-500 hover:text-amber-300 hover:bg-slate-800'
+            }`}
+            title={
+              activeNotebook?.pages[activePageIndex]?.isBookmarked
+                ? 'Sayfayı Yer İmlerinden Çıkar'
+                : 'Bu Sayfayı Yer İmlerine Ekle'
+            }
+          >
+            <Star
+              size={15}
+              className={
+                activeNotebook?.pages[activePageIndex]?.isBookmarked
+                  ? 'fill-amber-400'
+                  : ''
+              }
+            />
+          </button>
+
+          <div className="flex items-center bg-slate-800/80 rounded-lg p-0.5 border border-slate-750">
+            <button
+              onClick={() => setActivePageIndex(Math.max(0, activePageIndex - 1))}
+              disabled={activePageIndex === 0}
+              className={`p-1 rounded transition-colors ${
+                activePageIndex > 0
+                  ? 'text-slate-300 hover:text-white hover:bg-slate-700'
+                  : 'text-slate-600 cursor-not-allowed'
+              }`}
+              title="Önceki Sayfa"
+            >
+              <ChevronLeft size={13} />
+            </button>
+            <span className="text-[11px] font-mono font-semibold px-1.5 text-slate-300">
+              {activePageIndex + 1}/{totalPages}
+            </span>
+            <button
+              onClick={() => setActivePageIndex(Math.min(totalPages - 1, activePageIndex + 1))}
+              disabled={activePageIndex >= totalPages - 1}
+              className={`p-1 rounded transition-colors ${
+                activePageIndex < totalPages - 1
+                  ? 'text-slate-300 hover:text-white hover:bg-slate-700'
+                  : 'text-slate-600 cursor-not-allowed'
+              }`}
+              title="Sonraki Sayfa"
+            >
+              <ChevronRight size={13} />
+            </button>
+          </div>
         </div>
       </div>
 
@@ -380,6 +451,19 @@ export const Toolbar: React.FC = () => {
           <Compass size={16} />
         </button>
 
+        {/* GoodNotes Handwriting Zoom Window Box */}
+        <button
+          onClick={toggleZoomWindow}
+          className={`p-2 rounded-xl transition-all flex items-center justify-center ${
+            zoomWindowOpen
+              ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30 scale-105 ring-1 ring-indigo-400'
+              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
+          }`}
+          title="Büyüteç Yazım Penceresi (GoodNotes Zoom Window)"
+        >
+          <ZoomIn size={16} />
+        </button>
+
         <div className="w-px h-5 bg-slate-700 mx-1" />
 
         {/* 🌟 GoodNotes 3 Favorite Color Slots */}
@@ -545,6 +629,55 @@ export const Toolbar: React.FC = () => {
           title="Notlu PDF Olarak İndir"
         >
           <FileDown size={17} className={isExporting ? 'animate-bounce text-emerald-400' : ''} />
+        </button>
+
+        {/* GoodNotes 6 Study Sets / Flashcards */}
+        <button
+          onClick={() => setStudySetsModalOpen(true)}
+          className="p-2 text-slate-400 hover:text-amber-400 hover:bg-slate-800 rounded-xl transition-colors relative"
+          title="Çalışma Kartları & Aktif Hatırlama (GoodNotes Study Sets)"
+        >
+          <Brain size={17} />
+          {activeNotebook?.flashcards && activeNotebook.flashcards.length > 0 && (
+            <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+          )}
+        </button>
+
+        {/* Presentation Mode Toggle */}
+        <button
+          onClick={() => {
+            const next = !presentationMode;
+            setPresentationMode(next);
+            if (next && document.documentElement.requestFullscreen) {
+              document.documentElement.requestFullscreen().catch(() => {});
+            }
+          }}
+          className={`p-2 rounded-xl transition-colors ${
+            presentationMode
+              ? 'bg-indigo-600 text-white shadow-md ring-1 ring-indigo-400'
+              : 'text-slate-400 hover:text-indigo-400 hover:bg-slate-800'
+          }`}
+          title="Sunum Modu (Tam Ekran & Lazer)"
+        >
+          <Presentation size={17} />
+        </button>
+
+        {/* Smart Ink Contrast Inversion */}
+        <button
+          onClick={invertCurrentPageInks}
+          className="p-2 text-slate-400 hover:text-amber-300 hover:bg-slate-800 rounded-xl transition-colors hidden sm:block"
+          title="Akıllı Mürekkep Kontrastı (Siyah/Beyaz Yazı Renklerini Uyarla)"
+        >
+          <Sun size={17} />
+        </button>
+
+        {/* Export .notefree Notebook Package */}
+        <button
+          onClick={() => activeNotebook && exportNotebookAsNotefree(activeNotebook)}
+          className="p-2 text-slate-400 hover:text-indigo-400 hover:bg-slate-800 rounded-xl transition-colors hidden sm:block"
+          title="Defteri .notefree Dosyası Olarak Dışa Aktar"
+        >
+          <FolderDown size={17} />
         </button>
 
         {/* 🎙️ Notability Audio Recording & Note Replay */}
