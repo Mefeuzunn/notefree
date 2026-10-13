@@ -37,6 +37,8 @@ import {
 } from '../engine/lassoHelper';
 import { PRESET_STICKERS } from '../engine/stickersLibrary';
 import { audioRecorder } from '../services/audioService';
+import { speechTranscriptionService } from '../services/speechTranscriptionService';
+import { exportEntireVault, importEntireVault } from '../services/vaultBackupService';
 
 interface YouTubeState {
   isOpen: boolean;
@@ -271,6 +273,24 @@ interface NotebookStoreState {
   addStickyNoteToCurrentPage: (note: StickyNoteItem) => void;
   updateStickyNoteOnCurrentPage: (noteId: string, partial: Partial<StickyNoteItem>) => void;
   removeStickyNoteFromCurrentPage: (noteId: string) => void;
+
+  // Faz C: Live Speech-to-Text Transcription & Dictation
+  liveTranscript: string;
+  isTranscribing: boolean;
+  startSpeechTranscription: (lang?: string) => boolean;
+  stopSpeechTranscription: () => void;
+  clearSpeechTranscript: () => void;
+  addTranscriptToCurrentPageAsNote: () => void;
+
+  // Faz C: Notebook PIN Vault Security
+  unlockedNotebookIds: string[];
+  setNotebookPin: (notebookId: string, pin: string | null) => Promise<void>;
+  unlockNotebookSession: (notebookId: string) => void;
+  isNotebookSessionUnlocked: (notebookId: string) => boolean;
+
+  // Faz C: Full Library Backup & Restore
+  exportVaultBackup: () => void;
+  importVaultBackup: (file: File) => Promise<{ success: boolean; importedCount: number; error?: string }>;
 
   // Text Annotations
   addTextAnnotation: (
@@ -520,6 +540,11 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
   recordingDurationMs: 0,
   audioPlaybackTimeMs: 0,
   audioPlaying: false,
+
+  // Faz C Initial State
+  liveTranscript: '',
+  isTranscribing: false,
+  unlockedNotebookIds: [],
 
   undoStack: [],
   redoStack: [],
@@ -1582,13 +1607,32 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
     });
     if (ok) {
       set({ isRecordingAudio: true, recordingDurationMs: 0 });
+      // Start live lecture speech transcription if supported
+      if (speechTranscriptionService.isSupported()) {
+        speechTranscriptionService.clearTranscript();
+        speechTranscriptionService.startListening((full, interim) => {
+          set({
+            liveTranscript: full + (interim ? (full ? ' ' : '') + interim : ''),
+            isTranscribing: true,
+          });
+        });
+        set({ isTranscribing: true, liveTranscript: '' });
+      }
     }
   },
 
   stopAudioRecording: async () => {
     try {
       const res = await audioRecorder.stopRecording();
-      const { activeNotebookId, notebooks } = get();
+      let capturedTranscript = '';
+      if (speechTranscriptionService.getIsListening()) {
+        capturedTranscript = speechTranscriptionService.stopListening();
+        set({ isTranscribing: false });
+      }
+
+      const { activeNotebookId, notebooks, liveTranscript } = get();
+      const finalTranscript = capturedTranscript || liveTranscript || undefined;
+
       if (!activeNotebookId) {
         set({ isRecordingAudio: false });
         return;
@@ -1605,6 +1649,7 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
         durationMs: res.durationMs,
         createdAt: Date.now(),
         audioDataUrl: res.dataUrl,
+        transcript: finalTranscript,
       };
 
       const updatedRecordings = [newRec, ...(currentNb.audioRecordings || [])];
@@ -1626,6 +1671,103 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
       console.error('Stop recording error:', err);
       set({ isRecordingAudio: false });
     }
+  },
+
+  // FAZ C: SPEECH TRANSCRIPTION ACTIONS
+  startSpeechTranscription: (lang: string = 'tr-TR') => {
+    if (!speechTranscriptionService.isSupported()) return false;
+    speechTranscriptionService.clearTranscript();
+    const success = speechTranscriptionService.startListening((full, interim) => {
+      set({
+        liveTranscript: full + (interim ? (full ? ' ' : '') + interim : ''),
+        isTranscribing: true,
+      });
+    }, lang as any);
+    if (success) {
+      set({ isTranscribing: true, liveTranscript: '' });
+    }
+    return success;
+  },
+
+  stopSpeechTranscription: () => {
+    const transcript = speechTranscriptionService.stopListening();
+    set({ isTranscribing: false, liveTranscript: transcript || get().liveTranscript });
+  },
+
+  clearSpeechTranscript: () => {
+    speechTranscriptionService.clearTranscript();
+    set({ liveTranscript: '' });
+  },
+
+  addTranscriptToCurrentPageAsNote: () => {
+    const { liveTranscript, activePageIndex, addTextAnnotation } = get();
+    if (!liveTranscript.trim()) return;
+    const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    addTextAnnotation(
+      activePageIndex,
+      80,
+      140,
+      `🎙️ Dikte / Transkripsiyon [${timeStr}]:\n${liveTranscript}`
+    );
+  },
+
+  // FAZ C: NOTEBOOK PIN VAULT SECURITY ACTIONS
+  setNotebookPin: async (notebookId: string, pin: string | null) => {
+    const { notebooks } = get();
+    const updatedNotebooks = notebooks.map((nb) =>
+      nb.id === notebookId
+        ? {
+            ...nb,
+            isLocked: !!pin,
+            pinCode: pin || undefined,
+            updatedAt: Date.now(),
+          }
+        : nb
+    );
+    set({ notebooks: updatedNotebooks });
+    const target = updatedNotebooks.find((n) => n.id === notebookId);
+    if (target) await saveNotebookToDB(target);
+  },
+
+  unlockNotebookSession: (notebookId: string) => {
+    set((state) => ({
+      unlockedNotebookIds: Array.from(new Set([...state.unlockedNotebookIds, notebookId])),
+    }));
+  },
+
+  isNotebookSessionUnlocked: (notebookId: string) => {
+    const { notebooks, unlockedNotebookIds } = get();
+    const nb = notebooks.find((n) => n.id === notebookId);
+    if (!nb || !nb.isLocked) return true;
+    return unlockedNotebookIds.includes(notebookId);
+  },
+
+  // FAZ C: FULL LIBRARY VAULT BACKUP & RESTORE ACTIONS
+  exportVaultBackup: () => {
+    const { notebooks } = get();
+    exportEntireVault(notebooks);
+  },
+
+  importVaultBackup: async (file: File) => {
+    const res = await importEntireVault(file);
+    if (res.success && res.notebooks.length > 0) {
+      const existing = get().notebooks;
+      const existingIds = new Set(existing.map((n) => n.id));
+      const newItems = res.notebooks.filter((n) => !existingIds.has(n.id));
+      const updatedList = [
+        ...res.notebooks.filter((n) => existingIds.has(n.id)),
+        ...newItems,
+        ...existing.filter((n) => !res.notebooks.some((r) => r.id === n.id)),
+      ];
+
+      set({
+        notebooks: updatedList,
+        activeNotebookId: updatedList[0]?.id || null,
+        activePageIndex: 0,
+      });
+      return { success: true, importedCount: res.importedCount };
+    }
+    return { success: false, importedCount: 0, error: res.error || 'İçe aktarma başarısız.' };
   },
 
   setAudioPlaybackTimeMs: (ms: number) => {

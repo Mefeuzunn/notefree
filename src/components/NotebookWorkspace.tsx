@@ -1,10 +1,11 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { useNotebookStore } from '../store/notebookStore';
 import { CanvasPage } from './canvas/CanvasPage';
 import { YouTubePanel } from './youtube/YouTubePanel';
 import { Ruler } from './canvas/Ruler';
 import { Protractor } from './canvas/Protractor';
 import { InfiniteCanvas } from './canvas/InfiniteCanvas';
+import { NotebookLockModal } from './modals/NotebookLockModal';
 import {
   ZoomIn,
   ZoomOut,
@@ -21,6 +22,8 @@ import {
   Book,
   GripVertical,
   Infinity,
+  Lock,
+  KeyRound,
 } from 'lucide-react';
 
 export const NotebookWorkspace: React.FC = () => {
@@ -45,11 +48,14 @@ export const NotebookWorkspace: React.FC = () => {
     setActiveNotebook,
     canvasMode,
     setCanvasMode,
+    isNotebookSessionUnlocked,
   } = useNotebookStore();
 
+  const [lockModalOpen, setLockModalOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
 
   const activeNotebook = notebooks.find((n) => n.id === activeNotebookId);
+  const isLocked = !!(activeNotebook?.isLocked && !isNotebookSessionUnlocked(activeNotebook.id));
   const pages = activeNotebook?.pages || [];
 
   const isSplit = splitNotebook.isOpen && !!splitNotebook.secondaryNotebookId;
@@ -152,7 +158,26 @@ export const NotebookWorkspace: React.FC = () => {
             </div>
           )}
 
-          {canvasMode === 'infinite' ? (
+          {isLocked ? (
+            <div className="flex flex-col items-center justify-center my-auto py-20 text-slate-400 select-none animate-in fade-in">
+              <div className="w-16 h-16 rounded-3xl bg-indigo-600/20 text-indigo-400 border border-indigo-500/30 flex items-center justify-center mb-4 shadow-xl shadow-indigo-600/10">
+                <Lock size={30} />
+              </div>
+              <h3 className="text-base font-bold text-slate-100 mb-1">
+                Bu Defter Kilitli
+              </h3>
+              <p className="text-xs text-slate-400 max-w-xs text-center mb-5">
+                "{activeNotebook?.title}" defterinin sayfaları ve notları 4 haneli PIN kodu ile korunmaktadır.
+              </p>
+              <button
+                onClick={() => setLockModalOpen(true)}
+                className="flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs shadow-lg transition-all active:scale-95"
+              >
+                <KeyRound size={15} />
+                <span>PIN Kodu Girin</span>
+              </button>
+            </div>
+          ) : canvasMode === 'infinite' ? (
             <InfiniteCanvas />
           ) : pages.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-slate-500">
@@ -405,6 +430,16 @@ export const NotebookWorkspace: React.FC = () => {
 
       {/* 3. Floating Picture-in-Picture YouTube Panel */}
       {youtube.isOpen && youtube.mode === 'floating' && <YouTubePanel />}
+
+      {/* 🔒 Notebook PIN Vault Modal */}
+      {activeNotebook && (
+        <NotebookLockModal
+          isOpen={lockModalOpen}
+          onClose={() => setLockModalOpen(false)}
+          notebookId={activeNotebook.id}
+          mode="unlock"
+        />
+      )}
     </div>
   );
 };

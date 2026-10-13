@@ -16,7 +16,10 @@ import {
   Search,
   Edit2,
   Check,
+  Lock,
+  KeyRound,
 } from 'lucide-react';
+import { NotebookLockModal } from '../modals/NotebookLockModal';
 
 export const Sidebar: React.FC = () => {
   const {
@@ -35,6 +38,7 @@ export const Sidebar: React.FC = () => {
     setPageTitle,
     addOutlineItem,
     deleteOutlineItem,
+    isNotebookSessionUnlocked,
   } = useNotebookStore();
 
   const [activeTab, setActiveTab] = useState<'notebooks' | 'pages' | 'bookmarks' | 'outline'>('notebooks');
@@ -43,6 +47,15 @@ export const Sidebar: React.FC = () => {
   const [tempTitle, setTempTitle] = useState('');
   const [showAddChapter, setShowAddChapter] = useState(false);
   const [newChapterTitle, setNewChapterTitle] = useState('');
+  const [lockModalState, setLockModalState] = useState<{
+    isOpen: boolean;
+    notebookId: string | null;
+    mode: 'unlock' | 'set-pin' | 'remove-pin';
+  }>({
+    isOpen: false,
+    notebookId: null,
+    mode: 'unlock',
+  });
 
   const activeNotebook = notebooks.find((n) => n.id === activeNotebookId);
 
@@ -169,7 +182,17 @@ export const Sidebar: React.FC = () => {
               return (
                 <div
                   key={nb.id}
-                  onClick={() => setActiveNotebook(nb.id)}
+                  onClick={() => {
+                    if (nb.isLocked && !isNotebookSessionUnlocked(nb.id)) {
+                      setLockModalState({
+                        isOpen: true,
+                        notebookId: nb.id,
+                        mode: 'unlock',
+                      });
+                      return;
+                    }
+                    setActiveNotebook(nb.id);
+                  }}
                   className={`group flex items-center justify-between p-3 rounded-xl border cursor-pointer transition-all ${
                     isActive
                       ? 'bg-indigo-600/15 border-indigo-500/50 text-white shadow-md ring-1 ring-indigo-500/20'
@@ -178,12 +201,15 @@ export const Sidebar: React.FC = () => {
                 >
                   <div className="flex items-center gap-3 overflow-hidden">
                     <span
-                      className="w-4 h-9 rounded-md shrink-0 shadow-sm"
+                      className="w-4 h-9 rounded-md shrink-0 shadow-sm flex items-center justify-center text-white"
                       style={{ backgroundColor: nb.coverColor }}
-                    />
+                    >
+                      {nb.isLocked && <Lock size={9} />}
+                    </span>
                     <div className="truncate">
-                      <h4 className="text-xs font-semibold truncate group-hover:text-indigo-300 transition-colors">
-                        {nb.title}
+                      <h4 className="text-xs font-semibold truncate group-hover:text-indigo-300 transition-colors flex items-center gap-1">
+                        <span>{nb.title}</span>
+                        {nb.isLocked && <span className="text-[10px] text-amber-400">🔒</span>}
                       </h4>
                       <p className="text-[11px] text-slate-500 mt-0.5">
                         {nb.pages.length} sayfa
@@ -530,6 +556,19 @@ export const Sidebar: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* 🔒 Notebook PIN Lock & Vault Modal */}
+      <NotebookLockModal
+        isOpen={lockModalState.isOpen}
+        onClose={() => setLockModalState({ ...lockModalState, isOpen: false })}
+        notebookId={lockModalState.notebookId}
+        mode={lockModalState.mode}
+        onSuccess={() => {
+          if (lockModalState.mode === 'unlock' && lockModalState.notebookId) {
+            setActiveNotebook(lockModalState.notebookId);
+          }
+        }}
+      />
     </aside>
   );
 };

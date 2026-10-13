@@ -234,6 +234,7 @@ export interface AudioNoteRecording {
   durationMs: number;
   createdAt: number;
   audioDataUrl?: string; // Stored base64 / blob URL
+  transcript?: string; // Transcribed speech text
 }
 
 export interface Folder {
@@ -261,6 +262,15 @@ export interface Notebook {
   flashcards?: Flashcard[];
   pdfOutline?: PdfOutlineItem[];
   canvasMode?: CanvasMode;
+  isLocked?: boolean;
+  pinCode?: string;
+}
+
+export interface LibraryVaultBackup {
+  version: number;
+  exportedAt: number;
+  appName: string;
+  notebooks: Notebook[];
 }
 
 export type CanvasMode = 'paged' | 'infinite';

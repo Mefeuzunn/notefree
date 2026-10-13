@@ -1,23 +1,23 @@
 import React, { useState, useRef } from 'react';
 import { useNotebookStore } from '../../store/notebookStore';
 import { CoverStyle, Notebook } from '../../types/notebook';
-import { exportAllNotebooksBackup } from '../../services/storage';
+import { NotebookLockModal } from '../modals/NotebookLockModal';
 import {
   Book,
   Plus,
   Search,
-  Folder,
-  Star,
-  Clock,
   Trash2,
   UploadCloud,
   X,
-  FileText,
-  ChevronRight,
   BookOpen,
-  Sparkles,
   FolderDown,
   FileUp,
+  Lock,
+  Unlock,
+  KeyRound,
+  Archive,
+  Download,
+  ShieldCheck,
 } from 'lucide-react';
 
 interface LibraryViewProps {
@@ -33,30 +33,57 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ isOpen, onClose }) => 
     deleteNotebook,
     setNewNotebookModalOpen,
     setDocImportModalOpen,
-    importNotebook,
+    exportVaultBackup,
+    importVaultBackup,
+    isNotebookSessionUnlocked,
   } = useNotebookStore();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<'all' | 'favorites'>('all');
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [lockModalState, setLockModalState] = useState<{
+    isOpen: boolean;
+    notebookId: string | null;
+    mode: 'unlock' | 'set-pin' | 'remove-pin';
+  }>({
+    isOpen: false,
+    notebookId: null,
+    mode: 'unlock',
+  });
+
+  const vaultFileInputRef = useRef<HTMLInputElement | null>(null);
 
   if (!isOpen) return null;
 
-  const handleFileImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleVaultImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     try {
-      const text = await file.text();
-      await importNotebook(text);
-      alert('Defter başarıyla içe aktarıldı!');
-      onClose();
+      const res = await importVaultBackup(file);
+      if (res.success) {
+        alert(`Kütüphane başarıyla geri yüklendi! (${res.importedCount} defter)`);
+      } else {
+        alert(`Geri yükleme hatası: ${res.error || 'Dosya okunamadı'}`);
+      }
     } catch (err: any) {
-      console.error('Import error:', err);
-      alert(`Defter yüklenirken hata oluştu: ${err.message || 'Geçersiz dosya'}`);
+      console.error('Vault import error:', err);
+      alert(`Hata: ${err.message || 'Geçersiz yedek dosyası'}`);
     } finally {
-      if (fileInputRef.current) fileInputRef.current.value = '';
+      if (vaultFileInputRef.current) vaultFileInputRef.current.value = '';
     }
+  };
+
+  const handleNotebookClick = (nb: Notebook) => {
+    if (nb.isLocked && !isNotebookSessionUnlocked(nb.id)) {
+      setLockModalState({
+        isOpen: true,
+        notebookId: nb.id,
+        mode: 'unlock',
+      });
+      return;
+    }
+    setActiveNotebook(nb.id);
+    onClose();
   };
 
   const filteredNotebooks = notebooks.filter((nb) => {
@@ -67,6 +94,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ isOpen, onClose }) => 
 
   const renderCover = (nb: Notebook) => {
     const style: CoverStyle = nb.coverStyle || 'classic';
+    const isLockedAndHidden = nb.isLocked && !isNotebookSessionUnlocked(nb.id);
 
     return (
       <div
@@ -85,7 +113,10 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ isOpen, onClose }) => 
         {style === 'spiral' && (
           <div className="absolute left-1.5 inset-y-2 flex flex-col justify-between w-2 pointer-events-none">
             {Array.from({ length: 14 }).map((_, i) => (
-              <div key={i} className="w-3 h-1.5 rounded-full bg-slate-200 border border-slate-400 shadow-sm -ml-1" />
+              <div
+                key={i}
+                className="w-3 h-1.5 rounded-full bg-slate-200 border border-slate-400 shadow-sm -ml-1"
+              />
             ))}
           </div>
         )}
@@ -95,12 +126,30 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ isOpen, onClose }) => 
           <div className="absolute inset-1.5 border border-dashed border-amber-200/40 rounded-lg pointer-events-none" />
         )}
 
+        {/* Lock Overlay Badge if locked */}
+        {nb.isLocked && (
+          <div className="absolute top-2 right-2 z-10">
+            <span
+              className={`p-1.5 rounded-full shadow-md flex items-center justify-center text-xs ${
+                isLockedAndHidden
+                  ? 'bg-rose-600/90 text-white ring-2 ring-rose-400'
+                  : 'bg-emerald-600/90 text-white'
+              }`}
+              title={isLockedAndHidden ? 'Kilitli Defter (PIN Gerekli)' : 'PIN Kilidi Açık (Bu Oturum)'}
+            >
+              {isLockedAndHidden ? <Lock size={12} /> : <Unlock size={12} />}
+            </span>
+          </div>
+        )}
+
         {/* Notebook Title Badge */}
         <div className="bg-white/95 dark:bg-slate-900/90 backdrop-blur-md rounded-lg p-2.5 shadow-md border border-black/5 dark:border-white/10 mt-3 mx-1">
           <h3 className="font-bold text-xs text-slate-900 dark:text-slate-100 line-clamp-2 leading-tight">
-            {nb.title}
+            {isLockedAndHidden ? '🔒 Kilitli Defter' : nb.title}
           </h3>
-          <p className="text-[10px] text-slate-500 mt-1">{nb.pages.length} sayfa</p>
+          <p className="text-[10px] text-slate-500 mt-1">
+            {isLockedAndHidden ? 'Şifreli Kasa' : `${nb.pages.length} sayfa`}
+          </p>
         </div>
 
         {/* Footer info on cover */}
@@ -115,14 +164,14 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ isOpen, onClose }) => 
   return (
     <div className="fixed inset-0 bg-slate-950/95 backdrop-blur-2xl z-50 flex flex-col overflow-hidden select-none animate-in fade-in duration-200">
       {/* Top Header */}
-      <header className="h-16 border-b border-slate-800 px-6 flex items-center justify-between">
+      <header className="h-16 border-b border-slate-800 px-6 flex items-center justify-between shadow-md">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center text-white shadow-lg shadow-indigo-600/30">
             <BookOpen size={18} />
           </div>
           <div>
             <h1 className="text-base font-bold text-white tracking-tight">Kütüphanem</h1>
-            <p className="text-[11px] text-slate-400">Tüm Defterler ve Dokümanlar</p>
+            <p className="text-[11px] text-slate-400">Tüm Defterler ve Güvenli Kasa</p>
           </div>
         </div>
 
@@ -134,39 +183,42 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ isOpen, onClose }) => 
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Defterlerde ara..."
-            className="w-full bg-slate-900 border border-slate-850 rounded-xl pl-9 pr-4 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition-all"
+            className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-9 pr-4 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition-all"
           />
         </div>
 
         {/* Actions */}
         <div className="flex items-center gap-2">
-          {/* Hidden .notefree file input */}
+          {/* Hidden full vault file input */}
           <input
-            ref={fileInputRef}
+            ref={vaultFileInputRef}
             type="file"
-            accept=".notefree,.json"
-            onChange={handleFileImport}
+            accept=".notefree-vault,.json"
+            onChange={handleVaultImport}
             className="hidden"
           />
 
+          {/* Full Vault Restore */}
           <button
-            onClick={() => fileInputRef.current?.click()}
-            className="flex items-center gap-1.5 bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/30 px-3 py-2 rounded-xl text-xs font-semibold transition-colors"
-            title=".notefree dosyasını içe aktar"
-          >
-            <FileUp size={15} />
-            <span className="hidden sm:inline">.notefree İçe Aktar</span>
-          </button>
-
-          <button
-            onClick={() => exportAllNotebooksBackup(notebooks)}
+            onClick={() => vaultFileInputRef.current?.click()}
             className="flex items-center gap-1.5 bg-slate-850 hover:bg-slate-800 border border-slate-750 text-slate-300 hover:text-white px-3 py-2 rounded-xl text-xs font-semibold transition-colors"
-            title="Tüm defterleri tek dosya olarak yedekle"
+            title="Tüm Kütüphaneyi (.notefree-vault) dosyasından geri yükle"
           >
-            <FolderDown size={15} />
-            <span className="hidden md:inline">Yedekle</span>
+            <FileUp size={14} className="text-indigo-400" />
+            <span className="hidden sm:inline">Yedekten Yükle</span>
           </button>
 
+          {/* Full Vault Export Backup */}
+          <button
+            onClick={exportVaultBackup}
+            className="flex items-center gap-1.5 bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/30 text-indigo-300 px-3 py-2 rounded-xl text-xs font-semibold transition-colors shadow-sm"
+            title="Tüm Kütüphaneyi ve ses kayıtlarını tek dosya olarak yedekle (.notefree-vault)"
+          >
+            <Archive size={14} />
+            <span className="hidden md:inline">Tam Kütüphane Yedeği</span>
+          </button>
+
+          {/* New Notebook */}
           <button
             onClick={() => setNewNotebookModalOpen(true)}
             className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-500 text-white px-3.5 py-2 rounded-xl text-xs font-semibold shadow-md transition-colors"
@@ -175,6 +227,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ isOpen, onClose }) => 
             <span>Yeni Defter</span>
           </button>
 
+          {/* PDF / Word Import */}
           <button
             onClick={() => setDocImportModalOpen(true)}
             className="flex items-center gap-1.5 bg-slate-850 hover:bg-slate-800 border border-slate-750 text-slate-300 hover:text-white px-3 py-2 rounded-xl text-xs font-semibold transition-colors hidden lg:flex"
@@ -183,6 +236,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ isOpen, onClose }) => 
             <span>PDF/Word</span>
           </button>
 
+          {/* Close */}
           <button
             onClick={onClose}
             className="p-2 text-slate-400 hover:text-white rounded-xl hover:bg-slate-850 ml-2"
@@ -198,8 +252,8 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ isOpen, onClose }) => 
         <div className="max-w-6xl mx-auto">
           {/* Section Title */}
           <div className="flex items-center justify-between mb-6">
-            <h2 className="text-sm font-bold text-slate-300 uppercase tracking-wider">
-              Defterlerim ({filteredNotebooks.length})
+            <h2 className="text-sm font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
+              <span>Defterlerim ({filteredNotebooks.length})</span>
             </h2>
           </div>
 
@@ -208,24 +262,55 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ isOpen, onClose }) => 
             {filteredNotebooks.map((nb) => {
               const isActive = nb.id === activeNotebookId;
               return (
-                <div
-                  key={nb.id}
-                  onClick={() => {
-                    setActiveNotebook(nb.id);
-                    onClose();
-                  }}
-                  className="group flex flex-col items-center"
-                >
-                  {renderCover(nb)}
-                  <h4 className="mt-2.5 text-xs font-semibold text-slate-200 text-center truncate w-full group-hover:text-indigo-400 transition-colors">
-                    {nb.title}
-                  </h4>
+                <div key={nb.id} className="group flex flex-col items-center">
+                  <div className="w-full" onClick={() => handleNotebookClick(nb)}>
+                    {renderCover(nb)}
+                  </div>
+
+                  <div className="w-full mt-2.5 flex items-center justify-between px-1">
+                    <h4
+                      onClick={() => handleNotebookClick(nb)}
+                      className="text-xs font-semibold text-slate-200 truncate flex-1 cursor-pointer group-hover:text-indigo-400 transition-colors"
+                    >
+                      {nb.title}
+                    </h4>
+
+                    {/* Lock / PIN Button */}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setLockModalState({
+                          isOpen: true,
+                          notebookId: nb.id,
+                          mode: nb.isLocked ? 'remove-pin' : 'set-pin',
+                        });
+                      }}
+                      className="p-1 text-slate-500 hover:text-indigo-300 rounded hover:bg-slate-800 transition-colors"
+                      title={nb.isLocked ? 'PIN Kilidini Kaldır' : 'PIN Şifresi Koy (Gizli Kasa)'}
+                    >
+                      {nb.isLocked ? <Lock size={12} className="text-amber-400" /> : <KeyRound size={12} />}
+                    </button>
+                  </div>
                 </div>
               );
             })}
           </div>
         </div>
       </div>
+
+      {/* 🔒 Notebook PIN Lock & Vault Modal */}
+      <NotebookLockModal
+        isOpen={lockModalState.isOpen}
+        onClose={() => setLockModalState({ ...lockModalState, isOpen: false })}
+        notebookId={lockModalState.notebookId}
+        mode={lockModalState.mode}
+        onSuccess={() => {
+          if (lockModalState.mode === 'unlock' && lockModalState.notebookId) {
+            setActiveNotebook(lockModalState.notebookId);
+            onClose();
+          }
+        }}
+      />
     </div>
   );
 };
