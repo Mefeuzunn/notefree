@@ -77,6 +77,7 @@ interface LaserPoint {
 interface NotebookStoreState {
   notebooks: Notebook[];
   activeNotebookId: string | null;
+  openNotebookIds: string[];
   activePageIndex: number;
   isLoading: boolean;
 
@@ -162,6 +163,9 @@ interface NotebookStoreState {
   // Core Actions
   initialize: () => Promise<void>;
   setActiveNotebook: (id: string) => void;
+  openNotebookTab: (notebookId: string) => void;
+  closeNotebookTab: (notebookId: string) => void;
+  reorderNotebookTabs: (fromIndex: number, toIndex: number) => void;
   createNotebook: (
     title: string,
     coverColor: string,
@@ -564,6 +568,7 @@ function setupCollaborationListener(set: any, get: any) {
 export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
   notebooks: [],
   activeNotebookId: null,
+  openNotebookIds: [],
   activePageIndex: 0,
   isLoading: true,
 
@@ -726,9 +731,11 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
     try {
       const notebooks = await initStorage();
       const firstNb = notebooks[0];
+      const initialOpen = notebooks.slice(0, 4).map((n) => n.id);
       set({
         notebooks,
         activeNotebookId: firstNb ? firstNb.id : null,
+        openNotebookIds: initialOpen.length > 0 ? initialOpen : (firstNb ? [firstNb.id] : []),
         activePageIndex: firstNb ? firstNb.activePageIndex : 0,
         youtube: {
           ...get().youtube,
@@ -748,8 +755,11 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
   setActiveNotebook: (id: string) => {
     const nb = get().notebooks.find((n) => n.id === id);
     if (!nb) return;
+    const { openNotebookIds } = get();
+    const newOpen = openNotebookIds.includes(id) ? openNotebookIds : [...openNotebookIds, id];
     set({
       activeNotebookId: id,
+      openNotebookIds: newOpen,
       activePageIndex: Math.min(nb.activePageIndex, Math.max(0, nb.pages.length - 1)),
       undoStack: [],
       redoStack: [],
@@ -760,6 +770,52 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
         videoId: nb.youtubeUrl ? extractYouTubeId(nb.youtubeUrl) : get().youtube.videoId,
       },
     });
+  },
+
+  openNotebookTab: (notebookId: string) => {
+    get().setActiveNotebook(notebookId);
+  },
+
+  closeNotebookTab: (notebookId: string) => {
+    const { openNotebookIds, activeNotebookId, notebooks } = get();
+    const nextTabs = openNotebookIds.filter((id) => id !== notebookId);
+
+    if (activeNotebookId === notebookId) {
+      const closedIndex = openNotebookIds.indexOf(notebookId);
+      let nextActiveId: string | null = null;
+      if (nextTabs.length > 0) {
+        const nextIndex = Math.min(closedIndex, nextTabs.length - 1);
+        nextActiveId = nextTabs[nextIndex];
+      } else if (notebooks.length > 0) {
+        nextActiveId = notebooks[0].id;
+        nextTabs.push(nextActiveId);
+      }
+
+      if (nextActiveId) {
+        get().setActiveNotebook(nextActiveId);
+      } else {
+        set({ activeNotebookId: null, openNotebookIds: [] });
+      }
+    }
+
+    set({ openNotebookIds: nextTabs });
+  },
+
+  reorderNotebookTabs: (fromIndex: number, toIndex: number) => {
+    const { openNotebookIds } = get();
+    if (
+      fromIndex < 0 ||
+      toIndex < 0 ||
+      fromIndex >= openNotebookIds.length ||
+      toIndex >= openNotebookIds.length ||
+      fromIndex === toIndex
+    ) {
+      return;
+    }
+    const newTabs = [...openNotebookIds];
+    const [removed] = newTabs.splice(fromIndex, 1);
+    newTabs.splice(toIndex, 0, removed);
+    set({ openNotebookIds: newTabs });
   },
 
   createNotebook: async (
@@ -798,6 +854,7 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
     set({
       notebooks: updated,
       activeNotebookId: newId,
+      openNotebookIds: [...get().openNotebookIds, newId],
       activePageIndex: 0,
       undoStack: [],
       redoStack: [],
@@ -810,9 +867,14 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
 
   deleteNotebook: async (id: string) => {
     const filtered = get().notebooks.filter((n) => n.id !== id);
-    const nextActive = filtered[0] ? filtered[0].id : null;
+    const nextTabs = get().openNotebookIds.filter((tabId) => tabId !== id);
+    const nextActive = nextTabs.length > 0 ? nextTabs[0] : (filtered[0] ? filtered[0].id : null);
+    if (nextActive && !nextTabs.includes(nextActive)) {
+      nextTabs.push(nextActive);
+    }
     set({
       notebooks: filtered,
+      openNotebookIds: nextTabs,
       activeNotebookId: nextActive,
       activePageIndex: 0,
     });

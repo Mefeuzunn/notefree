@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { useNotebookStore } from './store/notebookStore';
 import { Toolbar } from './components/toolbar/Toolbar';
+import { DocumentTabsBar } from './components/tabs/DocumentTabsBar';
 import { Sidebar } from './components/sidebar/Sidebar';
 import { NotebookWorkspace } from './components/NotebookWorkspace';
 import { TemplateSelectorModal } from './components/modals/TemplateSelectorModal';
@@ -79,7 +80,10 @@ export const App: React.FC = () => {
 
   return (
     <div className="h-screen w-screen flex flex-col overflow-hidden bg-slate-950 text-slate-100 font-sans select-none">
-      {/* 1. Top Control Bar (Hidden in Presentation Mode) */}
+      {/* 1. Document Tabs Bar (GoodNotes Multi-Document Tabs) */}
+      {!presentationMode && <DocumentTabsBar />}
+
+      {/* 2. Top Control Bar (Hidden in Presentation Mode) */}
       {!presentationMode && <Toolbar />}
 
       {/* Presentation Mode Floating Minimal HUD */}
