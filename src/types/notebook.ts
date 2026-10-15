@@ -53,6 +53,15 @@ export type PaperColor = 'white' | 'cream' | 'yellow-pad' | 'dark' | 'kraft';
 
 export type CoverStyle = 'classic' | 'leather' | 'pastel' | 'spiral' | 'modern';
 
+export interface CustomTemplateItem {
+  id: string;
+  name: string;
+  dataUrl: string;
+  width?: number;
+  height?: number;
+  createdAt: number;
+}
+
 export interface StrokePoint {
   x: number;
   y: number;

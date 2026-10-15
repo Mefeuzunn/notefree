@@ -30,6 +30,7 @@ import {
   MarginCardColor,
   StylusDoubleTapAction,
   RulerUnit,
+  CustomTemplateItem,
 } from '../types/notebook';
 import { collaborationService } from '../services/collaborationService';
 import { db, initStorage, saveNotebookToDB, importNotebookFromNotefree } from '../services/storage';
@@ -133,6 +134,7 @@ interface NotebookStoreState {
 
   // Modals & Panels
   templateModalOpen: boolean;
+  customTemplates: CustomTemplateItem[];
   docImportModalOpen: boolean;
   newNotebookModalOpen: boolean;
   pageManagerModalOpen: boolean;
@@ -191,8 +193,12 @@ interface NotebookStoreState {
     paperColor: PaperColor,
     customPitch?: number,
     customLineColor?: string,
-    lineOpacity?: number
+    lineOpacity?: number,
+    backgroundImageUrl?: string,
+    applyToAllPages?: boolean
   ) => Promise<void>;
+  addCustomTemplate: (template: CustomTemplateItem) => void;
+  deleteCustomTemplate: (id: string) => void;
   updateCurrentPagePitch: (
     customPitch?: number,
     customLineColor?: string,
@@ -696,6 +702,14 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
   },
 
   templateModalOpen: false,
+  customTemplates: (() => {
+    try {
+      const saved = localStorage.getItem('notefree_custom_templates');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  })(),
   docImportModalOpen: false,
   newNotebookModalOpen: false,
   pageManagerModalOpen: false,
@@ -1009,7 +1023,9 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
     paperColor: PaperColor,
     customPitch?: number,
     customLineColor?: string,
-    lineOpacity?: number
+    lineOpacity?: number,
+    backgroundImageUrl?: string,
+    applyToAllPages?: boolean
   ) => {
     const { activeNotebookId, notebooks, activePageIndex } = get();
     if (!activeNotebookId) return;
@@ -1017,7 +1033,7 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
     if (!currentNb) return;
 
     const updatedPages = currentNb.pages.map((p, idx) =>
-      idx === activePageIndex
+      applyToAllPages || idx === activePageIndex
         ? {
             ...p,
             template,
@@ -1025,6 +1041,7 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
             customPitch: customPitch !== undefined ? customPitch : p.customPitch,
             customLineColor: customLineColor !== undefined ? customLineColor : p.customLineColor,
             lineOpacity: lineOpacity !== undefined ? lineOpacity : p.lineOpacity,
+            backgroundImageUrl: backgroundImageUrl !== undefined ? backgroundImageUrl : p.backgroundImageUrl,
           }
         : p
     );
@@ -1040,6 +1057,30 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
     });
 
     await saveNotebookToDB(updatedNotebook);
+  },
+
+  addCustomTemplate: (template: CustomTemplateItem) => {
+    set((state) => {
+      const updated = [template, ...state.customTemplates.filter((t) => t.id !== template.id)];
+      try {
+        localStorage.setItem('notefree_custom_templates', JSON.stringify(updated));
+      } catch (e) {
+        console.warn('Could not save custom template to localStorage', e);
+      }
+      return { customTemplates: updated };
+    });
+  },
+
+  deleteCustomTemplate: (id: string) => {
+    set((state) => {
+      const updated = state.customTemplates.filter((t) => t.id !== id);
+      try {
+        localStorage.setItem('notefree_custom_templates', JSON.stringify(updated));
+      } catch (e) {
+        console.warn('Could not update custom templates in localStorage', e);
+      }
+      return { customTemplates: updated };
+    });
   },
 
   updateCurrentPagePitch: async (

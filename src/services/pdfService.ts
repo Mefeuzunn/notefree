@@ -177,3 +177,33 @@ export async function exportNotebookToPdf(
   const pdfBytes = await pdfDoc.save();
   return new Blob([pdfBytes.buffer as ArrayBuffer], { type: 'application/pdf' });
 }
+
+/**
+ * FAZ R: Converts a PDF page into a high-resolution template image
+ */
+export async function renderPdfPageAsTemplateImage(
+  file: File,
+  pageNumber: number = 1
+): Promise<{ dataUrl: string; width: number; height: number }> {
+  const arrayBuffer = await file.arrayBuffer();
+  const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+  const pdfDoc = await loadingTask.promise;
+  const page = await pdfDoc.getPage(pageNumber);
+  const viewport = page.getViewport({ scale: 2.0 }); // Retina 2x high resolution
+
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+  canvas.width = viewport.width;
+  canvas.height = viewport.height;
+
+  if (!ctx) throw new Error('Canvas render context could not be created');
+  // @ts-ignore - pdfjs-dist typing
+  await page.render({ canvasContext: ctx, viewport }).promise;
+  const dataUrl = canvas.toDataURL('image/png');
+
+  return {
+    dataUrl,
+    width: Math.round(viewport.width / 2),
+    height: Math.round(viewport.height / 2),
+  };
+}
