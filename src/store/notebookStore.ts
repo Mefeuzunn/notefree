@@ -39,6 +39,8 @@ import { PRESET_STICKERS } from '../engine/stickersLibrary';
 import { audioRecorder } from '../services/audioService';
 import { speechTranscriptionService } from '../services/speechTranscriptionService';
 import { exportEntireVault, importEntireVault } from '../services/vaultBackupService';
+import { ambientAudioService, AmbientSoundType } from '../services/ambientAudioService';
+import { textToSpeechService } from '../services/textToSpeechService';
 
 interface YouTubeState {
   isOpen: boolean;
@@ -291,6 +293,38 @@ interface NotebookStoreState {
   // Faz C: Full Library Backup & Restore
   exportVaultBackup: () => void;
   importVaultBackup: (file: File) => Promise<{ success: boolean; importedCount: number; error?: string }>;
+
+  // Faz D: Compass (Pergel), Symmetry (Ayna Çizimi), Pomodoro & Ambiyans
+  compassVisible: boolean;
+  compassRadius: number;
+  compassAngle: number;
+  toggleCompass: () => void;
+  setCompassRadius: (radius: number) => void;
+  setCompassAngle: (angle: number) => void;
+
+  symmetryEnabled: boolean;
+  symmetryAxis: 'vertical' | 'horizontal';
+  symmetryPosition: number;
+  toggleSymmetry: () => void;
+  setSymmetryAxis: (axis: 'vertical' | 'horizontal') => void;
+  setSymmetryPosition: (pos: number) => void;
+
+  pomodoroOpen: boolean;
+  pomodoroRunning: boolean;
+  pomodoroMode: 'work' | 'shortBreak' | 'longBreak';
+  pomodoroTimeLeft: number;
+  pomodoroTotalDuration: number;
+  setPomodoroOpen: (open: boolean) => void;
+  setPomodoroRunning: (running: boolean) => void;
+  setPomodoroMode: (mode: 'work' | 'shortBreak' | 'longBreak') => void;
+  setPomodoroTimeLeft: (time: number) => void;
+  tickPomodoro: () => void;
+  resetPomodoro: () => void;
+
+  activeAmbience: AmbientSoundType | null;
+  ambienceVolume: number;
+  toggleAmbience: (type: AmbientSoundType) => void;
+  setAmbienceVolume: (volume: number) => void;
 
   // Text Annotations
   addTextAnnotation: (
@@ -545,6 +579,24 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
   liveTranscript: '',
   isTranscribing: false,
   unlockedNotebookIds: [],
+
+  // Faz D Initial State
+  compassVisible: false,
+  compassRadius: 140,
+  compassAngle: 0,
+
+  symmetryEnabled: false,
+  symmetryAxis: 'vertical',
+  symmetryPosition: 0.5,
+
+  pomodoroOpen: false,
+  pomodoroRunning: false,
+  pomodoroMode: 'work',
+  pomodoroTimeLeft: 25 * 60,
+  pomodoroTotalDuration: 25 * 60,
+
+  activeAmbience: null,
+  ambienceVolume: 0.5,
 
   undoStack: [],
   redoStack: [],
@@ -1794,6 +1846,101 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
 
   setProtractorAngle: (angle: number) => {
     set({ protractorAngle: angle });
+  },
+
+  // Faz D: Compass (Pergel), Symmetry, Pomodoro & Ambience
+  toggleCompass: () => {
+    set((state) => ({ compassVisible: !state.compassVisible }));
+  },
+
+  setCompassRadius: (radius: number) => {
+    set({ compassRadius: Math.max(20, Math.min(500, radius)) });
+  },
+
+  setCompassAngle: (angle: number) => {
+    set({ compassAngle: angle });
+  },
+
+  toggleSymmetry: () => {
+    set((state) => ({ symmetryEnabled: !state.symmetryEnabled }));
+  },
+
+  setSymmetryAxis: (axis: 'vertical' | 'horizontal') => {
+    set({ symmetryAxis: axis });
+  },
+
+  setSymmetryPosition: (pos: number) => {
+    set({ symmetryPosition: Math.max(0.1, Math.min(0.9, pos)) });
+  },
+
+  setPomodoroOpen: (open: boolean) => {
+    set({ pomodoroOpen: open });
+  },
+
+  setPomodoroRunning: (running: boolean) => {
+    set({ pomodoroRunning: running });
+  },
+
+  setPomodoroMode: (mode: 'work' | 'shortBreak' | 'longBreak') => {
+    const duration = mode === 'work' ? 25 * 60 : mode === 'shortBreak' ? 5 * 60 : 15 * 60;
+    set({
+      pomodoroMode: mode,
+      pomodoroTotalDuration: duration,
+      pomodoroTimeLeft: duration,
+      pomodoroRunning: false,
+    });
+  },
+
+  setPomodoroTimeLeft: (time: number) => {
+    set({ pomodoroTimeLeft: time });
+  },
+
+  tickPomodoro: () => {
+    const { pomodoroTimeLeft, pomodoroRunning } = get();
+    if (!pomodoroRunning) return;
+    if (pomodoroTimeLeft <= 1) {
+      set({ pomodoroTimeLeft: 0, pomodoroRunning: false });
+      try {
+        const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+        if (AudioCtx) {
+          const ctx = new AudioCtx();
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(880, ctx.currentTime);
+          osc.frequency.exponentialRampToValueAtTime(440, ctx.currentTime + 0.6);
+          gain.gain.setValueAtTime(0.2, ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.6);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start();
+          osc.stop(ctx.currentTime + 0.6);
+        }
+      } catch (_) {}
+    } else {
+      set({ pomodoroTimeLeft: pomodoroTimeLeft - 1 });
+    }
+  },
+
+  resetPomodoro: () => {
+    const { pomodoroTotalDuration } = get();
+    set({ pomodoroTimeLeft: pomodoroTotalDuration, pomodoroRunning: false });
+  },
+
+  toggleAmbience: (type: AmbientSoundType) => {
+    const current = ambientAudioService.getActiveSound();
+    if (current === type) {
+      ambientAudioService.stop();
+      set({ activeAmbience: null });
+    } else {
+      ambientAudioService.play(type);
+      set({ activeAmbience: type });
+    }
+  },
+
+  setAmbienceVolume: (volume: number) => {
+    ambientAudioService.setVolume(volume);
+    set({ ambienceVolume: volume });
   },
 
   addStickyNoteToCurrentPage: (note: StickyNoteItem) => {

@@ -29,6 +29,7 @@ import {
 } from '../../engine/lassoHelper';
 import { TextBoxOverlay } from './TextBoxOverlay';
 import { StickyNoteOverlay } from './StickyNoteOverlay';
+import { SymmetryGuide } from './SymmetryGuide';
 import { collaborationService } from '../../services/collaborationService';
 import { HandwritingOcrModal } from '../modals/HandwritingOcrModal';
 import {
@@ -114,6 +115,9 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
     remoteLiveStrokes,
     updateMyCursor,
     addStickyNoteToCurrentPage,
+    symmetryEnabled,
+    symmetryAxis,
+    symmetryPosition,
   } = useNotebookStore();
 
   const [isDrawing, setIsDrawing] = useState(false);
@@ -632,6 +636,27 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
         },
         toolSettings.streamline
       );
+
+      // 🪞 Faz D: Real-time Live Symmetry Mirror Stroke
+      if (symmetryEnabled && currentPointsRef.current.length > 0) {
+        const isVert = symmetryAxis === 'vertical';
+        const axisCoord = isVert ? width * symmetryPosition : height * symmetryPosition;
+        const mirroredPoints = currentPointsRef.current.map((pt) => ({
+          ...pt,
+          x: isVert ? 2 * axisCoord - pt.x : pt.x,
+          y: isVert ? pt.y : 2 * axisCoord - pt.y,
+        }));
+        drawStrokeOnCanvas(
+          ctx,
+          {
+            tool: activeTool as any,
+            color: toolSettings.color,
+            size: toolSettings.size,
+            points: mirroredPoints,
+          },
+          toolSettings.streamline
+        );
+      }
     }
 
     ctx.restore();
@@ -912,6 +937,26 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
     };
 
     addStrokeToCurrentPage(newStroke);
+
+    // 🪞 Faz D: Real-time Symmetry Mirrored Stroke Commit
+    if (symmetryEnabled && finalPoints.length > 0) {
+      const isVert = symmetryAxis === 'vertical';
+      const axisCoord = isVert ? width * symmetryPosition : height * symmetryPosition;
+      const mirroredPoints: StrokePoint[] = finalPoints.map((pt) => ({
+        ...pt,
+        x: isVert ? 2 * axisCoord - pt.x : pt.x,
+        y: isVert ? pt.y : 2 * axisCoord - pt.y,
+      }));
+      const mirrorBounds = calculateStrokeBounds(mirroredPoints, toolSettings.size);
+      const mirrorStroke: Stroke = {
+        ...newStroke,
+        id: `sym_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+        points: mirroredPoints,
+        bounds: mirrorBounds,
+      };
+      addStrokeToCurrentPage(mirrorStroke);
+    }
+
     currentPointsRef.current = [];
   };
 
@@ -1317,6 +1362,9 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
             </div>
           );
         })}
+
+      {/* 🪞 Faz D: Real-time Symmetry Axis Guide */}
+      <SymmetryGuide pageWidth={width} pageHeight={height} />
 
       {/* Faz A: Handwriting to Text OCR Modal */}
       <HandwritingOcrModal

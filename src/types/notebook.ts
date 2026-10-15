@@ -22,7 +22,8 @@ export type ToolType =
   | 'fill'
   | 'audio-scrub'
   | 'sticky-note'
-  | 'protractor';
+  | 'protractor'
+  | 'compass';
 
 export type EraserMode = 'stroke' | 'pixel';
 

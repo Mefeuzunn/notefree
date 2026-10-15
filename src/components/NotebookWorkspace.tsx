@@ -4,6 +4,7 @@ import { CanvasPage } from './canvas/CanvasPage';
 import { YouTubePanel } from './youtube/YouTubePanel';
 import { Ruler } from './canvas/Ruler';
 import { Protractor } from './canvas/Protractor';
+import { Compass } from './canvas/Compass';
 import { InfiniteCanvas } from './canvas/InfiniteCanvas';
 import { NotebookLockModal } from './modals/NotebookLockModal';
 import {
@@ -427,6 +428,9 @@ export const NotebookWorkspace: React.FC = () => {
 
       {/* 🌟 Interactive Protractor (360° Açıölçer) */}
       <Protractor scale={zoom} />
+
+      {/* 🌟 Interactive Geometry Compass (Hassas Pergel) */}
+      <Compass scale={zoom} />
 
       {/* 3. Floating Picture-in-Picture YouTube Panel */}
       {youtube.isOpen && youtube.mode === 'floating' && <YouTubePanel />}

@@ -52,9 +52,12 @@ import {
   Search,
   StickyNote,
   Disc,
+  CircleDot,
+  FlipHorizontal,
 } from 'lucide-react';
 import { PenType, ShapeType, ToolType } from '../../types/notebook';
 import { AudioPlayerBar } from '../audio/AudioPlayerBar';
+import { PomodoroBarWidget } from '../pomodoro/PomodoroBarWidget';
 
 const COLOR_PALETTE = [
   '#0f172a', // Slate black
@@ -133,6 +136,10 @@ export const Toolbar: React.FC = () => {
     setCollaborationModalOpen,
     protractorVisible,
     toggleProtractor,
+    compassVisible,
+    toggleCompass,
+    symmetryEnabled,
+    toggleSymmetry,
     addStickyNoteToCurrentPage,
   } = useNotebookStore();
 
@@ -612,6 +619,32 @@ export const Toolbar: React.FC = () => {
           <Disc size={16} />
         </button>
 
+        {/* 🧭 Faz D: Hassas Pergel / Çember & Yay Aracı (Compass) */}
+        <button
+          onClick={toggleCompass}
+          className={`p-2 rounded-xl transition-all flex items-center justify-center ${
+            compassVisible
+              ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30 scale-105 ring-1 ring-indigo-400'
+              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
+          }`}
+          title="Hassas Pergel / Çember & Yay Aracı (Compass Caliper)"
+        >
+          <CircleDot size={16} />
+        </button>
+
+        {/* 🪞 Faz D: Gerçek Zamanlı Simetri & Ayna Çizim (Symmetry Mode) */}
+        <button
+          onClick={toggleSymmetry}
+          className={`p-2 rounded-xl transition-all flex items-center justify-center ${
+            symmetryEnabled
+              ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30 scale-105 ring-1 ring-indigo-400'
+              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
+          }`}
+          title="Gerçek Zamanlı Ayna / Simetri Çizim Modu"
+        >
+          <FlipHorizontal size={16} />
+        </button>
+
         {/* 📌 Faz B: Yapışkan Notlar (3D Post-it Sticky Notes) */}
         <button
           onClick={() => {
@@ -1075,6 +1108,9 @@ export const Toolbar: React.FC = () => {
         >
           <FolderDown size={17} />
         </button>
+
+        {/* 🍅 Faz D: Pomodoro Sayacı & Web Audio Ambiyans Üreteci */}
+        <PomodoroBarWidget />
 
         {/* 🎙️ Notability Audio Recording & Note Replay */}
         <AudioPlayerBar />

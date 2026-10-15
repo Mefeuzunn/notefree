@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { StickyNoteItem, StickyNoteColor } from '../../types/notebook';
 import { useNotebookStore } from '../../store/notebookStore';
-import { Trash2, GripHorizontal, Palette } from 'lucide-react';
+import { Trash2, GripHorizontal, Palette, Volume2 } from 'lucide-react';
+import { textToSpeechService } from '../../services/textToSpeechService';
 
 interface StickyNoteOverlayProps {
   note: StickyNoteItem;
@@ -183,6 +184,18 @@ export const StickyNoteOverlay: React.FC<StickyNoteOverlayProps> = ({ note, scal
                 </div>
               )}
             </div>
+
+            {/* 🔊 Faz D: TTS Read Aloud */}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                if (note.text) textToSpeechService.toggle(note.text);
+              }}
+              className="p-1 rounded hover:bg-black/10 transition-colors opacity-70 hover:opacity-100"
+              title="Notu Sesli Oku (Text-to-Speech)"
+            >
+              <Volume2 size={12} />
+            </button>
 
             {/* Delete Button */}
             <button

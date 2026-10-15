@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { TextAnnotation } from '../../types/notebook';
-import { Trash2, Type, Move, X } from 'lucide-react';
+import { Trash2, Type, Move, X, Volume2 } from 'lucide-react';
+import { textToSpeechService } from '../../services/textToSpeechService';
 
 interface TextBoxOverlayProps {
   annotation: TextAnnotation;
@@ -95,6 +96,15 @@ export const TextBoxOverlay: React.FC<TextBoxOverlayProps> = ({
           </div>
 
           <div className="w-px h-3.5 bg-slate-750 mx-0.5" />
+
+          {/* 🔊 Faz D: TTS Read Aloud */}
+          <button
+            onClick={() => textToSpeechService.toggle(annotation.text)}
+            className="p-1 text-slate-400 hover:text-indigo-400 rounded transition-colors"
+            title="Metni Sesli Oku (Text-to-Speech)"
+          >
+            <Volume2 size={13} />
+          </button>
 
           {/* Delete Button */}
           <button

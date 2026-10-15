@@ -10,7 +10,9 @@ import {
   X,
   FileText,
   AlignLeft,
+  Volume2,
 } from 'lucide-react';
+import { textToSpeechService } from '../../services/textToSpeechService';
 
 interface HandwritingOcrModalProps {
   isOpen: boolean;
@@ -141,6 +143,16 @@ export const HandwritingOcrModal: React.FC<HandwritingOcrModalProps> = ({
 
           {/* Action Buttons */}
           <div className="flex gap-2.5 pt-1">
+            <button
+              onClick={() => textToSpeechService.toggle(transcribedText)}
+              disabled={!transcribedText.trim() || isProcessing}
+              className="py-2.5 px-3 bg-slate-800 hover:bg-slate-750 disabled:opacity-40 text-slate-200 border border-slate-700 rounded-xl text-xs font-semibold transition-colors flex items-center justify-center gap-1.5"
+              title="Metni Seslendir (TTS)"
+            >
+              <Volume2 size={14} className="text-indigo-400" />
+              <span>Seslendir</span>
+            </button>
+
             <button
               onClick={handleCopy}
               className="flex-1 py-2.5 bg-slate-800 hover:bg-slate-750 text-slate-200 border border-slate-700 rounded-xl text-xs font-semibold transition-colors flex items-center justify-center gap-1.5"
