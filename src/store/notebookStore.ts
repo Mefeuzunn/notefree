@@ -209,6 +209,8 @@ interface NotebookStoreState {
   toggleAutoDeselectEraser: () => void;
   setSelectedShape: (shape: ShapeType) => void;
   toggleAutoDetectShape: () => void;
+  setShapeFillColor: (color: string | undefined) => void;
+  setShapeFillOpacity: (opacity: number) => void;
   togglePalmRejection: () => void;
   toggleTiltShading: () => void;
   addStrokeToCurrentPage: (stroke: Stroke) => void;
@@ -590,6 +592,8 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
     autoDeselectEraser: false,
     selectedShape: 'line',
     autoDetectShape: true,
+    shapeFillColor: undefined,
+    shapeFillOpacity: 0.25,
     favoriteColors: ['#0f172a', '#1e40af', '#b91c1c'],
     favoriteSizes: [2.0, 3.5, 6.0],
     activeColorIndex: 0,
@@ -1298,6 +1302,24 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
       toolSettings: {
         ...state.toolSettings,
         autoDetectShape: !state.toolSettings.autoDetectShape,
+      },
+    }));
+  },
+
+  setShapeFillColor: (color: string | undefined) => {
+    set((state) => ({
+      toolSettings: {
+        ...state.toolSettings,
+        shapeFillColor: color,
+      },
+    }));
+  },
+
+  setShapeFillOpacity: (opacity: number) => {
+    set((state) => ({
+      toolSettings: {
+        ...state.toolSettings,
+        shapeFillOpacity: Math.max(0.05, Math.min(1.0, opacity)),
       },
     }));
   },

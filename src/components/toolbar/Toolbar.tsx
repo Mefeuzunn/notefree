@@ -54,6 +54,7 @@ import {
   Disc,
   CircleDot,
   FlipHorizontal,
+  Ban,
 } from 'lucide-react';
 import { PenType, ShapeType, ToolType } from '../../types/notebook';
 import { AudioPlayerBar } from '../audio/AudioPlayerBar';
@@ -87,6 +88,8 @@ export const Toolbar: React.FC = () => {
     setFavoriteColor,
     setFavoriteSize,
     setSelectedShape,
+    setShapeFillColor,
+    setShapeFillOpacity,
     activeNotebookId,
     notebooks,
     activePageIndex,
@@ -531,6 +534,86 @@ export const Toolbar: React.FC = () => {
                   )
                 )}
               </div>
+
+              {/* FAZ L: Shape Fill Color & Opacity Controls */}
+              <div className="h-px bg-slate-700/60 my-0.5" />
+
+              <div className="flex items-center justify-between px-1">
+                <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+                  Şekil İç Dolgusu
+                </span>
+                <span className="text-[10px] text-indigo-400 font-mono font-semibold">
+                  {toolSettings.shapeFillColor
+                    ? `%${Math.round((toolSettings.shapeFillOpacity ?? 0.25) * 100)}`
+                    : 'Dolgusuz'}
+                </span>
+              </div>
+
+              {/* Color Swatches */}
+              <div className="flex items-center gap-1.5 flex-wrap px-0.5">
+                {/* No fill / transparent button */}
+                <button
+                  type="button"
+                  onClick={() => setShapeFillColor(undefined)}
+                  className={`w-6 h-6 rounded-md border flex items-center justify-center transition-all ${
+                    !toolSettings.shapeFillColor
+                      ? 'border-rose-500 bg-rose-500/20 text-rose-400 ring-1 ring-rose-400'
+                      : 'border-slate-700 bg-slate-800 text-slate-400 hover:text-slate-200'
+                  }`}
+                  title="Dolgusuz (Şeffaf İç)"
+                >
+                  <Ban size={12} />
+                </button>
+
+                {/* Preset pastel fill colors */}
+                {[
+                  { name: 'Sarı', color: '#fef08a' },
+                  { name: 'Gül', color: '#fecdd3' },
+                  { name: 'Nane', color: '#a7f3d0' },
+                  { name: 'Mavi', color: '#bae6fd' },
+                  { name: 'Lavanta', color: '#ddd6fe' },
+                  { name: 'Turuncu', color: '#fed7aa' },
+                  { name: 'Grafit', color: '#cbd5e1' },
+                ].map(({ name, color }) => (
+                  <button
+                    key={color}
+                    type="button"
+                    onClick={() => setShapeFillColor(color)}
+                    className={`w-6 h-6 rounded-md border transition-all relative flex items-center justify-center ${
+                      toolSettings.shapeFillColor === color
+                        ? 'border-white scale-110 shadow-sm ring-2 ring-indigo-500'
+                        : 'border-slate-700/80 hover:scale-105'
+                    }`}
+                    style={{ backgroundColor: color }}
+                    title={name}
+                  >
+                    {toolSettings.shapeFillColor === color && (
+                      <Check size={11} className="text-slate-900 font-bold" />
+                    )}
+                  </button>
+                ))}
+              </div>
+
+              {/* Opacity presets (visible when fill is active) */}
+              {toolSettings.shapeFillColor && (
+                <div className="flex items-center gap-1 bg-slate-900 p-1 rounded-lg">
+                  <span className="text-[10px] text-slate-400 px-1 font-medium">Opaklık:</span>
+                  {[0.15, 0.3, 0.6, 1.0].map((op) => (
+                    <button
+                      key={op}
+                      type="button"
+                      onClick={() => setShapeFillOpacity(op)}
+                      className={`flex-1 py-0.5 text-[10px] rounded transition-colors font-mono ${
+                        Math.abs((toolSettings.shapeFillOpacity ?? 0.25) - op) < 0.08
+                          ? 'bg-indigo-600 text-white font-bold'
+                          : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+                      }`}
+                    >
+                      %{Math.round(op * 100)}
+                    </button>
+                  ))}
+                </div>
+              )}
 
               <div className="h-px bg-slate-700/60 my-0.5" />
 

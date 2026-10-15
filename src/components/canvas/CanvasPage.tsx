@@ -819,6 +819,25 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
         break;
     }
 
+    // FAZ L: Live shape fill preview during drawing
+    if (
+      toolSettings.shapeFillColor &&
+      ['rectangle', 'circle', 'triangle'].includes(toolSettings.selectedShape) &&
+      shapePoints.length >= 3
+    ) {
+      ctx.save();
+      ctx.fillStyle = toolSettings.shapeFillColor;
+      ctx.globalAlpha = toolSettings.shapeFillOpacity !== undefined ? toolSettings.shapeFillOpacity : 0.25;
+      ctx.beginPath();
+      ctx.moveTo(shapePoints[0].x, shapePoints[0].y);
+      for (let i = 1; i < shapePoints.length; i++) {
+        ctx.lineTo(shapePoints[i].x, shapePoints[i].y);
+      }
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
+
     drawStrokeOnCanvas(ctx, {
       tool: 'ballpoint',
       color: toolSettings.color,
@@ -1047,11 +1066,13 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
       bounds,
       timestamp: Date.now(),
       videoTimestamp: youtube.isOpen ? Math.floor(youtube.currentTime) : undefined,
-      // Faz I: shape editing metadata
+      // Faz I & L: shape editing and fill metadata
       ...(committedShapeType && {
         shapeType: committedShapeType,
         controlNodes: buildControlNodes(committedShapeType, committedStart, committedEnd),
         shapeFillColor: toolSettings.shapeFillColor,
+        shapeFillOpacity:
+          toolSettings.shapeFillOpacity !== undefined ? toolSettings.shapeFillOpacity : 0.25,
       }),
     };
 
@@ -1647,6 +1668,15 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
                 points: newPoints,
                 bounds,
                 controlNodes: newNodes,
+              });
+            }}
+            isClosedShape={['rectangle', 'circle', 'triangle'].includes(selectedShapeStroke.shapeType || '')}
+            fillColor={selectedShapeStroke.shapeFillColor}
+            fillOpacity={selectedShapeStroke.shapeFillOpacity ?? 0.25}
+            onFillChange={(color, opacity) => {
+              updateStrokeOnCurrentPage(selectedShapeStroke.id, {
+                shapeFillColor: color,
+                shapeFillOpacity: opacity,
               });
             }}
             onClose={() => setSelectedShapeStrokeId(null)}

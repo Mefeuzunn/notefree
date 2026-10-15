@@ -88,6 +88,7 @@ export interface Stroke {
   shapeType?: ShapeType; // Set when drawn as explicit shape
   controlNodes?: ShapeControlNode[]; // Editable control points for shape morphing
   shapeFillColor?: string; // Optional fill inside closed shapes
+  shapeFillOpacity?: number; // Optional opacity (0.0 to 1.0) for fill
 }
 
 export interface TextAnnotation {
@@ -365,6 +366,7 @@ export interface ToolSettings {
   selectedShape: ShapeType;
   autoDetectShape: boolean;
   shapeFillColor?: string;
+  shapeFillOpacity?: number; // 0.0 to 1.0 (defaults to 0.25)
   angleSnap?: boolean; // Snap to 0°, 15°, 30°, 45°, 90°
   gridSnap?: boolean; // Magnetic snap to paper grid intersections
   // GoodNotes style quick favorite slots
