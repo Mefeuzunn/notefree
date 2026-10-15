@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useNotebookStore } from '../../store/notebookStore';
 import { PageTemplate, PaperColor } from '../../types/notebook';
-import { PAPER_COLORS } from '../../engine/paperTemplates';
-import { X, Check } from 'lucide-react';
+import { PAPER_COLORS, drawPaperTemplate } from '../../engine/paperTemplates';
+import { X, Check, Sliders, Palette, Eye, RotateCcw, Ruler } from 'lucide-react';
 
 interface TemplateItem {
   id: PageTemplate;
@@ -45,6 +45,15 @@ const COLORS: Array<{ id: PaperColor; name: string; bg: string }> = [
   { id: 'dark', name: 'Koyu Mod', bg: '#181b26' },
 ];
 
+const PRESET_LINE_COLORS = [
+  { label: 'Varsayılan', color: '' },
+  { label: 'Grafit', color: '#64748b' },
+  { label: 'Klasik Mavi', color: '#3b82f6' },
+  { label: 'Sepia Kahve', color: '#b45309' },
+  { label: 'Lavanta', color: '#8b5cf6' },
+  { label: 'Soft Nane', color: '#10b981' },
+];
+
 export const TemplateSelectorModal: React.FC = () => {
   const {
     templateModalOpen,
@@ -64,9 +73,38 @@ export const TemplateSelectorModal: React.FC = () => {
   const [selectedColor, setSelectedColor] = useState<PaperColor>(
     currentPage?.paperColor || 'white'
   );
+  const [customPitch, setCustomPitch] = useState<number>(
+    currentPage?.customPitch || 32
+  );
+  const [customLineColor, setCustomLineColor] = useState<string>(
+    currentPage?.customLineColor || ''
+  );
+  const [lineOpacity, setLineOpacity] = useState<number>(
+    currentPage?.lineOpacity ?? 0.8
+  );
   const [activeCategory, setActiveCategory] = useState<
     'all' | 'classic' | 'stem' | 'plan' | 'creative'
   >('all');
+
+  const previewCanvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  // Live Canvas Preview
+  useEffect(() => {
+    const canvas = previewCanvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    drawPaperTemplate(
+      ctx,
+      canvas.width,
+      canvas.height,
+      selectedTemplate,
+      selectedColor,
+      customPitch,
+      customLineColor || undefined,
+      lineOpacity
+    );
+  }, [selectedTemplate, selectedColor, customPitch, customLineColor, lineOpacity]);
 
   const filteredTemplates = TEMPLATES.filter(
     (t) => activeCategory === 'all' || t.category === activeCategory
@@ -75,20 +113,37 @@ export const TemplateSelectorModal: React.FC = () => {
   if (!templateModalOpen) return null;
 
   const handleApply = () => {
-    updateCurrentPageTemplate(selectedTemplate, selectedColor);
+    updateCurrentPageTemplate(
+      selectedTemplate,
+      selectedColor,
+      customPitch,
+      customLineColor || undefined,
+      lineOpacity
+    );
   };
+
+  const isPitchApplicable = [
+    'lined',
+    'lined-margin',
+    'grid-5mm',
+    'dots',
+    'isometric',
+    'cornell',
+    'hexagonal',
+  ].includes(selectedTemplate);
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
-      <div className="bg-slate-900 border border-slate-700/80 rounded-2xl w-full max-w-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
+      <div className="bg-slate-900 border border-slate-700/80 rounded-2xl w-full max-w-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
         {/* Modal Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800">
           <div>
-            <h2 className="text-base font-semibold text-slate-100">
-              Defter Şablonu ve Kağıt Seçimi
+            <h2 className="text-base font-semibold text-slate-100 flex items-center gap-2">
+              <Ruler size={18} className="text-indigo-400" />
+              Defter Şablonu & Kılavuz Ayarları
             </h2>
             <p className="text-xs text-slate-400 mt-0.5">
-              Sayfa {activePageIndex + 1} için şablon ve kağıt rengini belirleyin.
+              Sayfa {activePageIndex + 1} için şablon, satır/kare aralığı ve kağıt rengini belirleyin.
             </p>
           </div>
           <button
@@ -132,6 +187,133 @@ export const TemplateSelectorModal: React.FC = () => {
               ))}
             </div>
           </div>
+
+          {/* 📏 Faz G: Custom Pitch & Line Color Studio (When applicable) */}
+          {isPitchApplicable && (
+            <div className="bg-slate-950/70 border border-slate-800 rounded-2xl p-4 space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Sliders size={16} className="text-indigo-400" />
+                  <span className="text-xs font-semibold text-slate-200">
+                    Kılavuz Çizgi / Kare Aralığı & Görünüm Ayarı
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] font-mono text-indigo-300 bg-indigo-500/10 px-2 py-0.5 rounded-md border border-indigo-500/20">
+                    {customPitch}px (~{(customPitch / 3.78).toFixed(1)} mm)
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-4 items-center">
+                {/* Live Preview Canvas Swatch */}
+                <div className="flex flex-col items-center gap-1 shrink-0">
+                  <div className="w-28 h-20 rounded-xl overflow-hidden border border-slate-700 shadow-inner bg-slate-900 relative">
+                    <canvas
+                      ref={previewCanvasRef}
+                      width={112}
+                      height={80}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                  <span className="text-[10px] text-slate-500 flex items-center gap-1">
+                    <Eye size={10} /> Canlı Önizleme
+                  </span>
+                </div>
+
+                {/* Pitch Slider & Presets */}
+                <div className="flex-1 w-full space-y-2.5">
+                  <div className="flex items-center justify-between text-xs text-slate-400">
+                    <span>Satır / Kare Aralığı:</span>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setCustomPitch(22)}
+                        className={`px-2 py-0.5 rounded text-[10px] font-medium border ${
+                          customPitch === 22
+                            ? 'bg-indigo-600 text-white border-indigo-500'
+                            : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-750'
+                        }`}
+                      >
+                        Dar (5mm)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setCustomPitch(32)}
+                        className={`px-2 py-0.5 rounded text-[10px] font-medium border ${
+                          customPitch === 32
+                            ? 'bg-indigo-600 text-white border-indigo-500'
+                            : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-750'
+                        }`}
+                      >
+                        Standart (7mm)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setCustomPitch(44)}
+                        className={`px-2 py-0.5 rounded text-[10px] font-medium border ${
+                          customPitch === 44
+                            ? 'bg-indigo-600 text-white border-indigo-500'
+                            : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-750'
+                        }`}
+                      >
+                        Geniş (10mm)
+                      </button>
+                    </div>
+                  </div>
+
+                  <input
+                    type="range"
+                    min={16}
+                    max={64}
+                    step={2}
+                    value={customPitch}
+                    onChange={(e) => setCustomPitch(Number(e.target.value))}
+                    className="w-full accent-indigo-500 cursor-pointer h-1.5 bg-slate-800 rounded-lg"
+                  />
+
+                  {/* Line Opacity & Color */}
+                  <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-slate-850">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] text-slate-400">Opaklık:</span>
+                      <input
+                        type="range"
+                        min={0.2}
+                        max={1.0}
+                        step={0.1}
+                        value={lineOpacity}
+                        onChange={(e) => setLineOpacity(Number(e.target.value))}
+                        className="w-20 accent-indigo-500 cursor-pointer h-1.5 bg-slate-800 rounded-lg"
+                      />
+                      <span className="text-[10px] font-mono text-slate-400">
+                        %{Math.round(lineOpacity * 100)}
+                      </span>
+                    </div>
+
+                    {/* Color Swatches */}
+                    <div className="flex items-center gap-1.5">
+                      {PRESET_LINE_COLORS.map((pc) => (
+                        <button
+                          key={pc.label}
+                          type="button"
+                          onClick={() => setCustomLineColor(pc.color)}
+                          className={`w-4 h-4 rounded-full border transition-all ${
+                            customLineColor === pc.color
+                              ? 'ring-2 ring-indigo-400 scale-110'
+                              : 'opacity-70 hover:opacity-100'
+                          }`}
+                          style={{
+                            backgroundColor: pc.color || (selectedColor === 'dark' ? '#282f44' : '#e2e8f0'),
+                          }}
+                          title={pc.label}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Template Style Selection */}
           <div>

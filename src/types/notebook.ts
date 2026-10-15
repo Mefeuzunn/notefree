@@ -191,6 +191,22 @@ export interface Page {
   height: number;
   title?: string;
   isBookmarked?: boolean;
+  customPitch?: number; // Custom line/grid spacing in px (e.g. 20 - 64)
+  customLineColor?: string; // Optional custom line hex color
+  lineOpacity?: number; // Line opacity (0.1 - 1.0)
+}
+
+export type MarginCardColor = 'amber' | 'emerald' | 'sky' | 'rose' | 'purple' | 'slate';
+
+export interface MarginExcerptCard {
+  id: string;
+  title: string;
+  content: string;
+  color: MarginCardColor;
+  targetPageIndex?: number; // Linked page index for fast jumping
+  targetY?: number; // Optional vertical coordinate on the page
+  tags?: string[];
+  createdAt: number;
 }
 
 export type StickyNoteColor = 'yellow' | 'pink' | 'mint' | 'blue' | 'purple';
@@ -268,6 +284,7 @@ export interface Notebook {
   isLocked?: boolean;
   pinCode?: string;
   twoPageSpread?: boolean;
+  marginCards?: MarginExcerptCard[];
 }
 
 export interface ExportOptions {

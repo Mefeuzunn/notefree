@@ -159,11 +159,31 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
         ctx.drawImage(img, 0, 0, width, height);
       };
     } else {
-      drawPaperTemplate(ctx, width, height, page.template, page.paperColor);
+      drawPaperTemplate(
+        ctx,
+        width,
+        height,
+        page.template,
+        page.paperColor,
+        page.customPitch,
+        page.customLineColor,
+        page.lineOpacity
+      );
     }
 
     ctx.restore();
-  }, [page.template, page.paperColor, page.backgroundImageUrl, width, height, dpr, layers.background]);
+  }, [
+    page.template,
+    page.paperColor,
+    page.customPitch,
+    page.customLineColor,
+    page.lineOpacity,
+    page.backgroundImageUrl,
+    width,
+    height,
+    dpr,
+    layers.background,
+  ]);
 
   // 2. Draw Committed Strokes Layer & Fills
   const redrawCommittedStrokes = useCallback(() => {

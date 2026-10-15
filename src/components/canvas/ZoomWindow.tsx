@@ -78,7 +78,16 @@ export const ZoomWindow: React.FC = () => {
     ctx.translate(-zoomWindowPos.x, -zoomWindowPos.y);
 
     // Draw page paper template
-    drawPaperTemplate(ctx, currentPage.width, currentPage.height, currentPage.template, currentPage.paperColor);
+    drawPaperTemplate(
+      ctx,
+      currentPage.width,
+      currentPage.height,
+      currentPage.template,
+      currentPage.paperColor,
+      currentPage.customPitch,
+      currentPage.customLineColor,
+      currentPage.lineOpacity
+    );
 
     // Draw strokes that overlap the zoom box
     for (const stroke of currentPage.strokes) {

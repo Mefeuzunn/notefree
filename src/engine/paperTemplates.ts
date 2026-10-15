@@ -41,7 +41,10 @@ export function drawPaperTemplate(
   width: number,
   height: number,
   template: PageTemplate,
-  paperColor: PaperColor
+  paperColor: PaperColor,
+  customPitch?: number,
+  customLineColor?: string,
+  lineOpacity?: number
 ) {
   const palette = PAPER_COLORS[paperColor] || PAPER_COLORS.white;
 
@@ -50,9 +53,13 @@ export function drawPaperTemplate(
   ctx.fillStyle = palette.bg;
   ctx.fillRect(0, 0, width, height);
 
+  const activeLineColor = customLineColor || palette.line;
   ctx.lineWidth = 1;
-  ctx.strokeStyle = palette.line;
+  ctx.strokeStyle = activeLineColor;
   ctx.fillStyle = palette.text;
+  if (typeof lineOpacity === 'number' && lineOpacity >= 0 && lineOpacity <= 1) {
+    ctx.globalAlpha = lineOpacity;
+  }
 
   switch (template) {
     case 'blank':
@@ -60,7 +67,7 @@ export function drawPaperTemplate(
       break;
 
     case 'lined': {
-      const lineSpacing = 32;
+      const lineSpacing = customPitch && customPitch >= 12 && customPitch <= 120 ? customPitch : 32;
       const topPadding = 60;
       for (let y = topPadding; y < height - 20; y += lineSpacing) {
         ctx.beginPath();
@@ -72,7 +79,7 @@ export function drawPaperTemplate(
     }
 
     case 'lined-margin': {
-      const lineSpacing = 32;
+      const lineSpacing = customPitch && customPitch >= 12 && customPitch <= 120 ? customPitch : 32;
       const topPadding = 60;
       const marginX = 90;
 
@@ -97,7 +104,7 @@ export function drawPaperTemplate(
     }
 
     case 'grid-5mm': {
-      const gridSize = 28;
+      const gridSize = customPitch && customPitch >= 10 && customPitch <= 120 ? customPitch : 28;
       // Vertical lines
       for (let x = 30; x < width - 20; x += gridSize) {
         ctx.beginPath();
@@ -116,8 +123,8 @@ export function drawPaperTemplate(
     }
 
     case 'dots': {
-      const dotSpacing = 28;
-      ctx.fillStyle = palette.line;
+      const dotSpacing = customPitch && customPitch >= 10 && customPitch <= 120 ? customPitch : 28;
+      ctx.fillStyle = activeLineColor;
       for (let x = 40; x < width - 30; x += dotSpacing) {
         for (let y = 40; y < height - 30; y += dotSpacing) {
           ctx.beginPath();
@@ -129,10 +136,10 @@ export function drawPaperTemplate(
     }
 
     case 'isometric': {
-      const step = 32;
+      const step = customPitch && customPitch >= 12 && customPitch <= 120 ? customPitch : 32;
       const h = (step * Math.sqrt(3)) / 2;
       ctx.save();
-      ctx.strokeStyle = palette.line;
+      ctx.strokeStyle = activeLineColor;
       ctx.lineWidth = 0.8;
 
       // Horizontal lines

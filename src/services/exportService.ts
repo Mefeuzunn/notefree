@@ -46,7 +46,16 @@ export async function renderPageToCanvas(
 
     // 2. Paper Template Grid / Lines
     if (options.includeTemplate !== false && page.template !== 'blank') {
-      drawPaperTemplate(ctx, page.width, page.height, page.template, page.paperColor);
+      drawPaperTemplate(
+        ctx,
+        page.width,
+        page.height,
+        page.template,
+        page.paperColor,
+        page.customPitch,
+        page.customLineColor,
+        page.lineOpacity
+      );
     }
   }
 

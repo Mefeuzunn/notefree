@@ -26,6 +26,8 @@ import {
   PeerUser,
   CollaborationSession,
   StickyNoteItem,
+  MarginExcerptCard,
+  MarginCardColor,
 } from '../types/notebook';
 import { collaborationService } from '../services/collaborationService';
 import { db, initStorage, saveNotebookToDB, importNotebookFromNotefree } from '../services/storage';
@@ -169,8 +171,19 @@ interface NotebookStoreState {
   setActivePageIndex: (index: number) => void;
   addPage: (template?: PageTemplate, paperColor?: PaperColor) => Promise<void>;
   removeCurrentPage: () => Promise<void>;
-  updateCurrentPageTemplate: (template: PageTemplate, paperColor: PaperColor) => Promise<void>;
   setViewMode: (mode: 'continuous' | 'single') => void;
+  updateCurrentPageTemplate: (
+    template: PageTemplate,
+    paperColor: PaperColor,
+    customPitch?: number,
+    customLineColor?: string,
+    lineOpacity?: number
+  ) => Promise<void>;
+  updateCurrentPagePitch: (
+    customPitch?: number,
+    customLineColor?: string,
+    lineOpacity?: number
+  ) => Promise<void>;
   togglePageBookmark: (pageIndex: number) => void;
   setPageTitle: (pageIndex: number, title: string) => void;
   invertCurrentPageInks: () => void;
@@ -331,6 +344,25 @@ interface NotebookStoreState {
   toggleTwoPageSpread: () => void;
   exportModalOpen: boolean;
   setExportModalOpen: (open: boolean) => void;
+
+  // Faz F: LiquidText Study Margin & Excerpt Workspace
+  marginWorkspaceOpen: boolean;
+  toggleMarginWorkspace: () => void;
+  setMarginWorkspaceOpen: (open: boolean) => void;
+  addMarginCard: (card: Omit<MarginExcerptCard, 'id' | 'createdAt'>) => void;
+  updateMarginCard: (id: string, partial: Partial<MarginExcerptCard>) => void;
+  deleteMarginCard: (id: string) => void;
+  stampMarginCardToCanvas: (cardId: string) => void;
+  exportMarginCardsToNewPage: () => Promise<void>;
+
+  // Faz H: Active Recall Tape Quiz Mode
+  tapeQuizMode: boolean;
+  tapeQuizActiveIndex: number;
+  setTapeQuizMode: (active: boolean) => void;
+  revealAllTapes: (pageIndex: number) => void;
+  hideAllTapes: (pageIndex: number) => void;
+  nextTapeQuizItem: () => void;
+  prevTapeQuizItem: () => void;
 
   // Text Annotations
   addTextAnnotation: (
@@ -608,6 +640,11 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
   twoPageSpread: false,
   exportModalOpen: false,
 
+  // Faz F & H Initial State
+  marginWorkspaceOpen: false,
+  tapeQuizMode: false,
+  tapeQuizActiveIndex: 0,
+
   undoStack: [],
   redoStack: [],
 
@@ -876,14 +913,29 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
     await saveNotebookToDB(updatedNotebook);
   },
 
-  updateCurrentPageTemplate: async (template: PageTemplate, paperColor: PaperColor) => {
+  updateCurrentPageTemplate: async (
+    template: PageTemplate,
+    paperColor: PaperColor,
+    customPitch?: number,
+    customLineColor?: string,
+    lineOpacity?: number
+  ) => {
     const { activeNotebookId, notebooks, activePageIndex } = get();
     if (!activeNotebookId) return;
     const currentNb = notebooks.find((n) => n.id === activeNotebookId);
     if (!currentNb) return;
 
     const updatedPages = currentNb.pages.map((p, idx) =>
-      idx === activePageIndex ? { ...p, template, paperColor } : p
+      idx === activePageIndex
+        ? {
+            ...p,
+            template,
+            paperColor,
+            customPitch: customPitch !== undefined ? customPitch : p.customPitch,
+            customLineColor: customLineColor !== undefined ? customLineColor : p.customLineColor,
+            lineOpacity: lineOpacity !== undefined ? lineOpacity : p.lineOpacity,
+          }
+        : p
     );
 
     const updatedNotebook = { ...currentNb, pages: updatedPages, updatedAt: Date.now() };
@@ -894,6 +946,39 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
     set({
       notebooks: updatedNotebooks,
       templateModalOpen: false,
+    });
+
+    await saveNotebookToDB(updatedNotebook);
+  },
+
+  updateCurrentPagePitch: async (
+    customPitch?: number,
+    customLineColor?: string,
+    lineOpacity?: number
+  ) => {
+    const { activeNotebookId, notebooks, activePageIndex } = get();
+    if (!activeNotebookId) return;
+    const currentNb = notebooks.find((n) => n.id === activeNotebookId);
+    if (!currentNb) return;
+
+    const updatedPages = currentNb.pages.map((p, idx) =>
+      idx === activePageIndex
+        ? {
+            ...p,
+            customPitch: customPitch !== undefined ? customPitch : p.customPitch,
+            customLineColor: customLineColor !== undefined ? customLineColor : p.customLineColor,
+            lineOpacity: lineOpacity !== undefined ? lineOpacity : p.lineOpacity,
+          }
+        : p
+    );
+
+    const updatedNotebook = { ...currentNb, pages: updatedPages, updatedAt: Date.now() };
+    const updatedNotebooks = notebooks.map((n) =>
+      n.id === activeNotebookId ? updatedNotebook : n
+    );
+
+    set({
+      notebooks: updatedNotebooks,
     });
 
     await saveNotebookToDB(updatedNotebook);
@@ -1960,6 +2045,216 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
 
   setExportModalOpen: (open: boolean) => {
     set({ exportModalOpen: open });
+  },
+
+  // Faz F: LiquidText Study Margin & Excerpt Workspace Actions
+  toggleMarginWorkspace: () => {
+    set((state) => ({ marginWorkspaceOpen: !state.marginWorkspaceOpen }));
+  },
+
+  setMarginWorkspaceOpen: (open: boolean) => {
+    set({ marginWorkspaceOpen: open });
+  },
+
+  addMarginCard: (cardData: Omit<MarginExcerptCard, 'id' | 'createdAt'>) => {
+    const { notebooks, activeNotebookId } = get();
+    const nb = notebooks.find((n) => n.id === activeNotebookId);
+    if (!nb) return;
+
+    const newCard: MarginExcerptCard = {
+      ...cardData,
+      id: `margin-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+      createdAt: Date.now(),
+    };
+
+    const updatedNotebook: Notebook = {
+      ...nb,
+      marginCards: [...(nb.marginCards || []), newCard],
+      updatedAt: Date.now(),
+    };
+
+    set({
+      notebooks: notebooks.map((n) => (n.id === activeNotebookId ? updatedNotebook : n)),
+    });
+    saveNotebookToDB(updatedNotebook);
+  },
+
+  updateMarginCard: (id: string, partial: Partial<MarginExcerptCard>) => {
+    const { notebooks, activeNotebookId } = get();
+    const nb = notebooks.find((n) => n.id === activeNotebookId);
+    if (!nb) return;
+
+    const updatedCards = (nb.marginCards || []).map((c) =>
+      c.id === id ? { ...c, ...partial } : c
+    );
+
+    const updatedNotebook: Notebook = {
+      ...nb,
+      marginCards: updatedCards,
+      updatedAt: Date.now(),
+    };
+
+    set({
+      notebooks: notebooks.map((n) => (n.id === activeNotebookId ? updatedNotebook : n)),
+    });
+    saveNotebookToDB(updatedNotebook);
+  },
+
+  deleteMarginCard: (id: string) => {
+    const { notebooks, activeNotebookId } = get();
+    const nb = notebooks.find((n) => n.id === activeNotebookId);
+    if (!nb) return;
+
+    const updatedCards = (nb.marginCards || []).filter((c) => c.id !== id);
+
+    const updatedNotebook: Notebook = {
+      ...nb,
+      marginCards: updatedCards,
+      updatedAt: Date.now(),
+    };
+
+    set({
+      notebooks: notebooks.map((n) => (n.id === activeNotebookId ? updatedNotebook : n)),
+    });
+    saveNotebookToDB(updatedNotebook);
+  },
+
+  stampMarginCardToCanvas: (cardId: string) => {
+    const { notebooks, activeNotebookId, addStickyNoteToCurrentPage } = get();
+    const nb = notebooks.find((n) => n.id === activeNotebookId);
+    if (!nb) return;
+    const card = (nb.marginCards || []).find((c) => c.id === cardId);
+    if (!card) return;
+
+    const colorMap: Record<MarginCardColor, 'yellow' | 'pink' | 'mint' | 'blue' | 'purple'> = {
+      amber: 'yellow',
+      emerald: 'mint',
+      sky: 'blue',
+      rose: 'pink',
+      purple: 'purple',
+      slate: 'yellow',
+    };
+
+    addStickyNoteToCurrentPage({
+      id: `sticky-${Date.now()}`,
+      x: 120 + Math.random() * 60,
+      y: 120 + Math.random() * 60,
+      width: 220,
+      height: 180,
+      color: colorMap[card.color] || 'yellow',
+      text: `${card.title ? `📌 ${card.title}\n\n` : ''}${card.content}`,
+      createdAt: Date.now(),
+    });
+  },
+
+  exportMarginCardsToNewPage: async () => {
+    const { notebooks, activeNotebookId, addPage } = get();
+    const nb = notebooks.find((n) => n.id === activeNotebookId);
+    if (!nb || !nb.marginCards || nb.marginCards.length === 0) return;
+
+    await addPage('lined-margin', 'cream');
+    const updatedNb = get().notebooks.find((n) => n.id === activeNotebookId);
+    if (!updatedNb) return;
+    const newPageIndex = updatedNb.pages.length - 1;
+
+    const colorMap: Record<MarginCardColor, 'yellow' | 'pink' | 'mint' | 'blue' | 'purple'> = {
+      amber: 'yellow',
+      emerald: 'mint',
+      sky: 'blue',
+      rose: 'pink',
+      purple: 'purple',
+      slate: 'yellow',
+    };
+
+    const newStickies: StickyNoteItem[] = nb.marginCards.map((card, idx) => {
+      const col = idx % 2;
+      const row = Math.floor(idx / 2);
+      return {
+        id: `sticky-summary-${Date.now()}-${idx}`,
+        x: 100 + col * 260,
+        y: 80 + row * 220,
+        width: 230,
+        height: 190,
+        color: colorMap[card.color] || 'yellow',
+        text: `${card.title ? `📌 ${card.title}\n` : ''}${card.tags && card.tags.length > 0 ? `[${card.tags.join(', ')}]\n\n` : '\n'}${card.content}`,
+        createdAt: Date.now(),
+      };
+    });
+
+    const curPages = [...updatedNb.pages];
+    const targetPage = curPages[newPageIndex];
+    if (targetPage) {
+      curPages[newPageIndex] = {
+        ...targetPage,
+        stickyNotes: [...(targetPage.stickyNotes || []), ...newStickies],
+      };
+      const finalNb = { ...updatedNb, pages: curPages, updatedAt: Date.now() };
+      set({
+        notebooks: get().notebooks.map((n) => (n.id === activeNotebookId ? finalNb : n)),
+      });
+      await saveNotebookToDB(finalNb);
+    }
+  },
+
+  // Faz H: Active Recall Tape Quiz Mode Actions
+  setTapeQuizMode: (active: boolean) => {
+    set({ tapeQuizMode: active, tapeQuizActiveIndex: 0 });
+    if (active) {
+      const { activePageIndex, hideAllTapes } = get();
+      hideAllTapes(activePageIndex);
+    }
+  },
+
+  revealAllTapes: (pageIndex: number) => {
+    const { notebooks, activeNotebookId } = get();
+    const nb = notebooks.find((n) => n.id === activeNotebookId);
+    if (!nb || !nb.pages[pageIndex]) return;
+
+    const targetPage = nb.pages[pageIndex];
+    const updatedTapes = (targetPage.tapes || []).map((t) => ({ ...t, isRevealed: true }));
+    const updatedPages = [...nb.pages];
+    updatedPages[pageIndex] = { ...targetPage, tapes: updatedTapes };
+    const updatedNotebook = { ...nb, pages: updatedPages, updatedAt: Date.now() };
+
+    set({
+      notebooks: notebooks.map((n) => (n.id === activeNotebookId ? updatedNotebook : n)),
+    });
+    saveNotebookToDB(updatedNotebook);
+  },
+
+  hideAllTapes: (pageIndex: number) => {
+    const { notebooks, activeNotebookId } = get();
+    const nb = notebooks.find((n) => n.id === activeNotebookId);
+    if (!nb || !nb.pages[pageIndex]) return;
+
+    const targetPage = nb.pages[pageIndex];
+    const updatedTapes = (targetPage.tapes || []).map((t) => ({ ...t, isRevealed: false }));
+    const updatedPages = [...nb.pages];
+    updatedPages[pageIndex] = { ...targetPage, tapes: updatedTapes };
+    const updatedNotebook = { ...nb, pages: updatedPages, updatedAt: Date.now() };
+
+    set({
+      notebooks: notebooks.map((n) => (n.id === activeNotebookId ? updatedNotebook : n)),
+    });
+    saveNotebookToDB(updatedNotebook);
+  },
+
+  nextTapeQuizItem: () => {
+    const { notebooks, activeNotebookId, activePageIndex, tapeQuizActiveIndex } = get();
+    const nb = notebooks.find((n) => n.id === activeNotebookId);
+    const tapes = nb?.pages[activePageIndex]?.tapes || [];
+    if (tapes.length === 0) return;
+    const nextIdx = (tapeQuizActiveIndex + 1) % tapes.length;
+    set({ tapeQuizActiveIndex: nextIdx });
+  },
+
+  prevTapeQuizItem: () => {
+    const { notebooks, activeNotebookId, activePageIndex, tapeQuizActiveIndex } = get();
+    const nb = notebooks.find((n) => n.id === activeNotebookId);
+    const tapes = nb?.pages[activePageIndex]?.tapes || [];
+    if (tapes.length === 0) return;
+    const prevIdx = tapeQuizActiveIndex === 0 ? tapes.length - 1 : tapeQuizActiveIndex - 1;
+    set({ tapeQuizActiveIndex: prevIdx });
   },
 
   addStickyNoteToCurrentPage: (note: StickyNoteItem) => {

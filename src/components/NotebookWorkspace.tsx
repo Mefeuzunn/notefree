@@ -26,8 +26,12 @@ import {
   Lock,
   KeyRound,
   BookOpen,
+  Bookmark,
+  Brain,
 } from 'lucide-react';
 import { ExportModal } from './modals/ExportModal';
+import { MarginStudyWorkspace } from './margin/MarginStudyWorkspace';
+import { TapeQuizToolbar } from './canvas/TapeQuizToolbar';
 
 export const NotebookWorkspace: React.FC = () => {
   const {
@@ -56,6 +60,10 @@ export const NotebookWorkspace: React.FC = () => {
     toggleTwoPageSpread,
     exportModalOpen,
     setExportModalOpen,
+    marginWorkspaceOpen,
+    toggleMarginWorkspace,
+    tapeQuizMode,
+    setTapeQuizMode,
   } = useNotebookStore();
 
   const [lockModalOpen, setLockModalOpen] = useState(false);
@@ -388,6 +396,12 @@ export const NotebookWorkspace: React.FC = () => {
         )}
       </div>
 
+      {/* 📑 Faz F: LiquidText Style Margin Study Workspace */}
+      <MarginStudyWorkspace />
+
+      {/* 🧠 Faz H: Active Recall Tape Quiz Floating Toolbar */}
+      <TapeQuizToolbar />
+
       {/* Floating Zoom & View Controls Dock (Bottom Left) */}
       <div className="fixed bottom-5 left-5 z-30 flex items-center bg-slate-900/90 backdrop-blur-md border border-slate-800/80 rounded-2xl px-2 py-1.5 shadow-2xl gap-1">
         <button
@@ -457,6 +471,34 @@ export const NotebookWorkspace: React.FC = () => {
             <span className="text-[10px] hidden sm:inline">Kitap Modu</span>
           </button>
         )}
+
+        {/* 📑 Faz F: LiquidText Style Margin Workspace Toggle */}
+        <button
+          onClick={toggleMarginWorkspace}
+          className={`p-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5 ${
+            marginWorkspaceOpen
+              ? 'bg-indigo-600/30 text-indigo-300 border border-indigo-500/50 font-semibold shadow-sm'
+              : 'text-slate-400 hover:text-white hover:bg-slate-800'
+          }`}
+          title="LiquidText Stili Sayfa Kenarı Not & Alıntı Alanı (Study Margin)"
+        >
+          <Bookmark size={14} className={marginWorkspaceOpen ? 'text-indigo-400' : ''} />
+          <span className="text-[10px] hidden sm:inline">Kenarlık</span>
+        </button>
+
+        {/* 🧠 Faz H: Active Recall Tape Quiz Mode Toggle */}
+        <button
+          onClick={() => setTapeQuizMode(!tapeQuizMode)}
+          className={`p-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5 ${
+            tapeQuizMode
+              ? 'bg-amber-500/20 text-amber-300 border border-amber-500/50 font-semibold shadow-sm'
+              : 'text-slate-400 hover:text-white hover:bg-slate-800'
+          }`}
+          title="Ezber Bantları Aktif Hatırlama Sınav Modu"
+        >
+          <Brain size={14} className={tapeQuizMode ? 'text-amber-400' : ''} />
+          <span className="text-[10px] hidden sm:inline">Ezber Testi</span>
+        </button>
 
         {/* Infinite Canvas vs Paged Mode Toggle */}
         <button
