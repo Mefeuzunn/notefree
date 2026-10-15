@@ -1,17 +1,54 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import { useNotebookStore } from '../../store/notebookStore';
-import { RotateCw, X, Compass } from 'lucide-react';
+import {
+  X,
+  Compass,
+  RotateCw,
+  Magnet,
+  Maximize2,
+  PenTool,
+  Tag,
+  Check,
+} from 'lucide-react';
+import { RulerUnit } from '../../types/notebook';
+import {
+  PX_PER_CM,
+  PX_PER_MM,
+  PX_PER_IN,
+  RULER_DEFAULT_HEIGHT,
+  formatRulerMeasurement,
+  getRulerEdgeSegments,
+  createRulerStraightStroke,
+  createRulerDimensionCallout,
+} from '../../engine/rulerHelper';
 
 interface RulerProps {
   scale?: number;
 }
 
 export const Ruler: React.FC<RulerProps> = ({ scale = 1.0 }) => {
-  const { rulerVisible, toggleRuler, rulerAngle, setRulerAngle } = useNotebookStore();
+  const {
+    rulerVisible,
+    toggleRuler,
+    rulerAngle,
+    setRulerAngle,
+    rulerPosition,
+    setRulerPosition,
+    rulerWidth,
+    setRulerWidth,
+    rulerUnit,
+    setRulerUnit,
+    rulerEdgeSnap,
+    toggleRulerEdgeSnap,
+    toolSettings,
+    addStrokeToCurrentPage,
+    addTextAnnotation,
+    activePageIndex,
+  } = useNotebookStore();
 
-  const [position, setPosition] = useState<{ x: number; y: number }>({ x: 180, y: 350 });
   const [isDragging, setIsDragging] = useState(false);
-  const [isRotating, setIsRotating] = useState(false);
+  const [isResizing, setIsResizing] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const dragStartRef = useRef<{ mouseX: number; mouseY: number; startX: number; startY: number }>({
     mouseX: 0,
@@ -20,92 +57,207 @@ export const Ruler: React.FC<RulerProps> = ({ scale = 1.0 }) => {
     startY: 0,
   });
 
+  const resizeStartRef = useRef<{ mouseX: number; startWidth: number }>({
+    mouseX: 0,
+    startWidth: 600,
+  });
+
   if (!rulerVisible) return null;
 
-  const rulerWidth = 600;
-  const rulerHeight = 85;
+  const rulerHeight = RULER_DEFAULT_HEIGHT;
 
+  // Move entire ruler
   const handlePointerDown = (e: React.PointerEvent) => {
+    // Ignore button and slider clicks
+    if ((e.target as HTMLElement).closest('button, input, .resize-handle')) return;
     e.stopPropagation();
     setIsDragging(true);
     dragStartRef.current = {
       mouseX: e.clientX,
       mouseY: e.clientY,
-      startX: position.x,
-      startY: position.y,
+      startX: rulerPosition.x,
+      startY: rulerPosition.y,
     };
-    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
   };
 
   const handlePointerMove = (e: React.PointerEvent) => {
-    if (!isDragging) return;
-    const dx = e.clientX - dragStartRef.current.mouseX;
-    const dy = e.clientY - dragStartRef.current.mouseY;
-    setPosition({
-      x: dragStartRef.current.startX + dx,
-      y: dragStartRef.current.startY + dy,
-    });
+    if (isDragging) {
+      const dx = e.clientX - dragStartRef.current.mouseX;
+      const dy = e.clientY - dragStartRef.current.mouseY;
+      setRulerPosition({
+        x: Math.round(dragStartRef.current.startX + dx),
+        y: Math.round(dragStartRef.current.startY + dy),
+      });
+    } else if (isResizing) {
+      const dx = e.clientX - resizeStartRef.current.mouseX;
+      const newWidth = Math.max(300, Math.min(1000, Math.round(resizeStartRef.current.startWidth + dx)));
+      setRulerWidth(newWidth);
+    }
   };
 
   const handlePointerUp = () => {
     setIsDragging(false);
+    setIsResizing(false);
   };
 
+  // Resize ruler length
+  const handleResizeStart = (e: React.PointerEvent) => {
+    e.stopPropagation();
+    setIsResizing(true);
+    resizeStartRef.current = {
+      mouseX: e.clientX,
+      startWidth: rulerWidth,
+    };
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+  };
+
+  // Rotate ruler with magnetic snapping
   const handleRotate = (deltaDeg: number) => {
     let next = (rulerAngle + deltaDeg) % 360;
     if (next < 0) next += 360;
 
-    // Magnetic snap near common angles (0, 30, 45, 60, 90, 180)
-    const snaps = [0, 30, 45, 60, 90, 120, 135, 150, 180, 210, 225, 240, 270, 315, 360];
+    // Common technical angles snap
+    const snaps = [0, 15, 30, 45, 60, 75, 90, 105, 120, 135, 150, 180, 210, 225, 240, 270, 300, 315, 330, 360];
     for (const snap of snaps) {
-      if (Math.abs(next - snap) < 4) {
+      if (Math.abs(next - snap) < 3.5) {
         next = snap === 360 ? 0 : snap;
         break;
       }
     }
-    setRulerAngle(next);
+    setRulerAngle(Math.round(next));
   };
 
-  // Generate tick marks (cm and mm)
-  const ticks = [];
-  const cmCount = 28;
-  const pixelsPerCm = rulerWidth / cmCount;
+  // Generate top edge tick marks based on active measurement unit
+  const topTicks = useMemo(() => {
+    const ticks: React.ReactNode[] = [];
+    let stepPx = PX_PER_CM;
+    let labelMultiplier = 1;
+    let subTickCount = 10;
 
-  for (let cm = 0; cm <= cmCount; cm++) {
-    const x = cm * pixelsPerCm;
-    ticks.push(
-      <div key={`cm_${cm}`} className="absolute top-0 flex flex-col items-center" style={{ left: `${x}px` }}>
-        <div className="w-[1.5px] h-4 bg-slate-700/80 dark:bg-slate-300" />
-        <span className="text-[9px] font-mono font-bold text-slate-750 dark:text-slate-300 mt-0.5 select-none">
-          {cm}
-        </span>
-      </div>
-    );
-    // 5mm mark and mm sub-ticks
-    if (cm < cmCount) {
-      for (let mm = 1; mm < 10; mm++) {
-        const mmX = x + (mm * pixelsPerCm) / 10;
-        const isHalf = mm === 5;
-        ticks.push(
-          <div
-            key={`mm_${cm}_${mm}`}
-            className="absolute top-0 w-[1px] bg-slate-500/60"
-            style={{
-              left: `${mmX}px`,
-              height: isHalf ? '10px' : '5px',
-            }}
-          />
-        );
+    if (rulerUnit === 'cm') {
+      stepPx = PX_PER_CM;
+      labelMultiplier = 1;
+      subTickCount = 10;
+    } else if (rulerUnit === 'mm') {
+      stepPx = PX_PER_MM * 10; // Major mark every 10mm
+      labelMultiplier = 10;
+      subTickCount = 10;
+    } else if (rulerUnit === 'in') {
+      stepPx = PX_PER_IN;
+      labelMultiplier = 1;
+      subTickCount = 16;
+    } else {
+      // px
+      stepPx = 50;
+      labelMultiplier = 50;
+      subTickCount = 5;
+    }
+
+    const maxUnits = Math.floor(rulerWidth / stepPx);
+
+    for (let u = 0; u <= maxUnits; u++) {
+      const x = u * stepPx;
+      const labelText = u * labelMultiplier;
+
+      // Major unit mark
+      ticks.push(
+        <div
+          key={`maj_${u}`}
+          className="absolute top-0 flex flex-col items-center pointer-events-none"
+          style={{ left: `${x}px` }}
+        >
+          <div className="w-[1.5px] h-4.5 bg-slate-800 dark:bg-slate-200" />
+          <span className="text-[9px] font-mono font-bold text-slate-800 dark:text-slate-200 mt-0.5 select-none leading-none">
+            {labelText}
+          </span>
+        </div>
+      );
+
+      // Sub-ticks
+      if (u < maxUnits) {
+        for (let sub = 1; sub < subTickCount; sub++) {
+          const subX = x + (sub * stepPx) / subTickCount;
+          const isMid = sub === subTickCount / 2;
+          ticks.push(
+            <div
+              key={`sub_${u}_${sub}`}
+              className="absolute top-0 pointer-events-none"
+              style={{
+                left: `${subX}px`,
+                width: '1px',
+                height: isMid ? '10px' : '5px',
+                backgroundColor: isMid ? 'rgba(71, 85, 105, 0.9)' : 'rgba(100, 116, 139, 0.5)',
+              }}
+            />
+          );
+        }
       }
     }
-  }
+
+    return ticks;
+  }, [rulerWidth, rulerUnit]);
+
+  // Bottom edge sub-ticks
+  const bottomTicks = useMemo(() => {
+    const ticks: React.ReactNode[] = [];
+    const step = 20;
+    const count = Math.floor(rulerWidth / step);
+    for (let i = 0; i <= count; i++) {
+      const x = i * step;
+      const isFive = i % 5 === 0;
+      ticks.push(
+        <div
+          key={`bot_${i}`}
+          className="absolute bottom-0 pointer-events-none"
+          style={{
+            left: `${x}px`,
+            width: '1px',
+            height: isFive ? '8px' : '4px',
+            backgroundColor: isFive ? 'rgba(99, 102, 241, 0.8)' : 'rgba(148, 163, 184, 0.4)',
+          }}
+        />
+      );
+    }
+    return ticks;
+  }, [rulerWidth]);
+
+  // Stamp straight line along ruler top edge
+  const handleStampStraightLine = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const { topStart, topEnd } = getRulerEdgeSegments(rulerPosition, rulerWidth, rulerHeight, rulerAngle);
+    const stroke = createRulerStraightStroke(topStart, topEnd, toolSettings.color, toolSettings.size);
+    addStrokeToCurrentPage(stroke);
+
+    setToastMessage(`📏 ${formatRulerMeasurement(rulerWidth, rulerUnit)} Çizgi Çizildi`);
+    setTimeout(() => setToastMessage(null), 1800);
+  };
+
+  // Stamp architectural dimension callout
+  const handleStampDimensionCallout = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const { topStart, topEnd } = getRulerEdgeSegments(rulerPosition, rulerWidth, rulerHeight, rulerAngle);
+    const { strokes, text, x, y } = createRulerDimensionCallout(
+      topStart,
+      topEnd,
+      rulerUnit,
+      toolSettings.color || '#4f46e5',
+      toolSettings.size || 2.0
+    );
+
+    strokes.forEach((s) => addStrokeToCurrentPage(s));
+    addTextAnnotation(activePageIndex, x, y, text);
+
+    setToastMessage(`📐 ${formatRulerMeasurement(rulerWidth, rulerUnit)} Ölçü Etiketi Eklendi`);
+    setTimeout(() => setToastMessage(null), 1800);
+  };
 
   return (
     <div
       className="absolute z-40 select-none touch-none filter drop-shadow-2xl transition-transform"
       style={{
-        left: `${position.x}px`,
-        top: `${position.y}px`,
+        left: `${rulerPosition.x}px`,
+        top: `${rulerPosition.y}px`,
         width: `${rulerWidth}px`,
         height: `${rulerHeight}px`,
         transform: `rotate(${rulerAngle}deg)`,
@@ -117,51 +269,147 @@ export const Ruler: React.FC<RulerProps> = ({ scale = 1.0 }) => {
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
-        className="w-full h-full bg-white/70 dark:bg-slate-900/80 backdrop-blur-md rounded-xl border border-white/60 dark:border-slate-700/80 shadow-2xl relative overflow-hidden flex items-center justify-between px-4 cursor-grab active:cursor-grabbing ring-1 ring-black/5"
+        className="w-full h-full bg-white/80 dark:bg-slate-900/85 backdrop-blur-md rounded-2xl border border-white/80 dark:border-slate-700/80 shadow-2xl relative overflow-visible flex items-center justify-between px-3 cursor-grab active:cursor-grabbing ring-1 ring-black/10"
       >
-        {/* Top Ticks */}
-        <div className="absolute top-0 left-4 right-4 h-6 pointer-events-none">{ticks}</div>
+        {/* Top Edge Ticks */}
+        <div className="absolute top-0 left-0 right-0 h-6 pointer-events-none overflow-hidden">
+          {topTicks}
+        </div>
 
-        {/* Center Angle Dial & Control Area */}
-        <div className="mx-auto flex items-center gap-3 bg-slate-800/80 text-white px-3 py-1.5 rounded-full border border-slate-700/80 shadow-inner z-10">
-          <Compass size={14} className="text-indigo-400" />
-          <span className="font-mono text-xs font-bold tracking-wider">{Math.round(rulerAngle)}°</span>
+        {/* Bottom Edge Ticks */}
+        <div className="absolute bottom-0 left-0 right-0 h-3 pointer-events-none overflow-hidden">
+          {bottomTicks}
+        </div>
 
-          {/* Quick Rotate Buttons */}
+        {/* Center HUD & Control Strip */}
+        <div
+          className="mx-auto flex items-center gap-1.5 bg-slate-900/90 text-white px-2.5 py-1.5 rounded-xl border border-slate-700/90 shadow-xl z-20 pointer-events-auto"
+          onClick={(e) => e.stopPropagation()}
+          onPointerDown={(e) => e.stopPropagation()}
+        >
+          {/* Angle Display & Stepper */}
+          <div className="flex items-center gap-1 bg-slate-800/80 px-2 py-0.5 rounded-lg border border-slate-700/60">
+            <Compass size={13} className="text-indigo-400" />
+            <span className="font-mono text-xs font-bold tracking-tight text-white min-w-[32px] text-center">
+              {Math.round(rulerAngle)}°
+            </span>
+            <button
+              type="button"
+              onClick={() => handleRotate(-1)}
+              className="px-1 text-[10px] text-slate-300 hover:text-white hover:bg-slate-700 rounded font-mono"
+              title="-1° İnce Ayar"
+            >
+              -1°
+            </button>
+            <button
+              type="button"
+              onClick={() => handleRotate(1)}
+              className="px-1 text-[10px] text-slate-300 hover:text-white hover:bg-slate-700 rounded font-mono"
+              title="+1° İnce Ayar"
+            >
+              +1°
+            </button>
+            <button
+              type="button"
+              onClick={() => setRulerAngle(0)}
+              className="px-1 text-[10px] text-amber-400 hover:bg-slate-700 rounded font-mono"
+              title="Açıyı Sıfırla (0°)"
+            >
+              0°
+            </button>
+          </div>
+
+          {/* Live Measurement Length HUD */}
+          <div className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-indigo-950/60 border border-indigo-500/40 text-indigo-300 font-mono text-xs font-bold">
+            <span>📏</span>
+            <span>{formatRulerMeasurement(rulerWidth, rulerUnit)}</span>
+          </div>
+
+          {/* Unit Switcher */}
+          <div className="flex items-center bg-slate-800/90 rounded-lg p-0.5 border border-slate-700/70 text-[10px] font-mono">
+            {(['cm', 'mm', 'in', 'px'] as RulerUnit[]).map((u) => (
+              <button
+                key={u}
+                type="button"
+                onClick={() => setRulerUnit(u)}
+                className={`px-1.5 py-0.5 rounded uppercase font-bold transition-all ${
+                  rulerUnit === u
+                    ? 'bg-indigo-600 text-white shadow-sm'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                {u}
+              </button>
+            ))}
+          </div>
+
+          {/* Magnetic Edge Snap Toggle */}
           <button
-            onClick={(e) => {
-              e.stopPropagation();
-              handleRotate(-45);
-            }}
-            className="p-1 hover:bg-slate-700 rounded-full text-slate-300 hover:text-white text-xs font-mono"
-            title="-45° Çevir"
+            type="button"
+            onClick={toggleRulerEdgeSnap}
+            className={`flex items-center gap-1 px-2 py-1 rounded-lg border text-[11px] font-medium transition-all ${
+              rulerEdgeSnap
+                ? 'bg-emerald-600/20 border-emerald-500 text-emerald-300'
+                : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-slate-200'
+            }`}
+            title="Kalem çizimlerini cetvel kenarına manyetik olarak kilitle"
           >
-            ↺
+            <Magnet size={12} className={rulerEdgeSnap ? 'text-emerald-400' : 'text-slate-400'} />
+            <span className="hidden sm:inline">Manyetik</span>
           </button>
+
+          {/* Stamp Straight Line Action */}
           <button
-            onClick={(e) => {
-              e.stopPropagation();
-              handleRotate(45);
-            }}
-            className="p-1 hover:bg-slate-700 rounded-full text-slate-300 hover:text-white text-xs font-mono"
-            title="+45° Çevir"
+            type="button"
+            onClick={handleStampStraightLine}
+            className="flex items-center gap-1 px-2 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-[11px] font-medium shadow-sm transition-colors"
+            title="Cetvel boyunca düz çizgi çiz"
           >
-            ↻
+            <PenTool size={11} />
+            <span className="hidden sm:inline">Çizgi Çiz</span>
+          </button>
+
+          {/* Stamp Dimension Callout Action */}
+          <button
+            type="button"
+            onClick={handleStampDimensionCallout}
+            className="flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-750 text-amber-300 border border-slate-750 text-[11px] font-medium transition-colors"
+            title="Ölçülendirme çizgisi ve uzunluk etiketi damgala"
+          >
+            <Tag size={11} />
+            <span className="hidden sm:inline">Ölçülendir</span>
+          </button>
+
+          {/* Close Ruler Button */}
+          <button
+            type="button"
+            onClick={toggleRuler}
+            className="p-1 text-slate-400 hover:text-rose-400 rounded-lg hover:bg-slate-800 transition-colors ml-0.5"
+            title="Cetveli Gizle"
+          >
+            <X size={14} />
           </button>
         </div>
 
-        {/* Close Ruler Button */}
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            toggleRuler();
-          }}
-          className="absolute top-2 right-2 p-1 text-slate-500 hover:text-rose-500 rounded-full hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors z-20"
-          title="Cetveli Gizle"
+        {/* Right Edge Resize Handle */}
+        <div
+          onPointerDown={handleResizeStart}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+          className="resize-handle absolute -right-2 top-1/2 -translate-y-1/2 w-4 h-12 rounded-full bg-slate-800 hover:bg-indigo-600 border border-white/60 shadow-lg cursor-ew-resize flex items-center justify-center text-white text-[9px] transition-colors group z-30"
+          title="Cetvel boyunu uzatmak / kısaltmak için sürükleyin"
         >
-          <X size={15} />
-        </button>
+          <div className="w-0.5 h-6 bg-slate-400 group-hover:bg-white rounded-full" />
+        </div>
       </div>
+
+      {/* Floating Status Toast */}
+      {toastMessage && (
+        <div className="absolute -top-10 left-1/2 -translate-x-1/2 bg-slate-900/95 text-white text-xs px-3 py-1 rounded-xl shadow-xl border border-slate-700/80 font-mono flex items-center gap-1.5 animate-in fade-in z-50">
+          <Check size={12} className="text-emerald-400" />
+          <span>{toastMessage}</span>
+        </div>
+      )}
     </div>
   );
 };

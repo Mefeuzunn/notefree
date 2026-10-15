@@ -34,6 +34,7 @@ import { TextBoxOverlay } from './TextBoxOverlay';
 import { StickyNoteOverlay } from './StickyNoteOverlay';
 import { SymmetryGuide } from './SymmetryGuide';
 import { ShapeNodeEditor } from './ShapeNodeEditor';
+import { getSnapToRulerPoint, formatRulerMeasurement } from '../../engine/rulerHelper';
 import { collaborationService } from '../../services/collaborationService';
 import { HandwritingOcrModal } from '../modals/HandwritingOcrModal';
 import {
@@ -136,6 +137,12 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
     symmetryPosition,
     undo,
     selectFavoriteColor,
+    rulerVisible,
+    rulerPosition,
+    rulerWidth,
+    rulerAngle,
+    rulerUnit,
+    rulerEdgeSnap,
   } = useNotebookStore();
 
   const [isDrawing, setIsDrawing] = useState(false);
@@ -144,6 +151,7 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
   const [recolorMenuOpen, setRecolorMenuOpen] = useState(false);
   const [alignMenuOpen, setAlignMenuOpen] = useState(false);
   const [ocrModalOpen, setOcrModalOpen] = useState(false);
+  const [liveRulerHUD, setLiveRulerHUD] = useState<{ distance: string; angle: number; x: number; y: number } | null>(null);
   const hasStylusUsedRef = useRef<boolean>(false);
   const lastPenTapRef = useRef<{ time: number; x: number; y: number } | null>(null);
   const [selectedShapeStrokeId, setSelectedShapeStrokeId] = useState<string | null>(null);
@@ -508,7 +516,23 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
     setActivePageIndex(pageIndex);
     e.currentTarget.setPointerCapture(e.pointerId);
 
-    const { x, y } = getCanvasCoords(e);
+    let { x, y } = getCanvasCoords(e);
+
+    // FAZ P: Ruler Magnetic Edge Snapping
+    if (rulerVisible && rulerEdgeSnap && !['eraser', 'lasso', 'eyedropper', 'pan'].includes(activeTool)) {
+      const snap = getSnapToRulerPoint(x, y, rulerPosition, rulerWidth, 85, rulerAngle, 28);
+      if (snap.isSnapped) {
+        x = snap.snappedX;
+        y = snap.snappedY;
+        setLiveRulerHUD({
+          distance: formatRulerMeasurement(snap.distanceAlongEdge, rulerUnit),
+          angle: Math.round(snap.rulerAngle),
+          x,
+          y,
+        });
+      }
+    }
+
     const pressure = calculatePressure(x, y, e.pressure);
 
     // ReadOnly Mode (e.g. Secondary Split Notebook)
@@ -677,13 +701,32 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
 
   // Pointer Move
   const handlePointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    const { x, y } = getCanvasCoords(e);
+    let { x, y } = getCanvasCoords(e);
 
     // Eyedropper hovering loupe
     if (activeTool === 'eyedropper') {
       const hex = sampleColorAt(x, y);
       setEyedropperLoupe({ x, y, hex });
       return;
+    }
+
+    // FAZ P: Ruler Edge Snapping & Live Measurement HUD
+    if (rulerVisible && rulerEdgeSnap && !['eraser', 'lasso', 'eyedropper', 'pan'].includes(activeTool)) {
+      const snap = getSnapToRulerPoint(x, y, rulerPosition, rulerWidth, 85, rulerAngle, 28);
+      if (snap.isSnapped) {
+        x = snap.snappedX;
+        y = snap.snappedY;
+        setLiveRulerHUD({
+          distance: formatRulerMeasurement(snap.distanceAlongEdge, rulerUnit),
+          angle: Math.round(snap.rulerAngle),
+          x,
+          y,
+        });
+      } else if (liveRulerHUD) {
+        setLiveRulerHUD(null);
+      }
+    } else if (liveRulerHUD) {
+      setLiveRulerHUD(null);
     }
 
     // Laser pointer movement
@@ -943,6 +986,7 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
     if (!isDrawing) return;
     setIsDrawing(false);
     lastPointRef.current = null;
+    setLiveRulerHUD(null);
 
     const liveCanvas = liveCanvasRef.current;
     if (liveCanvas) {
@@ -1033,6 +1077,24 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
     let committedShapeType: ShapeType | undefined;
     let committedStart = finalPoints[0];
     let committedEnd = finalPoints[finalPoints.length - 1];
+
+    // FAZ P: If stroke was drawn along ruler, straighten it into precision line
+    if (rulerVisible && rulerEdgeSnap && finalPoints.length >= 2 && activeTool !== 'shape') {
+      const pStart = finalPoints[0];
+      const pEnd = finalPoints[finalPoints.length - 1];
+      const snapStart = getSnapToRulerPoint(pStart.x, pStart.y, rulerPosition, rulerWidth, 85, rulerAngle, 32);
+      const snapEnd = getSnapToRulerPoint(pEnd.x, pEnd.y, rulerPosition, rulerWidth, 85, rulerAngle, 32);
+
+      if (snapStart.isSnapped && snapEnd.isSnapped) {
+        const dist = Math.hypot(pEnd.x - pStart.x, pEnd.y - pStart.y);
+        if (dist >= 16) {
+          finalPoints = interpolateLine(pStart, pEnd, 40);
+          committedShapeType = 'line';
+          committedStart = pStart;
+          committedEnd = pEnd;
+        }
+      }
+    }
 
     if (activeTool === 'shape') {
       committedShapeType = toolSettings.selectedShape;
@@ -1606,6 +1668,23 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
             <span className="text-[9px] text-indigo-300 rotate-90 font-mono tracking-tighter opacity-70">
               İLERLE
             </span>
+          </div>
+        </div>
+      )}
+
+      {/* FAZ P: Live Ruler Measurement & Dimensioning HUD */}
+      {liveRulerHUD && rulerVisible && (
+        <div
+          className="absolute pointer-events-none z-30 flex flex-col items-center -translate-x-1/2 -translate-y-full pb-3 animate-in fade-in duration-75"
+          style={{
+            left: `${liveRulerHUD.x * scale}px`,
+            top: `${liveRulerHUD.y * scale}px`,
+          }}
+        >
+          <div className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-slate-900/95 text-white border border-indigo-500/80 shadow-2xl backdrop-blur-md font-mono text-xs font-bold ring-2 ring-indigo-500/20">
+            <span className="text-indigo-400">📏 {liveRulerHUD.distance}</span>
+            <span className="text-slate-500">•</span>
+            <span className="text-amber-400">{liveRulerHUD.angle}°</span>
           </div>
         </div>
       )}

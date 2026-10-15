@@ -27,6 +27,8 @@ export type ToolType =
 
 export type EraserMode = 'stroke' | 'pixel';
 
+export type RulerUnit = 'cm' | 'mm' | 'in' | 'px';
+
 export type ShapeType = 'line' | 'rectangle' | 'circle' | 'triangle' | 'arrow';
 
 export type PageTemplate =

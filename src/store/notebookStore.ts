@@ -29,6 +29,7 @@ import {
   MarginExcerptCard,
   MarginCardColor,
   StylusDoubleTapAction,
+  RulerUnit,
 } from '../types/notebook';
 import { collaborationService } from '../services/collaborationService';
 import { db, initStorage, saveNotebookToDB, importNotebookFromNotefree } from '../services/storage';
@@ -101,6 +102,10 @@ interface NotebookStoreState {
   // Ruler & Laser
   rulerVisible: boolean;
   rulerAngle: number;
+  rulerPosition: { x: number; y: number };
+  rulerWidth: number;
+  rulerUnit: RulerUnit;
+  rulerEdgeSnap: boolean;
   laserPoints: LaserPoint[];
 
   // Zoom Window Box (GoodNotes Magnifying Area)
@@ -404,6 +409,10 @@ interface NotebookStoreState {
   // Ruler, Laser & Presentation Actions
   toggleRuler: () => void;
   setRulerAngle: (angle: number) => void;
+  setRulerPosition: (pos: { x: number; y: number }) => void;
+  setRulerWidth: (width: number) => void;
+  setRulerUnit: (unit: RulerUnit) => void;
+  toggleRulerEdgeSnap: () => void;
   addLaserPoint: (x: number, y: number) => void;
   clearLaserPoints: () => void;
   setPresentationMode: (enabled: boolean) => void;
@@ -617,6 +626,10 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
 
   rulerVisible: false,
   rulerAngle: 0,
+  rulerPosition: { x: 180, y: 350 },
+  rulerWidth: 600,
+  rulerUnit: 'cm',
+  rulerEdgeSnap: true,
   protractorVisible: false,
   protractorAngle: 0,
   laserPoints: [],
@@ -2270,6 +2283,22 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
 
   setRulerAngle: (angle: number) => {
     set({ rulerAngle: angle });
+  },
+
+  setRulerPosition: (pos: { x: number; y: number }) => {
+    set({ rulerPosition: pos });
+  },
+
+  setRulerWidth: (width: number) => {
+    set({ rulerWidth: width });
+  },
+
+  setRulerUnit: (unit: RulerUnit) => {
+    set({ rulerUnit: unit });
+  },
+
+  toggleRulerEdgeSnap: () => {
+    set((state) => ({ rulerEdgeSnap: !state.rulerEdgeSnap }));
   },
 
   // Faz B: Protractor & Sticky Notes
