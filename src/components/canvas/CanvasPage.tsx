@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
-import { FillItem, LassoSelection, Page, PageSticker, Stroke, StrokePoint, TapeItem } from '../../types/notebook';
+import { FillItem, LassoSelection, Page, PageSticker, Stroke, StrokePoint, TapeItem, ShapeType, ShapeControlNode } from '../../types/notebook';
 import { useNotebookStore } from '../../store/notebookStore';
 import {
   calculateStrokeBounds,
@@ -22,6 +22,8 @@ import {
   generateTrianglePoints,
   interpolateLine,
   applyPrecisionSnapping,
+  rebuildShapeFromNodes,
+  rebuildShapeAndNodesFromDrag,
 } from '../../engine/shapeDetector';
 import {
   computeGroupBounds,
@@ -30,6 +32,7 @@ import {
 import { TextBoxOverlay } from './TextBoxOverlay';
 import { StickyNoteOverlay } from './StickyNoteOverlay';
 import { SymmetryGuide } from './SymmetryGuide';
+import { ShapeNodeEditor } from './ShapeNodeEditor';
 import { collaborationService } from '../../services/collaborationService';
 import { HandwritingOcrModal } from '../modals/HandwritingOcrModal';
 import {
@@ -74,6 +77,7 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
     toolSettings,
     addStrokeToCurrentPage,
     eraseStrokesOnCurrentPage,
+    updateStrokeOnCurrentPage,
     youtube,
     lassoSelection,
     setLassoSelection,
@@ -126,6 +130,7 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
   const [recolorMenuOpen, setRecolorMenuOpen] = useState(false);
   const [ocrModalOpen, setOcrModalOpen] = useState(false);
   const hasStylusUsedRef = useRef<boolean>(false);
+  const [selectedShapeStrokeId, setSelectedShapeStrokeId] = useState<string | null>(null);
 
   // Faz 1 interactive states
   const [eyedropperLoupe, setEyedropperLoupe] = useState<{ x: number; y: number; hex: string } | null>(null);
@@ -532,6 +537,21 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
       }
     }
 
+    // Faz I: Check if user clicked on an existing shape stroke to edit its vertices
+    if (activeTool === 'shape' || activeTool === 'lasso') {
+      const hitShape = page.strokes.find(
+        (s) => s.shapeType && s.controlNodes && s.controlNodes.length > 0 && isPointNearStroke({ x, y }, s, 18)
+      );
+      if (hitShape) {
+        setSelectedShapeStrokeId(hitShape.id);
+        return;
+      }
+    }
+
+    if (selectedShapeStrokeId) {
+      setSelectedShapeStrokeId(null);
+    }
+
     setIsDrawing(true);
     currentPointsRef.current = [
       {
@@ -892,7 +912,12 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
     let finalPoints = [...currentPointsRef.current];
 
     // Explicit shape mode vs auto-detection
+    let committedShapeType: ShapeType | undefined;
+    let committedStart = finalPoints[0];
+    let committedEnd = finalPoints[finalPoints.length - 1];
+
     if (activeTool === 'shape') {
+      committedShapeType = toolSettings.selectedShape;
       let start = finalPoints[0];
       let end = finalPoints[finalPoints.length - 1];
 
@@ -901,6 +926,8 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
         start = snapped.start;
         end = snapped.end;
       }
+      committedStart = start;
+      committedEnd = end;
 
       switch (toolSettings.selectedShape) {
         case 'line':
@@ -938,9 +965,62 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
         gridSnap: toolSettings.gridSnap,
       });
       if (detected) {
+        committedShapeType = detected.type;
         finalPoints = detected.replacementPoints;
+        committedStart = finalPoints[0];
+        committedEnd = finalPoints[finalPoints.length - 1];
       }
     }
+
+    // Build control nodes for editable shape vertices (Faz I)
+    const buildControlNodes = (shapeType: ShapeType, s: StrokePoint, e: StrokePoint): ShapeControlNode[] => {
+      const minX = Math.min(s.x, e.x);
+      const minY = Math.min(s.y, e.y);
+      const maxX = Math.max(s.x, e.x);
+      const maxY = Math.max(s.y, e.y);
+      const cx = (minX + maxX) / 2;
+      const cy = (minY + maxY) / 2;
+      const rx = (maxX - minX) / 2;
+      const ry = (maxY - minY) / 2;
+
+      switch (shapeType) {
+        case 'line':
+        case 'arrow':
+          return [
+            { id: 'start', x: s.x, y: s.y, role: 'endpoint' },
+            { id: 'end', x: e.x, y: e.y, role: 'endpoint' },
+          ];
+        case 'rectangle':
+          return [
+            { id: 'tl', x: minX, y: minY, role: 'corner' },
+            { id: 'tr', x: maxX, y: minY, role: 'corner' },
+            { id: 'br', x: maxX, y: maxY, role: 'corner' },
+            { id: 'bl', x: minX, y: maxY, role: 'corner' },
+            { id: 'mid-t', x: cx, y: minY, role: 'edge' },
+            { id: 'mid-r', x: maxX, y: cy, role: 'edge' },
+            { id: 'mid-b', x: cx, y: maxY, role: 'edge' },
+            { id: 'mid-l', x: minX, y: cy, role: 'edge' },
+          ];
+        case 'circle':
+          return [
+            { id: 'cx', x: cx, y: cy, role: 'center' },
+            { id: 'rx-handle', x: maxX, y: cy, role: 'radius' },
+            { id: 'ry-handle', x: cx, y: maxY, role: 'radius' },
+            { id: 'tl', x: minX, y: minY, role: 'corner' },
+            { id: 'tr', x: maxX, y: minY, role: 'corner' },
+            { id: 'br', x: maxX, y: maxY, role: 'corner' },
+            { id: 'bl', x: minX, y: maxY, role: 'corner' },
+          ];
+        case 'triangle':
+          return [
+            { id: 'apex', x: cx, y: minY, role: 'apex' },
+            { id: 'br', x: maxX, y: maxY, role: 'corner' },
+            { id: 'bl', x: minX, y: maxY, role: 'corner' },
+          ];
+        default:
+          return [];
+      }
+    };
 
     const strokeId = `st_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
     const bounds = calculateStrokeBounds(finalPoints, toolSettings.size);
@@ -954,9 +1034,20 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
       bounds,
       timestamp: Date.now(),
       videoTimestamp: youtube.isOpen ? Math.floor(youtube.currentTime) : undefined,
+      // Faz I: shape editing metadata
+      ...(committedShapeType && {
+        shapeType: committedShapeType,
+        controlNodes: buildControlNodes(committedShapeType, committedStart, committedEnd),
+        shapeFillColor: toolSettings.shapeFillColor,
+      }),
     };
 
     addStrokeToCurrentPage(newStroke);
+
+    // Faz I: Automatically activate control node editor on newly drawn shape
+    if (committedShapeType) {
+      setSelectedShapeStrokeId(strokeId);
+    }
 
     // 🪞 Faz D: Real-time Symmetry Mirrored Stroke Commit
     if (symmetryEnabled && finalPoints.length > 0) {
@@ -1385,6 +1476,55 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
 
       {/* 🪞 Faz D: Real-time Symmetry Axis Guide */}
       <SymmetryGuide pageWidth={width} pageHeight={height} />
+
+      {/* Faz I: Akıllı Geometrik Şekil Köşe Tutamaçları ve Vertex Düzenleyici */}
+      {(() => {
+        if (!selectedShapeStrokeId) return null;
+        const selectedShapeStroke = page.strokes.find((s) => s.id === selectedShapeStrokeId);
+        if (
+          !selectedShapeStroke ||
+          !selectedShapeStroke.shapeType ||
+          !selectedShapeStroke.controlNodes ||
+          selectedShapeStroke.controlNodes.length === 0
+        ) {
+          return null;
+        }
+
+        return (
+          <ShapeNodeEditor
+            nodes={selectedShapeStroke.controlNodes}
+            scale={scale}
+            onNodesChange={(newNodes) => {
+              const newPoints = rebuildShapeFromNodes(selectedShapeStroke.shapeType!, newNodes);
+              const bounds = calculateStrokeBounds(newPoints, selectedShapeStroke.size);
+              updateStrokeOnCurrentPage(selectedShapeStroke.id, {
+                points: newPoints,
+                bounds,
+                controlNodes: newNodes,
+              });
+            }}
+            onNodeDrag={(nodeId, newPos) => {
+              const { points: newPoints, nodes: newNodes } = rebuildShapeAndNodesFromDrag(
+                selectedShapeStroke.shapeType!,
+                nodeId,
+                newPos,
+                selectedShapeStroke.controlNodes!
+              );
+              const bounds = calculateStrokeBounds(newPoints, selectedShapeStroke.size);
+              updateStrokeOnCurrentPage(selectedShapeStroke.id, {
+                points: newPoints,
+                bounds,
+                controlNodes: newNodes,
+              });
+            }}
+            onClose={() => setSelectedShapeStrokeId(null)}
+            onDelete={() => {
+              eraseStrokesOnCurrentPage([selectedShapeStroke.id]);
+              setSelectedShapeStrokeId(null);
+            }}
+          />
+        );
+      })()}
 
       {/* Faz A: Handwriting to Text OCR Modal */}
       <HandwritingOcrModal

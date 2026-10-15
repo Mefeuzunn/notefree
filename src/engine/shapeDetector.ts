@@ -1,4 +1,4 @@
-import { ShapeType, StrokePoint } from '../types/notebook';
+import { ShapeControlNode, ShapeType, StrokePoint } from '../types/notebook';
 
 /**
  * Applies magnetic angle locking (0°, 15°, 30°, 45°, 90°) and paper grid snapping
@@ -252,3 +252,225 @@ export function generateArrowPoints(
   pts.push(e, leftBarb, e, rightBarb);
   return pts;
 }
+
+/**
+ * Generates triangle points connecting 3 arbitrary vertices
+ */
+export function generateFreeTrianglePoints(
+  apex: StrokePoint,
+  br: StrokePoint,
+  bl: StrokePoint
+): StrokePoint[] {
+  const pts: StrokePoint[] = [];
+  const corners = [apex, br, bl, apex];
+  for (let i = 0; i < 3; i++) {
+    const p1 = corners[i];
+    const p2 = corners[i + 1];
+    for (let step = 0; step < 10; step++) {
+      const t = step / 10;
+      pts.push({
+        x: p1.x + (p2.x - p1.x) * t,
+        y: p1.y + (p2.y - p1.y) * t,
+        pressure: 0.5,
+      });
+    }
+  }
+  pts.push(corners[0]);
+  return pts;
+}
+
+/**
+ * FAZ I – Shape Vertex Editor
+ * Rebuilds the StrokePoint array for a shape from its (possibly edited) control nodes.
+ * This allows dragging a corner handle to morph the shape after it has been drawn.
+ */
+export function rebuildShapeFromNodes(
+  shapeType: ShapeType,
+  nodes: ShapeControlNode[]
+): StrokePoint[] {
+  const find = (key: string): ShapeControlNode | undefined =>
+    nodes.find((n) => n.id === key || n.role === key);
+
+  switch (shapeType) {
+    case 'line': {
+      const s = find('start');
+      const e = find('end');
+      if (!s || !e) return [];
+      return interpolateLine(
+        { x: s.x, y: s.y, pressure: 0.5 },
+        { x: e.x, y: e.y, pressure: 0.5 },
+        40
+      );
+    }
+
+    case 'arrow': {
+      const s = find('start');
+      const e = find('end');
+      if (!s || !e) return [];
+      return generateArrowPoints(
+        { x: s.x, y: s.y, pressure: 0.5 },
+        { x: e.x, y: e.y, pressure: 0.5 }
+      );
+    }
+
+    case 'rectangle': {
+      const tl = find('tl');
+      const br = find('br');
+      if (tl && br) {
+        return generateRectanglePoints(tl.x, tl.y, br.x, br.y);
+      }
+      // Fallback: derive from tr & bl
+      const tr = find('tr');
+      const bl = find('bl');
+      if (!tr || !bl) return [];
+      return generateRectanglePoints(bl.x, tr.y, tr.x, bl.y);
+    }
+
+    case 'circle': {
+      const cxNode = find('cx') || find('center');
+      const rxH = find('rx-handle');
+      const ryH = find('ry-handle');
+      if (!cxNode || !rxH || !ryH) return [];
+      const rx = Math.abs(rxH.x - cxNode.x);
+      const ry = Math.abs(ryH.y - cxNode.y);
+      return generateEllipsePoints(cxNode.x, cxNode.y, rx, ry);
+    }
+
+    case 'triangle': {
+      const apex = find('apex');
+      const bl = find('bl');
+      const br = find('br');
+      if (!apex || !bl || !br) return [];
+      return generateFreeTrianglePoints(
+        { x: apex.x, y: apex.y, pressure: 0.5 },
+        { x: br.x, y: br.y, pressure: 0.5 },
+        { x: bl.x, y: bl.y, pressure: 0.5 }
+      );
+    }
+
+    default:
+      return [];
+  }
+}
+
+/**
+ * FAZ I – Updates shape control nodes and returns both morphed stroke points and synchronized nodes.
+ */
+export function rebuildShapeAndNodesFromDrag(
+  shapeType: ShapeType,
+  draggedNodeId: string,
+  newPos: { x: number; y: number },
+  currentNodes: ShapeControlNode[]
+): { points: StrokePoint[]; nodes: ShapeControlNode[] } {
+  const find = (key: string): ShapeControlNode | undefined =>
+    currentNodes.find((n) => n.id === key || n.role === key);
+
+  switch (shapeType) {
+    case 'line':
+    case 'arrow': {
+      const s = find('start') || { id: 'start', x: 0, y: 0, role: 'endpoint' };
+      const e = find('end') || { id: 'end', x: 0, y: 0, role: 'endpoint' };
+      const updatedS = draggedNodeId === 'start' ? { ...s, x: newPos.x, y: newPos.y } : s;
+      const updatedE = draggedNodeId === 'end' ? { ...e, x: newPos.x, y: newPos.y } : e;
+      const nodes = [updatedS, updatedE];
+      const pts = shapeType === 'arrow'
+        ? generateArrowPoints({ x: updatedS.x, y: updatedS.y, pressure: 0.5 }, { x: updatedE.x, y: updatedE.y, pressure: 0.5 })
+        : interpolateLine({ x: updatedS.x, y: updatedS.y, pressure: 0.5 }, { x: updatedE.x, y: updatedE.y, pressure: 0.5 }, 40);
+      return { points: pts, nodes };
+    }
+
+    case 'rectangle': {
+      let minX = Math.min(...currentNodes.map((n) => n.x));
+      let maxX = Math.max(...currentNodes.map((n) => n.x));
+      let minY = Math.min(...currentNodes.map((n) => n.y));
+      let maxY = Math.max(...currentNodes.map((n) => n.y));
+
+      if (draggedNodeId === 'tl') { minX = newPos.x; minY = newPos.y; }
+      else if (draggedNodeId === 'tr') { maxX = newPos.x; minY = newPos.y; }
+      else if (draggedNodeId === 'br') { maxX = newPos.x; maxY = newPos.y; }
+      else if (draggedNodeId === 'bl') { minX = newPos.x; maxY = newPos.y; }
+      else if (draggedNodeId === 'mid-t') { minY = newPos.y; }
+      else if (draggedNodeId === 'mid-b') { maxY = newPos.y; }
+      else if (draggedNodeId === 'mid-l') { minX = newPos.x; }
+      else if (draggedNodeId === 'mid-r') { maxX = newPos.x; }
+
+      const actualMinX = Math.min(minX, maxX);
+      const actualMaxX = Math.max(minX, maxX);
+      const actualMinY = Math.min(minY, maxY);
+      const actualMaxY = Math.max(minY, maxY);
+      const cx = (actualMinX + actualMaxX) / 2;
+      const cy = (actualMinY + actualMaxY) / 2;
+
+      const nodes: ShapeControlNode[] = [
+        { id: 'tl', x: actualMinX, y: actualMinY, role: 'corner' },
+        { id: 'tr', x: actualMaxX, y: actualMinY, role: 'corner' },
+        { id: 'br', x: actualMaxX, y: actualMaxY, role: 'corner' },
+        { id: 'bl', x: actualMinX, y: actualMaxY, role: 'corner' },
+        { id: 'mid-t', x: cx, y: actualMinY, role: 'edge' },
+        { id: 'mid-r', x: actualMaxX, y: cy, role: 'edge' },
+        { id: 'mid-b', x: cx, y: actualMaxY, role: 'edge' },
+        { id: 'mid-l', x: actualMinX, y: cy, role: 'edge' },
+      ];
+      const points = generateRectanglePoints(actualMinX, actualMinY, actualMaxX, actualMaxY);
+      return { points, nodes };
+    }
+
+    case 'circle': {
+      const cxNode = find('cx') || find('center');
+      let cx = cxNode ? cxNode.x : 0;
+      let cy = cxNode ? cxNode.y : 0;
+      const rxH = find('rx-handle');
+      const ryH = find('ry-handle');
+      let rx = rxH ? Math.abs(rxH.x - cx) : 50;
+      let ry = ryH ? Math.abs(ryH.y - cy) : 50;
+
+      if (draggedNodeId === 'cx' || draggedNodeId === 'center') {
+        cx = newPos.x;
+        cy = newPos.y;
+      } else if (draggedNodeId === 'rx-handle') {
+        rx = Math.max(5, Math.abs(newPos.x - cx));
+      } else if (draggedNodeId === 'ry-handle') {
+        ry = Math.max(5, Math.abs(newPos.y - cy));
+      } else if (['tl', 'tr', 'br', 'bl'].includes(draggedNodeId)) {
+        rx = Math.max(5, Math.abs(newPos.x - cx));
+        ry = Math.max(5, Math.abs(newPos.y - cy));
+      }
+
+      const nodes: ShapeControlNode[] = [
+        { id: 'cx', x: cx, y: cy, role: 'center' },
+        { id: 'rx-handle', x: cx + rx, y: cy, role: 'radius' },
+        { id: 'ry-handle', x: cx, y: cy + ry, role: 'radius' },
+        { id: 'tl', x: cx - rx, y: cy - ry, role: 'corner' },
+        { id: 'tr', x: cx + rx, y: cy - ry, role: 'corner' },
+        { id: 'br', x: cx + rx, y: cy + ry, role: 'corner' },
+        { id: 'bl', x: cx - rx, y: cy + ry, role: 'corner' },
+      ];
+      const points = generateEllipsePoints(cx, cy, rx, ry);
+      return { points, nodes };
+    }
+
+    case 'triangle': {
+      const apex = find('apex') || { id: 'apex', x: 0, y: 0, role: 'apex' };
+      const br = find('br') || { id: 'br', x: 0, y: 0, role: 'corner' };
+      const bl = find('bl') || { id: 'bl', x: 0, y: 0, role: 'corner' };
+
+      const updatedApex = draggedNodeId === 'apex' ? { ...apex, x: newPos.x, y: newPos.y } : apex;
+      const updatedBr = draggedNodeId === 'br' ? { ...br, x: newPos.x, y: newPos.y } : br;
+      const updatedBl = draggedNodeId === 'bl' ? { ...bl, x: newPos.x, y: newPos.y } : bl;
+
+      const nodes: ShapeControlNode[] = [updatedApex, updatedBr, updatedBl];
+      const points = generateFreeTrianglePoints(
+        { x: updatedApex.x, y: updatedApex.y, pressure: 0.5 },
+        { x: updatedBr.x, y: updatedBr.y, pressure: 0.5 },
+        { x: updatedBl.x, y: updatedBl.y, pressure: 0.5 }
+      );
+      return { points, nodes };
+    }
+
+    default:
+      return { points: [], nodes: currentNodes };
+  }
+}
+
+
+

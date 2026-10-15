@@ -205,6 +205,7 @@ interface NotebookStoreState {
   toggleTiltShading: () => void;
   addStrokeToCurrentPage: (stroke: Stroke) => void;
   eraseStrokesOnCurrentPage: (strokeIds: string[]) => void;
+  updateStrokeOnCurrentPage: (strokeId: string, partial: Partial<Stroke>) => void;
   undo: () => void;
   redo: () => void;
   clearCurrentPageStrokes: () => void;
@@ -1334,6 +1335,39 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
       set({ activeTool: previousTool });
     }
   },
+
+  updateStrokeOnCurrentPage: (strokeId: string, partial: Partial<Stroke>) => {
+    const { activeNotebookId, notebooks, activePageIndex, undoStack } = get();
+    if (!activeNotebookId) return;
+    const currentNb = notebooks.find((n) => n.id === activeNotebookId);
+    if (!currentNb) return;
+    const currentPage = currentNb.pages[activePageIndex];
+    if (!currentPage) return;
+
+    const newUndoStack = [...undoStack, [...currentPage.strokes]];
+    const updatedStrokes = currentPage.strokes.map((s) =>
+      s.id === strokeId ? { ...s, ...partial } : s
+    );
+
+    const updatedPages = currentNb.pages.map((p, idx) =>
+      idx === activePageIndex ? { ...p, strokes: updatedStrokes } : p
+    );
+
+    const updatedNotebook = { ...currentNb, pages: updatedPages, updatedAt: Date.now() };
+    const updatedNotebooks = notebooks.map((n) =>
+      n.id === activeNotebookId ? updatedNotebook : n
+    );
+
+    set({
+      notebooks: updatedNotebooks,
+      undoStack: newUndoStack,
+      redoStack: [],
+    });
+
+    db.pages.update(currentPage.id, { strokes: updatedStrokes });
+  },
+
+
 
   undo: () => {
     const { activeNotebookId, notebooks, activePageIndex, undoStack, redoStack } = get();

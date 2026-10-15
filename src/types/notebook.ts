@@ -67,6 +67,13 @@ export interface StrokeBounds {
   maxY: number;
 }
 
+export interface ShapeControlNode {
+  id: string;    // e.g. 'tl' | 'tr' | 'bl' | 'br' | 'start' | 'end' | 'cx' | 'cy' | 'rx' | 'ry' | 'apex' | 'mid-l' | 'mid-r'
+  x: number;
+  y: number;
+  role: 'corner' | 'edge' | 'center' | 'apex' | 'radius' | 'endpoint' | 'barb';
+}
+
 export interface Stroke {
   id: string;
   tool: PenType;
@@ -77,6 +84,10 @@ export interface Stroke {
   timestamp: number;
   videoTimestamp?: number; // Linked YouTube timestamp in seconds
   audioTimestamp?: number; // Linked audio recording timestamp in milliseconds
+  // Faz I: Shape vertex editing metadata
+  shapeType?: ShapeType; // Set when drawn as explicit shape
+  controlNodes?: ShapeControlNode[]; // Editable control points for shape morphing
+  shapeFillColor?: string; // Optional fill inside closed shapes
 }
 
 export interface TextAnnotation {
