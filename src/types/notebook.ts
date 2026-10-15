@@ -90,6 +90,7 @@ export interface TextAnnotation {
   width: number;
   height?: number;
   bg?: string;
+  pageLink?: number; // Target page index for hyperlinks
 }
 
 export interface PdfOutlineItem {
@@ -148,6 +149,7 @@ export interface PageImage {
   height: number;
   dataUrl: string;
   timestamp?: number;
+  cropBounds?: { x: number; y: number; width: number; height: number };
 }
 
 export interface TapeItem {
@@ -265,6 +267,17 @@ export interface Notebook {
   canvasMode?: CanvasMode;
   isLocked?: boolean;
   pinCode?: string;
+  twoPageSpread?: boolean;
+}
+
+export interface ExportOptions {
+  format: 'pdf' | 'png' | 'jpeg';
+  scope: 'current' | 'all';
+  scale: 1 | 2 | 3;
+  transparentBg: boolean;
+  includeTemplate: boolean;
+  includeStickyNotes: boolean;
+  includeTexts: boolean;
 }
 
 export interface LibraryVaultBackup {

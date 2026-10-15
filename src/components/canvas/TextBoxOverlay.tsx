@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { TextAnnotation } from '../../types/notebook';
-import { Trash2, Type, Move, X, Volume2 } from 'lucide-react';
+import { Trash2, Type, Move, X, Volume2, Link2, ExternalLink } from 'lucide-react';
 import { textToSpeechService } from '../../services/textToSpeechService';
+import { useNotebookStore } from '../../store/notebookStore';
 
 interface TextBoxOverlayProps {
   annotation: TextAnnotation;
@@ -20,6 +21,10 @@ export const TextBoxOverlay: React.FC<TextBoxOverlayProps> = ({
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [showToolbar, setShowToolbar] = useState(false);
+
+  const { notebooks, activeNotebookId, setActivePageIndex } = useNotebookStore();
+  const activeNotebook = notebooks.find((n) => n.id === activeNotebookId);
+  const totalPages = activeNotebook?.pages.length || 1;
 
   const getFontFamily = (family: string) => {
     switch (family) {
@@ -97,6 +102,30 @@ export const TextBoxOverlay: React.FC<TextBoxOverlayProps> = ({
 
           <div className="w-px h-3.5 bg-slate-750 mx-0.5" />
 
+          {/* 🔗 Faz E: Internal Page Hyperlink Selector */}
+          <div className="flex items-center gap-1 bg-slate-800 border border-slate-700 rounded-lg px-1.5 py-0.5 text-xs text-slate-300">
+            <Link2 size={11} className="text-indigo-400" />
+            <select
+              value={annotation.pageLink ?? ''}
+              onChange={(e) =>
+                onUpdate({
+                  pageLink: e.target.value === '' ? undefined : parseInt(e.target.value, 10),
+                })
+              }
+              className="bg-transparent text-[11px] focus:outline-none cursor-pointer text-indigo-300 font-medium"
+              title="Sayfaya Bağla (Köprü Link)"
+            >
+              <option value="" className="bg-slate-900 text-slate-400">
+                Bağlantı Yok
+              </option>
+              {Array.from({ length: totalPages }, (_, i) => (
+                <option key={i} value={i} className="bg-slate-900 text-slate-200">
+                  Sayfa {i + 1}
+                </option>
+              ))}
+            </select>
+          </div>
+
           {/* 🔊 Faz D: TTS Read Aloud */}
           <button
             onClick={() => textToSpeechService.toggle(annotation.text)}
@@ -143,6 +172,21 @@ export const TextBoxOverlay: React.FC<TextBoxOverlayProps> = ({
           fontFamily: getFontFamily(annotation.fontFamily),
         }}
       />
+
+      {/* 🔗 Faz E: Clickable Jump Link Badge */}
+      {annotation.pageLink !== undefined && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            setActivePageIndex(annotation.pageLink!);
+          }}
+          className="absolute -bottom-6 left-0 flex items-center gap-1 px-2 py-0.5 rounded-full bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-bold shadow-md hover:scale-105 transition-all z-20"
+          title={`Sayfa ${annotation.pageLink + 1}'e Atla`}
+        >
+          <ExternalLink size={10} />
+          <span>Sayfa {annotation.pageLink + 1}'e Git</span>
+        </button>
+      )}
     </div>
   );
 };

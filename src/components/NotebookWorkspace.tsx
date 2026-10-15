@@ -25,7 +25,9 @@ import {
   Infinity,
   Lock,
   KeyRound,
+  BookOpen,
 } from 'lucide-react';
+import { ExportModal } from './modals/ExportModal';
 
 export const NotebookWorkspace: React.FC = () => {
   const {
@@ -50,6 +52,10 @@ export const NotebookWorkspace: React.FC = () => {
     canvasMode,
     setCanvasMode,
     isNotebookSessionUnlocked,
+    twoPageSpread,
+    toggleTwoPageSpread,
+    exportModalOpen,
+    setExportModalOpen,
   } = useNotebookStore();
 
   const [lockModalOpen, setLockModalOpen] = useState(false);
@@ -198,6 +204,50 @@ export const NotebookWorkspace: React.FC = () => {
                   />
                 </div>
               ))}
+            </div>
+          ) : twoPageSpread && pages.length > 1 ? (
+            /* 📖 Faz E: Two-Page Book Spread View (İkili Kitap Modu) */
+            <div className="flex flex-col items-center pb-24">
+              <div className="flex items-center justify-center gap-1 p-3 bg-slate-900/60 rounded-3xl shadow-2xl border border-slate-800 relative max-w-full overflow-x-auto">
+                {/* Left Page (Even Index) */}
+                {pages[activePageIndex % 2 === 0 ? activePageIndex : activePageIndex - 1] && (
+                  <div className="relative shadow-xl">
+                    <CanvasPage
+                      page={pages[activePageIndex % 2 === 0 ? activePageIndex : activePageIndex - 1]}
+                      pageIndex={activePageIndex % 2 === 0 ? activePageIndex : activePageIndex - 1}
+                      scale={zoom * 0.72}
+                      isCurrent={activePageIndex % 2 === 0}
+                    />
+                  </div>
+                )}
+
+                {/* Classic Book Spine Crease & Shadow */}
+                <div className="w-3 self-stretch bg-gradient-to-r from-slate-900 via-slate-950 to-slate-900 shadow-inner flex flex-col items-center justify-center opacity-70">
+                  <div className="w-px h-full bg-slate-800" />
+                </div>
+
+                {/* Right Page (Odd Index) */}
+                {pages[(activePageIndex % 2 === 0 ? activePageIndex : activePageIndex - 1) + 1] ? (
+                  <div className="relative shadow-xl">
+                    <CanvasPage
+                      page={pages[(activePageIndex % 2 === 0 ? activePageIndex : activePageIndex - 1) + 1]}
+                      pageIndex={(activePageIndex % 2 === 0 ? activePageIndex : activePageIndex - 1) + 1}
+                      scale={zoom * 0.72}
+                      isCurrent={activePageIndex % 2 !== 0}
+                    />
+                  </div>
+                ) : (
+                  <div
+                    className="flex flex-col items-center justify-center bg-slate-950/40 border border-dashed border-slate-800 rounded-2xl text-slate-500 text-xs shadow-inner"
+                    style={{
+                      width: `${(pages[0]?.width || 800) * zoom * 0.72}px`,
+                      height: `${(pages[0]?.height || 1050) * zoom * 0.72}px`,
+                    }}
+                  >
+                    <span>Boş Sayfa (Defter Sonu)</span>
+                  </div>
+                )}
+              </div>
             </div>
           ) : (
             /* Single Page View */
@@ -392,6 +442,22 @@ export const NotebookWorkspace: React.FC = () => {
           </button>
         )}
 
+        {/* 📖 Faz E: Two Page Book Spread View Toggle */}
+        {canvasMode === 'paged' && (
+          <button
+            onClick={toggleTwoPageSpread}
+            className={`p-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5 ${
+              twoPageSpread
+                ? 'bg-indigo-600/30 text-indigo-300 border border-indigo-500/50 font-semibold shadow-sm'
+                : 'text-slate-400 hover:text-white hover:bg-slate-800'
+            }`}
+            title="Çift Sayfa Kitap / Defter Görünümü (Book Spread Mode)"
+          >
+            <BookOpen size={14} className={twoPageSpread ? 'text-indigo-400' : ''} />
+            <span className="text-[10px] hidden sm:inline">Kitap Modu</span>
+          </button>
+        )}
+
         {/* Infinite Canvas vs Paged Mode Toggle */}
         <button
           onClick={() => setCanvasMode(canvasMode === 'infinite' ? 'paged' : 'infinite')}
@@ -444,6 +510,12 @@ export const NotebookWorkspace: React.FC = () => {
           mode="unlock"
         />
       )}
+
+      {/* 🖼️ Faz E: Comprehensive Export Studio Modal */}
+      <ExportModal
+        isOpen={exportModalOpen}
+        onClose={() => setExportModalOpen(false)}
+      />
     </div>
   );
 };

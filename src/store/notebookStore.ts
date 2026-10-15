@@ -326,6 +326,12 @@ interface NotebookStoreState {
   toggleAmbience: (type: AmbientSoundType) => void;
   setAmbienceVolume: (volume: number) => void;
 
+  // Faz E: Two-Page Book Spread & Export Studio
+  twoPageSpread: boolean;
+  toggleTwoPageSpread: () => void;
+  exportModalOpen: boolean;
+  setExportModalOpen: (open: boolean) => void;
+
   // Text Annotations
   addTextAnnotation: (
     pageIndex: number,
@@ -597,6 +603,10 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
 
   activeAmbience: null,
   ambienceVolume: 0.5,
+
+  // Faz E Initial State
+  twoPageSpread: false,
+  exportModalOpen: false,
 
   undoStack: [],
   redoStack: [],
@@ -1941,6 +1951,15 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
   setAmbienceVolume: (volume: number) => {
     ambientAudioService.setVolume(volume);
     set({ ambienceVolume: volume });
+  },
+
+  // Faz E: Two-Page Book Spread & Export Studio Actions
+  toggleTwoPageSpread: () => {
+    set((state) => ({ twoPageSpread: !state.twoPageSpread }));
+  },
+
+  setExportModalOpen: (open: boolean) => {
+    set({ exportModalOpen: open });
   },
 
   addStickyNoteToCurrentPage: (note: StickyNoteItem) => {

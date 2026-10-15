@@ -141,6 +141,7 @@ export const Toolbar: React.FC = () => {
     symmetryEnabled,
     toggleSymmetry,
     addStickyNoteToCurrentPage,
+    setExportModalOpen,
   } = useNotebookStore();
 
   const [activeColorSlot, setActiveColorSlot] = useState<number | null>(null);
@@ -1009,14 +1010,13 @@ export const Toolbar: React.FC = () => {
           <UploadCloud size={17} />
         </button>
 
-        {/* Export to PDF */}
+        {/* 🖼️ Faz E: Export & Share Studio (PDF, PNG, JPEG) */}
         <button
-          onClick={handleExportPdf}
-          disabled={isExporting}
+          onClick={() => setExportModalOpen(true)}
           className="p-2 text-slate-400 hover:text-emerald-400 hover:bg-slate-800 rounded-xl transition-colors"
-          title="Notlu PDF Olarak İndir"
+          title="Dışa Aktar & Paylaş (PDF, PNG, JPEG)"
         >
-          <FileDown size={17} className={isExporting ? 'animate-bounce text-emerald-400' : ''} />
+          <FileDown size={17} />
         </button>
 
         {/* GoodNotes 6 Study Sets / Flashcards */}

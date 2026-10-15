@@ -11,7 +11,9 @@ import {
   Trash2,
   FolderPlus,
   Check,
+  Crop,
 } from 'lucide-react';
+import { ImageCropModal } from './ImageCropModal';
 
 export const StickersDrawer: React.FC = () => {
   const {
@@ -32,6 +34,36 @@ export const StickersDrawer: React.FC = () => {
   const [showNewCollectionInput, setShowNewCollectionInput] = useState(false);
   const [newCollectionName, setNewCollectionName] = useState('');
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const cropFileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const [cropModalOpen, setCropModalOpen] = useState(false);
+  const [cropImageSrc, setCropImageSrc] = useState<string>('');
+  const [cropItemName, setCropItemName] = useState<string>('');
+
+  const handleApplyCroppedImage = (croppedData: string) => {
+    const newSticker: StickerItem = {
+      id: `el_user_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+      name: cropItemName || 'Kırpılmış Görsel',
+      category: activeCategory === 'all' ? 'custom' : activeCategory,
+      content: `<img src="${croppedData}" style="max-width:100%; max-height:100%; object-fit:contain;" />`,
+      width: 140,
+      height: 140,
+    };
+    addCustomSticker(newSticker);
+  };
+
+  const handleCropFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      setCropImageSrc(reader.result as string);
+      setCropItemName(file.name.replace(/\.[^/.]+$/, '').slice(0, 20));
+      setCropModalOpen(true);
+      if (cropFileInputRef.current) cropFileInputRef.current.value = '';
+    };
+    reader.readAsDataURL(file);
+  };
 
   if (!stickersDrawerOpen) return null;
 
@@ -97,7 +129,7 @@ export const StickersDrawer: React.FC = () => {
           <button
             onClick={() => fileInputRef.current?.click()}
             className="p-1.5 text-slate-400 hover:text-amber-400 hover:bg-slate-800 rounded-lg transition-colors flex items-center gap-1"
-            title="Görsel veya SVG İçe Aktar"
+            title="Doğrudan Görsel veya SVG Yükle"
           >
             <Upload size={15} />
           </button>
@@ -106,6 +138,22 @@ export const StickersDrawer: React.FC = () => {
             type="file"
             accept="image/*,.svg"
             onChange={handleFileUpload}
+            className="hidden"
+          />
+
+          {/* ✂️ Faz E: Upload & Crop Button */}
+          <button
+            onClick={() => cropFileInputRef.current?.click()}
+            className="p-1.5 text-slate-400 hover:text-indigo-400 hover:bg-slate-800 rounded-lg transition-colors flex items-center gap-1"
+            title="Kırparak Yükle (Dikdörtgen veya Serbest Kement)"
+          >
+            <Crop size={15} />
+          </button>
+          <input
+            ref={cropFileInputRef}
+            type="file"
+            accept="image/*"
+            onChange={handleCropFileUpload}
             className="hidden"
           />
 
@@ -192,18 +240,37 @@ export const StickersDrawer: React.FC = () => {
                 onClick={() => addStickerToCurrentPage(item)}
                 className="p-2.5 rounded-2xl border border-slate-800 bg-slate-850/60 hover:border-amber-500/50 hover:bg-slate-800 cursor-pointer transition-all flex flex-col items-center justify-between group hover:scale-[1.02] shadow-sm relative overflow-hidden"
               >
-                {/* Delete button for user-added items */}
+                {/* Actions for custom items */}
                 {isCustom && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      deleteCustomSticker(item.id);
-                    }}
-                    className="absolute top-1.5 right-1.5 p-1 rounded-lg bg-slate-900/80 text-slate-400 hover:text-rose-400 opacity-0 group-hover:opacity-100 transition-opacity z-10"
-                    title="Öğeyi Sil"
-                  >
-                    <Trash2 size={12} />
-                  </button>
+                  <div className="absolute top-1.5 right-1.5 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                    {item.content.includes('<img') && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const match = item.content.match(/src="([^"]+)"/);
+                          if (match) {
+                            setCropImageSrc(match[1]);
+                            setCropItemName(item.name);
+                            setCropModalOpen(true);
+                          }
+                        }}
+                        className="p-1 rounded-lg bg-slate-900/90 text-slate-400 hover:text-indigo-400 transition-colors"
+                        title="Görseli Kırp"
+                      >
+                        <Crop size={12} />
+                      </button>
+                    )}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        deleteCustomSticker(item.id);
+                      }}
+                      className="p-1 rounded-lg bg-slate-900/90 text-slate-400 hover:text-rose-400 transition-colors"
+                      title="Öğeyi Sil"
+                    >
+                      <Trash2 size={12} />
+                    </button>
+                  </div>
                 )}
 
                 <div
@@ -225,6 +292,14 @@ export const StickersDrawer: React.FC = () => {
         <span>{filtered.length} Öğe Listelendi</span>
         <span className="text-amber-400 font-medium">Tıkla ve Tuvale Ekle</span>
       </div>
+
+      {/* ✂️ Faz E: Interactive Image Cropper Modal */}
+      <ImageCropModal
+        isOpen={cropModalOpen}
+        imageSrc={cropImageSrc}
+        onClose={() => setCropModalOpen(false)}
+        onApplyCrop={handleApplyCroppedImage}
+      />
     </div>
   );
 };
