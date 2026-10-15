@@ -28,6 +28,7 @@ import {
 import {
   computeGroupBounds,
   isStrokeCapturedByLasso,
+  AlignmentType,
 } from '../../engine/lassoHelper';
 import { TextBoxOverlay } from './TextBoxOverlay';
 import { StickyNoteOverlay } from './StickyNoteOverlay';
@@ -49,6 +50,13 @@ import {
   Check,
   Calculator,
   Type,
+  FlipHorizontal,
+  FlipVertical,
+  AlignLeft,
+  AlignCenter,
+  AlignRight,
+  ArrowDownToLine,
+  Copy,
 } from 'lucide-react';
 
 interface CanvasPageProps {
@@ -86,6 +94,10 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
     recolorLassoSelection,
     deleteLassoSelection,
     saveLassoSelectionAsSticker,
+    flipLassoSelection,
+    alignLassoSelection,
+    duplicateLassoSelection,
+    pushContentDownOnCurrentPage,
     laserPoints,
     addLaserPoint,
     clearLaserPoints,
@@ -128,6 +140,7 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
   const [isDraggingLasso, setIsDraggingLasso] = useState(false);
   const [lassoDragStart, setLassoDragStart] = useState<{ x: number; y: number } | null>(null);
   const [recolorMenuOpen, setRecolorMenuOpen] = useState(false);
+  const [alignMenuOpen, setAlignMenuOpen] = useState(false);
   const [ocrModalOpen, setOcrModalOpen] = useState(false);
   const hasStylusUsedRef = useRef<boolean>(false);
   const [selectedShapeStrokeId, setSelectedShapeStrokeId] = useState<string | null>(null);
@@ -1255,6 +1268,57 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
               <BookmarkPlus size={14} />
             </button>
 
+            {/* FAZ J: Çoğalt (Duplicate) */}
+            <button
+              onClick={duplicateLassoSelection}
+              className="p-1.5 hover:bg-slate-800 text-teal-400 rounded-lg transition-colors"
+              title="Seçimi Çoğalt (Duplicate)"
+            >
+              <Copy size={14} />
+            </button>
+
+            {/* FAZ J: Yatay ve Dikey Aynalama (Flip) */}
+            <button
+              onClick={() => flipLassoSelection('horizontal')}
+              className="p-1.5 hover:bg-slate-800 text-sky-400 rounded-lg transition-colors"
+              title="Yatay Aynala (Flip Horizontal)"
+            >
+              <FlipHorizontal size={14} />
+            </button>
+            <button
+              onClick={() => flipLassoSelection('vertical')}
+              className="p-1.5 hover:bg-slate-800 text-sky-400 rounded-lg transition-colors"
+              title="Dikey Aynala (Flip Vertical)"
+            >
+              <FlipVertical size={14} />
+            </button>
+
+            {/* FAZ J: Çizimleri Hizalama (Align Dropdown) */}
+            <button
+              onClick={() => setAlignMenuOpen(!alignMenuOpen)}
+              className={`p-1.5 hover:bg-slate-800 rounded-lg transition-colors ${
+                alignMenuOpen ? 'bg-slate-800 text-emerald-300' : 'text-emerald-400'
+              }`}
+              title="Çizimleri Hizala (Align)"
+            >
+              <AlignLeft size={14} />
+            </button>
+
+            {/* FAZ J: Dikey Alan Açma (Insert Space / Vertical Push) */}
+            <button
+              onClick={() => {
+                const pushY = lassoSelection.bounds.maxY + 5;
+                pushContentDownOnCurrentPage(pushY, 140);
+                setToastMessage('↕️ 140px dikey alan açıldı');
+                setTimeout(() => setToastMessage(null), 2500);
+              }}
+              className="px-2 py-1 hover:bg-slate-800 text-amber-300 rounded-lg transition-colors flex items-center gap-1 text-[11px] font-semibold border border-amber-500/30 bg-amber-950/40"
+              title="Seçimin Altına 140px Boşluk Aç (Insert Space)"
+            >
+              <ArrowDownToLine size={13} />
+              <span>Boşluk Aç</span>
+            </button>
+
             {/* Faz 2: Math AI Denklem Çözücü */}
             <button
               onClick={() => {
@@ -1312,6 +1376,74 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
                   />
                 )
               )}
+            </div>
+          )}
+
+          {/* FAZ J: Alignment Options Dropdown */}
+          {alignMenuOpen && (
+            <div className="absolute -top-24 left-1/2 -translate-x-1/2 bg-slate-900 border border-slate-700 p-1.5 rounded-xl flex items-center gap-1 shadow-2xl z-40 text-xs text-slate-200 backdrop-blur whitespace-nowrap">
+              <span className="text-[10px] text-slate-400 px-1 font-semibold uppercase">Hizala:</span>
+              <button
+                onClick={() => {
+                  alignLassoSelection('left');
+                  setAlignMenuOpen(false);
+                }}
+                className="px-2 py-1 hover:bg-slate-800 rounded flex items-center gap-1 text-slate-300 hover:text-white"
+                title="Sola Hizala"
+              >
+                <AlignLeft size={13} /> Sola
+              </button>
+              <button
+                onClick={() => {
+                  alignLassoSelection('center');
+                  setAlignMenuOpen(false);
+                }}
+                className="px-2 py-1 hover:bg-slate-800 rounded flex items-center gap-1 text-slate-300 hover:text-white"
+                title="Yatay Ortala"
+              >
+                <AlignCenter size={13} /> Ortala
+              </button>
+              <button
+                onClick={() => {
+                  alignLassoSelection('right');
+                  setAlignMenuOpen(false);
+                }}
+                className="px-2 py-1 hover:bg-slate-800 rounded flex items-center gap-1 text-slate-300 hover:text-white"
+                title="Sağa Hizala"
+              >
+                <AlignRight size={13} /> Sağa
+              </button>
+              <div className="w-px h-4 bg-slate-700" />
+              <button
+                onClick={() => {
+                  alignLassoSelection('top');
+                  setAlignMenuOpen(false);
+                }}
+                className="px-2 py-1 hover:bg-slate-800 rounded text-slate-300 hover:text-white"
+                title="Üste Hizala"
+              >
+                Üst
+              </button>
+              <button
+                onClick={() => {
+                  alignLassoSelection('middle');
+                  setAlignMenuOpen(false);
+                }}
+                className="px-2 py-1 hover:bg-slate-800 rounded text-slate-300 hover:text-white"
+                title="Dikey Ortala"
+              >
+                Orta
+              </button>
+              <button
+                onClick={() => {
+                  alignLassoSelection('bottom');
+                  setAlignMenuOpen(false);
+                }}
+                className="px-2 py-1 hover:bg-slate-800 rounded text-slate-300 hover:text-white"
+                title="Alta Hizala"
+              >
+                Alt
+              </button>
             </div>
           )}
 

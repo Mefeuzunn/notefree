@@ -119,3 +119,98 @@ export function recolorStrokes(strokes: Stroke[], newColor: string): Stroke[] {
     color: newColor,
   }));
 }
+
+/**
+ * FAZ J: Flips strokes horizontally or vertically around a center point
+ */
+export function flipStrokes(
+  strokes: Stroke[],
+  direction: 'horizontal' | 'vertical',
+  centerX: number,
+  centerY: number
+): Stroke[] {
+  return strokes.map((s) => {
+    const newPoints = s.points.map((p) => ({
+      ...p,
+      x: direction === 'horizontal' ? 2 * centerX - p.x : p.x,
+      y: direction === 'vertical' ? 2 * centerY - p.y : p.y,
+    }));
+    return {
+      ...s,
+      points: newPoints,
+      bounds: calculateStrokeBounds(newPoints, s.size),
+      ...(s.controlNodes && {
+        controlNodes: s.controlNodes.map((n) => ({
+          ...n,
+          x: direction === 'horizontal' ? 2 * centerX - n.x : n.x,
+          y: direction === 'vertical' ? 2 * centerY - n.y : n.y,
+        })),
+      }),
+    };
+  });
+}
+
+export type AlignmentType = 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom';
+
+/**
+ * FAZ J: Aligns individual strokes within a group relative to the group bounds
+ */
+export function alignStrokes(
+  strokes: Stroke[],
+  alignment: AlignmentType,
+  groupBounds: StrokeBounds
+): Stroke[] {
+  const groupCenterX = (groupBounds.minX + groupBounds.maxX) / 2;
+  const groupCenterY = (groupBounds.minY + groupBounds.maxY) / 2;
+
+  return strokes.map((s) => {
+    let dx = 0;
+    let dy = 0;
+
+    switch (alignment) {
+      case 'left':
+        dx = groupBounds.minX - s.bounds.minX;
+        break;
+      case 'right':
+        dx = groupBounds.maxX - s.bounds.maxX;
+        break;
+      case 'center': {
+        const strokeCenterX = (s.bounds.minX + s.bounds.maxX) / 2;
+        dx = groupCenterX - strokeCenterX;
+        break;
+      }
+      case 'top':
+        dy = groupBounds.minY - s.bounds.minY;
+        break;
+      case 'bottom':
+        dy = groupBounds.maxY - s.bounds.maxY;
+        break;
+      case 'middle': {
+        const strokeCenterY = (s.bounds.minY + s.bounds.maxY) / 2;
+        dy = groupCenterY - strokeCenterY;
+        break;
+      }
+    }
+
+    if (dx === 0 && dy === 0) return s;
+    return translateStrokes([s], dx, dy)[0];
+  });
+}
+
+/**
+ * FAZ J: Shifts strokes located at or below startY downwards by amount
+ */
+export function pushStrokesDown(
+  strokes: Stroke[],
+  startY: number,
+  amount: number
+): Stroke[] {
+  return strokes.map((s) => {
+    // If the stroke's midpoint or top is below startY, shift it down
+    if (s.bounds.minY >= startY || (s.bounds.minY + s.bounds.maxY) / 2 >= startY) {
+      return translateStrokes([s], 0, amount)[0];
+    }
+    return s;
+  });
+}
+

@@ -28,6 +28,8 @@ export interface DBPage {
   title?: string;
   isBookmarked?: boolean;
   tapes?: any[];
+  stickyNotes?: any[];
+  stickers?: any[];
 }
 
 class NotFreeDatabase extends Dexie {

@@ -36,6 +36,10 @@ import {
   recolorStrokes,
   scaleStrokes,
   translateStrokes,
+  flipStrokes,
+  alignStrokes,
+  AlignmentType,
+  pushStrokesDown,
 } from '../engine/lassoHelper';
 import { PRESET_STICKERS } from '../engine/stickersLibrary';
 import { audioRecorder } from '../services/audioService';
@@ -223,6 +227,10 @@ interface NotebookStoreState {
   recolorLassoSelection: (color: string) => void;
   deleteLassoSelection: () => void;
   saveLassoSelectionAsSticker: (name: string) => void;
+  flipLassoSelection: (direction: 'horizontal' | 'vertical') => void;
+  alignLassoSelection: (alignment: AlignmentType) => void;
+  duplicateLassoSelection: () => void;
+  pushContentDownOnCurrentPage: (startY: number, amount: number) => void;
 
   // Zoom Window Controls
   toggleZoomWindow: () => void;
@@ -1612,6 +1620,215 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
       customStickers: [...state.customStickers, newSticker],
       stickersDrawerOpen: true,
     }));
+  },
+
+  // FAZ J: Flip selected strokes horizontally or vertically
+  flipLassoSelection: (direction: 'horizontal' | 'vertical') => {
+    const { lassoSelection, activeNotebookId, notebooks, activePageIndex, undoStack } = get();
+    if (!lassoSelection || !activeNotebookId) return;
+    const currentNb = notebooks.find((n) => n.id === activeNotebookId);
+    if (!currentNb) return;
+    const currentPage = currentNb.pages[activePageIndex];
+    if (!currentPage) return;
+
+    const selectedIdSet = new Set(lassoSelection.strokeIds);
+    const cx = (lassoSelection.bounds.minX + lassoSelection.bounds.maxX) / 2;
+    const cy = (lassoSelection.bounds.minY + lassoSelection.bounds.maxY) / 2;
+
+    const selectedStrokes = currentPage.strokes.filter((s) => selectedIdSet.has(s.id));
+    const flippedSelected = flipStrokes(selectedStrokes, direction, cx, cy);
+    const flippedMap = new Map(flippedSelected.map((s) => [s.id, s]));
+
+    const updatedStrokes = currentPage.strokes.map((s) => flippedMap.get(s.id) || s);
+    const newBounds = computeGroupBounds(flippedSelected);
+
+    const updatedPages = currentNb.pages.map((p, idx) =>
+      idx === activePageIndex ? { ...p, strokes: updatedStrokes } : p
+    );
+
+    const updatedNotebook = { ...currentNb, pages: updatedPages, updatedAt: Date.now() };
+
+    set({
+      notebooks: notebooks.map((n) => (n.id === activeNotebookId ? updatedNotebook : n)),
+      undoStack: [...undoStack, [...currentPage.strokes]],
+      redoStack: [],
+      lassoSelection: {
+        ...lassoSelection,
+        bounds: newBounds,
+      },
+    });
+
+    db.pages.update(currentPage.id, { strokes: updatedStrokes });
+  },
+
+  // FAZ J: Align selected strokes relative to the group boundary
+  alignLassoSelection: (alignment: AlignmentType) => {
+    const { lassoSelection, activeNotebookId, notebooks, activePageIndex, undoStack } = get();
+    if (!lassoSelection || !activeNotebookId) return;
+    const currentNb = notebooks.find((n) => n.id === activeNotebookId);
+    if (!currentNb) return;
+    const currentPage = currentNb.pages[activePageIndex];
+    if (!currentPage) return;
+
+    const selectedIdSet = new Set(lassoSelection.strokeIds);
+    const selectedStrokes = currentPage.strokes.filter((s) => selectedIdSet.has(s.id));
+    if (selectedStrokes.length <= 1) return;
+
+    const alignedSelected = alignStrokes(selectedStrokes, alignment, lassoSelection.bounds);
+    const alignedMap = new Map(alignedSelected.map((s) => [s.id, s]));
+
+    const updatedStrokes = currentPage.strokes.map((s) => alignedMap.get(s.id) || s);
+    const newBounds = computeGroupBounds(alignedSelected);
+
+    const updatedPages = currentNb.pages.map((p, idx) =>
+      idx === activePageIndex ? { ...p, strokes: updatedStrokes } : p
+    );
+
+    const updatedNotebook = { ...currentNb, pages: updatedPages, updatedAt: Date.now() };
+
+    set({
+      notebooks: notebooks.map((n) => (n.id === activeNotebookId ? updatedNotebook : n)),
+      undoStack: [...undoStack, [...currentPage.strokes]],
+      redoStack: [],
+      lassoSelection: {
+        ...lassoSelection,
+        bounds: newBounds,
+      },
+    });
+
+    db.pages.update(currentPage.id, { strokes: updatedStrokes });
+  },
+
+  // FAZ J: Duplicate selected strokes with a slight offset
+  duplicateLassoSelection: () => {
+    const { lassoSelection, activeNotebookId, notebooks, activePageIndex, undoStack } = get();
+    if (!lassoSelection || !activeNotebookId) return;
+    const currentNb = notebooks.find((n) => n.id === activeNotebookId);
+    if (!currentNb) return;
+    const currentPage = currentNb.pages[activePageIndex];
+    if (!currentPage) return;
+
+    const selectedIdSet = new Set(lassoSelection.strokeIds);
+    const selectedStrokes = currentPage.strokes.filter((s) => selectedIdSet.has(s.id));
+    if (selectedStrokes.length === 0) return;
+
+    const offset = 25;
+    const clonedStrokes: Stroke[] = selectedStrokes.map((s) => {
+      const newId = `st_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+      const shifted = translateStrokes([s], offset, offset)[0];
+      return {
+        ...shifted,
+        id: newId,
+        timestamp: Date.now(),
+      };
+    });
+
+    const updatedStrokes = [...currentPage.strokes, ...clonedStrokes];
+    const newBounds = computeGroupBounds(clonedStrokes);
+
+    const updatedPages = currentNb.pages.map((p, idx) =>
+      idx === activePageIndex ? { ...p, strokes: updatedStrokes } : p
+    );
+
+    const updatedNotebook = { ...currentNb, pages: updatedPages, updatedAt: Date.now() };
+
+    set({
+      notebooks: notebooks.map((n) => (n.id === activeNotebookId ? updatedNotebook : n)),
+      undoStack: [...undoStack, [...currentPage.strokes]],
+      redoStack: [],
+      lassoSelection: {
+        pageId: currentPage.id,
+        strokeIds: clonedStrokes.map((s) => s.id),
+        bounds: newBounds,
+        originalStrokes: clonedStrokes,
+        offsetX: 0,
+        offsetY: 0,
+        scaleX: 1,
+        scaleY: 1,
+        rotation: 0,
+      },
+    });
+
+    db.pages.update(currentPage.id, { strokes: updatedStrokes });
+  },
+
+  // FAZ J: Insert space / push all content below startY downwards by amount
+  pushContentDownOnCurrentPage: (startY: number, amount: number) => {
+    const { activeNotebookId, notebooks, activePageIndex, undoStack } = get();
+    if (!activeNotebookId) return;
+    const currentNb = notebooks.find((n) => n.id === activeNotebookId);
+    if (!currentNb) return;
+    const currentPage = currentNb.pages[activePageIndex];
+    if (!currentPage) return;
+
+    // 1. Shift strokes below startY
+    const updatedStrokes = pushStrokesDown(currentPage.strokes, startY, amount);
+
+    // 2. Shift texts below startY
+    const updatedTexts = currentPage.texts?.map((t) =>
+      t.y >= startY ? { ...t, y: t.y + amount } : t
+    );
+
+    // 3. Shift sticky notes below startY
+    const updatedStickyNotes = currentPage.stickyNotes?.map((sn) =>
+      sn.y >= startY ? { ...sn, y: sn.y + amount } : sn
+    );
+
+    // 4. Shift tapes below startY
+    const updatedTapes = currentPage.tapes?.map((tape) => {
+      const isBelow = tape.points.some((p) => p.y >= startY);
+      if (isBelow) {
+        return {
+          ...tape,
+          points: tape.points.map((p) => ({ ...p, y: p.y + amount })),
+        };
+      }
+      return tape;
+    });
+
+    // 5. Shift stickers below startY
+    const updatedStickers = currentPage.stickers?.map((stk: PageSticker) =>
+      stk.y >= startY ? { ...stk, y: stk.y + amount } : stk
+    );
+
+    // Calculate maximum Y to expand page height if needed
+    let maxY = currentPage.height;
+    for (const s of updatedStrokes) {
+      if (s.bounds.maxY > maxY) maxY = s.bounds.maxY;
+    }
+    const newHeight = Math.max(currentPage.height, Math.ceil(maxY + 100));
+
+    const updatedPage: Page = {
+      ...currentPage,
+      strokes: updatedStrokes,
+      texts: updatedTexts,
+      stickyNotes: updatedStickyNotes,
+      tapes: updatedTapes,
+      stickers: updatedStickers,
+      height: newHeight,
+    };
+
+    const updatedPages = currentNb.pages.map((p, idx) =>
+      idx === activePageIndex ? updatedPage : p
+    );
+
+    const updatedNotebook = { ...currentNb, pages: updatedPages, updatedAt: Date.now() };
+
+    set({
+      notebooks: notebooks.map((n) => (n.id === activeNotebookId ? updatedNotebook : n)),
+      undoStack: [...undoStack, [...currentPage.strokes]],
+      redoStack: [],
+      lassoSelection: null,
+    });
+
+    db.pages.update(currentPage.id, {
+      strokes: updatedStrokes,
+      texts: updatedTexts,
+      stickyNotes: updatedStickyNotes,
+      tapes: updatedTapes,
+      stickers: updatedStickers,
+      height: newHeight,
+    });
   },
 
   // STICKERS ACTIONS
