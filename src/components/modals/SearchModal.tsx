@@ -181,9 +181,70 @@ export const SearchModal: React.FC = () => {
             });
           }
         }
+
+        // Sticky Notes (Yapışkan Post-It Notlar)
+        if (page.stickyNotes && page.stickyNotes.length > 0) {
+          page.stickyNotes.forEach((sn, snIdx) => {
+            if (sn.text && sn.text.toLowerCase().includes(trimmed)) {
+              items.push({
+                id: `sn_${nb.id}_${page.id}_${sn.id || snIdx}`,
+                type: 'text',
+                title: sn.text.slice(0, 80) + (sn.text.length > 80 ? '...' : ''),
+                subtitle: `${nb.title} • Sayfa ${page.pageNumber} (Yapışkan Not)`,
+                notebookId: nb.id,
+                notebookTitle: nb.title,
+                pageIndex: pIdx,
+                badge: 'Yapışkan Not',
+                badgeColor: 'bg-amber-400/20 text-amber-300 border-amber-400/40',
+              });
+            }
+          });
+        }
       });
 
-      // 3. Flashcards
+      // 3. Margin Cards (Kenarlık Alıntı & Özet Kartları)
+      if (nb.marginCards && nb.marginCards.length > 0) {
+        nb.marginCards.forEach((mc) => {
+          if (
+            (mc.title && mc.title.toLowerCase().includes(trimmed)) ||
+            (mc.content && mc.content.toLowerCase().includes(trimmed)) ||
+            (mc.tags && mc.tags.some((t) => t.toLowerCase().includes(trimmed)))
+          ) {
+            items.push({
+              id: `mc_${nb.id}_${mc.id}`,
+              type: 'text',
+              title: mc.title || mc.content.slice(0, 60),
+              subtitle: `${nb.title} • Çalışma Kenarlığı Alıntısı`,
+              notebookId: nb.id,
+              notebookTitle: nb.title,
+              pageIndex: mc.targetPageIndex ?? 0,
+              badge: 'Kenarlık Kartı',
+              badgeColor: 'bg-sky-500/20 text-sky-300 border-sky-500/30',
+            });
+          }
+        });
+      }
+
+      // 4. Audio Transcripts (Ses Dikte Kayıtları)
+      if (nb.audioRecordings && nb.audioRecordings.length > 0) {
+        nb.audioRecordings.forEach((rec) => {
+          if (rec.transcript && rec.transcript.toLowerCase().includes(trimmed)) {
+            items.push({
+              id: `rec_${nb.id}_${rec.id}`,
+              type: 'text',
+              title: rec.transcript.slice(0, 80) + (rec.transcript.length > 80 ? '...' : ''),
+              subtitle: `${nb.title} • Ses Transkripti (${Math.round((rec.durationMs || 0) / 1000)} sn)`,
+              notebookId: nb.id,
+              notebookTitle: nb.title,
+              pageIndex: 0,
+              badge: 'Ses Dikte',
+              badgeColor: 'bg-violet-500/20 text-violet-300 border-violet-500/30',
+            });
+          }
+        });
+      }
+
+      // 5. Flashcards
       if (nb.flashcards && nb.flashcards.length > 0) {
         nb.flashcards.forEach((fc) => {
           if (

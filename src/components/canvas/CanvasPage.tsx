@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
-import { FillItem, LassoSelection, Page, PageSticker, Stroke, StrokePoint, TapeItem, ShapeType, ShapeControlNode } from '../../types/notebook';
+import { FillItem, LassoSelection, Page, PageSticker, Stroke, StrokePoint, TapeItem, ShapeType, ShapeControlNode, StylusDoubleTapAction } from '../../types/notebook';
 import { useNotebookStore } from '../../store/notebookStore';
 import {
   calculateStrokeBounds,
@@ -134,6 +134,8 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
     symmetryEnabled,
     symmetryAxis,
     symmetryPosition,
+    undo,
+    selectFavoriteColor,
   } = useNotebookStore();
 
   const [isDrawing, setIsDrawing] = useState(false);
@@ -143,12 +145,69 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
   const [alignMenuOpen, setAlignMenuOpen] = useState(false);
   const [ocrModalOpen, setOcrModalOpen] = useState(false);
   const hasStylusUsedRef = useRef<boolean>(false);
+  const lastPenTapRef = useRef<{ time: number; x: number; y: number } | null>(null);
   const [selectedShapeStrokeId, setSelectedShapeStrokeId] = useState<string | null>(null);
 
   // Faz 1 interactive states
   const [eyedropperLoupe, setEyedropperLoupe] = useState<{ x: number; y: number; hex: string } | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [audioRipple, setAudioRipple] = useState<{ x: number; y: number } | null>(null);
+
+  // FAZ M: Stylus Action Handler (Double-Tap or Barrel Button)
+  const executeStylusAction = useCallback(
+    (action?: StylusDoubleTapAction) => {
+      const act = action || toolSettings.stylusDoubleTapAction || 'switch-eraser';
+      if (act === 'none') return;
+
+      if (act === 'switch-eraser') {
+        if (activeTool === 'eraser') {
+          const target = previousTool || 'ballpoint';
+          setActiveTool(target);
+          setToastMessage(`🖊️ ${target.toUpperCase()} Kaleme Geçildi`);
+        } else {
+          setActiveTool('eraser');
+          setToastMessage('🧹 Silgiye Geçildi');
+        }
+      } else if (act === 'switch-last-tool') {
+        const target = previousTool || 'ballpoint';
+        setActiveTool(target);
+        setToastMessage(`🔄 ${target.toUpperCase()} Aracına Geçildi`);
+      } else if (act === 'show-color-palette') {
+        const colors = toolSettings.favoriteColors;
+        if (colors && colors.length > 0) {
+          const nextIdx = ((toolSettings.activeColorIndex ?? 0) + 1) % colors.length;
+          selectFavoriteColor(nextIdx);
+          setToastMessage(`🎨 Renk: ${colors[nextIdx]}`);
+        }
+      } else if (act === 'undo') {
+        undo();
+        setToastMessage('↩️ Son Çizim Geri Alındı');
+      }
+
+      setTimeout(() => setToastMessage(null), 1500);
+    },
+    [
+      activeTool,
+      previousTool,
+      toolSettings.stylusDoubleTapAction,
+      toolSettings.favoriteColors,
+      toolSettings.activeColorIndex,
+      setActiveTool,
+      selectFavoriteColor,
+      undo,
+    ]
+  );
+
+  // FAZ M: Listen for native iPadOS / WebKit Apple Pencil double-tap gesture
+  useEffect(() => {
+    const handlePencilGesture = () => {
+      executeStylusAction();
+    };
+    window.addEventListener('pencilgesture' as any, handlePencilGesture);
+    return () => {
+      window.removeEventListener('pencilgesture' as any, handlePencilGesture);
+    };
+  }, [executeStylusAction]);
 
   const currentPointsRef = useRef<StrokePoint[]>([]);
   const lastPointRef = useRef<{ x: number; y: number; time: number } | null>(null);
@@ -416,6 +475,33 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
 
     // Smart Palm Rejection: If stylus has been used or palm rejection is enabled, reject single-finger touches
     if (e.pointerType === 'touch' && (hasStylusUsedRef.current || toolSettings.palmRejection)) {
+      return;
+    }
+
+    // FAZ M: Stylus Hardware Double-Tap & Barrel Button Handler
+    const isBarrelButtonClick = e.pointerType === 'pen' && (e.button === 2 || (e.buttons & 2) === 2);
+    let isStylusDoubleTap = false;
+
+    if (e.pointerType === 'pen' && !isBarrelButtonClick) {
+      const now = Date.now();
+      const lastTap = lastPenTapRef.current;
+      if (lastTap && now - lastTap.time < 350) {
+        const dist = Math.hypot(e.clientX - lastTap.x, e.clientY - lastTap.y);
+        if (dist < 22) {
+          isStylusDoubleTap = true;
+          lastPenTapRef.current = null;
+        } else {
+          lastPenTapRef.current = { time: now, x: e.clientX, y: e.clientY };
+        }
+      } else {
+        lastPenTapRef.current = { time: now, x: e.clientX, y: e.clientY };
+      }
+    }
+
+    if (isBarrelButtonClick || isStylusDoubleTap) {
+      e.preventDefault();
+      e.stopPropagation();
+      executeStylusAction();
       return;
     }
 
@@ -1243,6 +1329,7 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerUp}
+        onContextMenu={(e) => e.preventDefault()}
       />
 
       {/* Layer 3: Lasso Active Transform Box & Popup Menu */}

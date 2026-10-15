@@ -382,7 +382,15 @@ export interface ToolSettings {
   smartInkInversion?: boolean;
   palmRejection?: boolean; // Reject single finger touches when stylus is active
   tiltShading?: boolean; // Enable broad graphite pencil shading when stylus is tilted
+  stylusDoubleTapAction?: StylusDoubleTapAction; // Hardware / touch double tap action on stylus
 }
+
+export type StylusDoubleTapAction =
+  | 'switch-eraser'
+  | 'switch-last-tool'
+  | 'show-color-palette'
+  | 'undo'
+  | 'none';
 
 export interface LassoSelection {
   pageId: string;

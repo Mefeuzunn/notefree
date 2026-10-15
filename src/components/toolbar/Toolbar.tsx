@@ -56,7 +56,7 @@ import {
   FlipHorizontal,
   Ban,
 } from 'lucide-react';
-import { PenType, ShapeType, ToolType } from '../../types/notebook';
+import { PenType, ShapeType, ToolType, StylusDoubleTapAction } from '../../types/notebook';
 import { AudioPlayerBar } from '../audio/AudioPlayerBar';
 import { PomodoroBarWidget } from '../pomodoro/PomodoroBarWidget';
 
@@ -135,6 +135,7 @@ export const Toolbar: React.FC = () => {
     toggleGridSnap,
     togglePalmRejection,
     toggleTiltShading,
+    setStylusDoubleTapAction,
     collaboration,
     setCollaborationModalOpen,
     protractorVisible,
@@ -897,6 +898,28 @@ export const Toolbar: React.FC = () => {
                   >
                     {toolSettings.tiltShading ? 'Aktif' : 'Kapalı'}
                   </button>
+                </div>
+
+                {/* FAZ M: Stylus Hardware Double-Tap & Barrel Button Action */}
+                <div className="pt-2 border-t border-slate-800 space-y-1.5">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-slate-300 font-medium">Apple Pencil / Stylus</span>
+                    <span className="text-[10px] text-amber-400 font-mono font-medium">Çift Tıklama & Tuş</span>
+                  </div>
+                  <select
+                    value={toolSettings.stylusDoubleTapAction ?? 'switch-eraser'}
+                    onChange={(e) => setStylusDoubleTapAction(e.target.value as StylusDoubleTapAction)}
+                    className="w-full bg-slate-900 border border-slate-700 text-slate-200 text-xs rounded-lg px-2 py-1.5 focus:outline-none focus:border-indigo-500 font-medium cursor-pointer"
+                  >
+                    <option value="switch-eraser">🖊️ ↔ 🧹 Kalem / Silgi Değiştir</option>
+                    <option value="switch-last-tool">🔄 Son Kullanılan Araca Geç</option>
+                    <option value="show-color-palette">🎨 Renk Yuvası Değiştir</option>
+                    <option value="undo">↩️ Son Çizimi Geri Al (Undo)</option>
+                    <option value="none">🚫 Devre Dışı</option>
+                  </select>
+                  <p className="text-[10px] text-slate-400 leading-tight">
+                    Apple Pencil çift dokunuşunda veya Wacom/S-Pen fıçı tuşunda tetiklenir.
+                  </p>
                 </div>
               </div>
             </div>

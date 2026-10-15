@@ -28,6 +28,7 @@ import {
   StickyNoteItem,
   MarginExcerptCard,
   MarginCardColor,
+  StylusDoubleTapAction,
 } from '../types/notebook';
 import { collaborationService } from '../services/collaborationService';
 import { db, initStorage, saveNotebookToDB, importNotebookFromNotefree } from '../services/storage';
@@ -213,6 +214,7 @@ interface NotebookStoreState {
   setShapeFillOpacity: (opacity: number) => void;
   togglePalmRejection: () => void;
   toggleTiltShading: () => void;
+  setStylusDoubleTapAction: (action: StylusDoubleTapAction) => void;
   addStrokeToCurrentPage: (stroke: Stroke) => void;
   eraseStrokesOnCurrentPage: (strokeIds: string[]) => void;
   updateStrokeOnCurrentPage: (strokeId: string, partial: Partial<Stroke>) => void;
@@ -607,6 +609,7 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
     gridSnap: false,
     palmRejection: true,
     tiltShading: true,
+    stylusDoubleTapAction: 'switch-eraser',
   },
 
   presentationMode: false,
@@ -3418,6 +3421,15 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
       toolSettings: {
         ...state.toolSettings,
         tiltShading: !state.toolSettings.tiltShading,
+      },
+    }));
+  },
+
+  setStylusDoubleTapAction: (action: StylusDoubleTapAction) => {
+    set((state) => ({
+      toolSettings: {
+        ...state.toolSettings,
+        stylusDoubleTapAction: action,
       },
     }));
   },
