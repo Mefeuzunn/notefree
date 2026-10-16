@@ -135,36 +135,198 @@ export function drawPaperTemplate(
       break;
     }
 
-    case 'isometric': {
-      const step = customPitch && customPitch >= 12 && customPitch <= 120 ? customPitch : 32;
-      const h = (step * Math.sqrt(3)) / 2;
+    case 'isometric':
+    case 'isometric-3d': {
+      // True 3D Isometric Projection Grid (Vertical 90°, and 30° / 150° Axes)
+      const L = customPitch && customPitch >= 14 && customPitch <= 120 ? customPitch : 30;
+      const dx = (L * Math.sqrt(3)) / 2;
+      const topPadding = 50;
+      const bottomLimit = height - 25;
+
       ctx.save();
       ctx.strokeStyle = activeLineColor;
-      ctx.lineWidth = 0.8;
+      ctx.lineWidth = 0.75;
 
-      // Horizontal lines
-      for (let y = 30; y < height - 20; y += h) {
+      // Header Tag
+      ctx.font = 'bold 11px Inter, sans-serif';
+      ctx.fillStyle = palette.text;
+      ctx.fillText('📐 İZOMETRİK 3D TEKNİK ÇİZİM KAĞIDI (30° / 90° / 150°)', 35, 34);
+
+      // Clip inside margins
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(20, topPadding, width - 40, bottomLimit - topPadding);
+      ctx.clip();
+
+      // 1. Vertical lines (90°)
+      for (let x = 20; x < width - 15; x += dx) {
         ctx.beginPath();
-        ctx.moveTo(20, y);
-        ctx.lineTo(width - 20, y);
+        ctx.moveTo(x, topPadding);
+        ctx.lineTo(x, bottomLimit);
         ctx.stroke();
       }
 
-      // Diagonal +60 deg
-      for (let x = -height; x < width + height; x += step) {
+      // 2. Diagonals at +30°: y = x / sqrt(3) + c => c = y - x / sqrt(3)
+      const slope = 1 / Math.sqrt(3);
+      const minC = topPadding - width * slope;
+      const maxC = bottomLimit;
+
+      for (let c = minC; c <= maxC; c += L) {
         ctx.beginPath();
-        ctx.moveTo(x, 20);
-        ctx.lineTo(x + (height * Math.sqrt(3)) / 3, height - 20);
+        ctx.moveTo(0, c);
+        ctx.lineTo(width, c + width * slope);
         ctx.stroke();
       }
 
-      // Diagonal -60 deg
-      for (let x = -height; x < width + height; x += step) {
+      // 3. Diagonals at -30° (150°): y = -x / sqrt(3) + c
+      const minC2 = topPadding;
+      const maxC2 = bottomLimit + width * slope;
+
+      for (let c = minC2; c <= maxC2; c += L) {
         ctx.beginPath();
-        ctx.moveTo(x, 20);
-        ctx.lineTo(x - (height * Math.sqrt(3)) / 3, height - 20);
+        ctx.moveTo(0, c);
+        ctx.lineTo(width, c - width * slope);
         ctx.stroke();
       }
+
+      ctx.restore();
+      ctx.restore();
+      break;
+    }
+
+    case 'isometric-dots': {
+      // Isometric 3D Dot Matrix Grid
+      const L = customPitch && customPitch >= 14 && customPitch <= 120 ? customPitch : 30;
+      const dx = (L * Math.sqrt(3)) / 2;
+      const topPadding = 55;
+
+      ctx.save();
+
+      // Header Tag
+      ctx.font = 'bold 11px Inter, sans-serif';
+      ctx.fillStyle = palette.text;
+      ctx.fillText('⁖ İZOMETRİK 3D NOKTALI ÇİZİM KAĞIDI (DOT MATRIX)', 35, 34);
+      ctx.fillStyle = activeLineColor;
+
+      let col = 0;
+      for (let x = 30; x < width - 20; x += dx) {
+        const isOdd = col % 2 === 1;
+        const yOffset = isOdd ? L / 2 : 0;
+        for (let y = topPadding + yOffset; y < height - 25; y += L) {
+          ctx.beginPath();
+          ctx.arc(x, y, 1.3, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        col++;
+      }
+
+      ctx.restore();
+      break;
+    }
+
+    case 'polar-coordinate': {
+      // Precision Polar & Radial Coordinate Grid
+      const cx = width / 2;
+      const cy = height / 2 + 15;
+      const maxR = Math.min(cx - 35, cy - 75, height - cy - 35);
+      const dr = customPitch && customPitch >= 14 && customPitch <= 80 ? customPitch : 26;
+
+      ctx.save();
+
+      // Header Title
+      ctx.font = 'bold 12px Inter, sans-serif';
+      ctx.fillStyle = palette.text;
+      ctx.fillText('🎯 RADYAL & POLAR KOORDİNAT DÜZLEMİ (r, θ)', 40, 40);
+
+      // 1. Concentric Circles
+      let ringIndex = 1;
+      for (let r = dr; r <= maxR; r += dr) {
+        ctx.beginPath();
+        ctx.arc(cx, cy, r, 0, Math.PI * 2);
+        const isMajor = ringIndex % 5 === 0 || r + dr > maxR;
+        ctx.lineWidth = isMajor ? 1.4 : 0.6;
+        ctx.strokeStyle = activeLineColor;
+        ctx.stroke();
+
+        // Distance label along +X axis
+        if (isMajor) {
+          ctx.font = 'bold 9px Inter, monospace';
+          ctx.fillStyle = palette.text;
+          ctx.fillText(`r=${ringIndex}`, cx + r - 14, cy - 4);
+        }
+        ringIndex++;
+      }
+
+      // 2. Radial Rays (every 15°)
+      const angles = [
+        { deg: 0, rad: '0', isAxis: true },
+        { deg: 15, isAxis: false },
+        { deg: 30, rad: 'π/6', isAxis: false },
+        { deg: 45, rad: 'π/4', isAxis: false },
+        { deg: 60, rad: 'π/3', isAxis: false },
+        { deg: 75, isAxis: false },
+        { deg: 90, rad: 'π/2', isAxis: true },
+        { deg: 105, isAxis: false },
+        { deg: 120, rad: '2π/3', isAxis: false },
+        { deg: 135, rad: '3π/4', isAxis: false },
+        { deg: 150, rad: '5π/6', isAxis: false },
+        { deg: 165, isAxis: false },
+        { deg: 180, rad: 'π', isAxis: true },
+        { deg: 195, isAxis: false },
+        { deg: 210, rad: '7π/6', isAxis: false },
+        { deg: 225, rad: '5π/4', isAxis: false },
+        { deg: 240, rad: '4π/3', isAxis: false },
+        { deg: 255, isAxis: false },
+        { deg: 270, rad: '3π/2', isAxis: true },
+        { deg: 285, isAxis: false },
+        { deg: 300, rad: '5π/3', isAxis: false },
+        { deg: 315, rad: '7π/4', isAxis: false },
+        { deg: 330, rad: '11π/6', isAxis: false },
+        { deg: 345, isAxis: false },
+      ];
+
+      angles.forEach(({ deg, rad, isAxis }) => {
+        const radAngle = (deg * Math.PI) / 180;
+        const cosA = Math.cos(radAngle);
+        const sinA = -Math.sin(radAngle); // Canvas Y points downward
+
+        const x2 = cx + maxR * cosA;
+        const y2 = cy + maxR * sinA;
+
+        ctx.beginPath();
+        ctx.moveTo(cx, cy);
+        ctx.lineTo(x2, y2);
+        ctx.lineWidth = isAxis ? 1.5 : rad ? 0.8 : 0.4;
+        ctx.strokeStyle = isAxis ? (customLineColor || palette.line) : activeLineColor;
+        ctx.stroke();
+
+        // Outer angle labels
+        if (rad !== undefined) {
+          const labelDist = maxR + 18;
+          const lx = cx + labelDist * cosA;
+          const ly = cy + labelDist * sinA;
+
+          ctx.font = isAxis ? 'bold 10px Inter, sans-serif' : '9px Inter, sans-serif';
+          ctx.fillStyle = palette.text;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(`${deg}°`, lx, ly - 5);
+          ctx.font = '8px Inter, monospace';
+          ctx.fillText(rad, lx, ly + 6);
+        }
+      });
+
+      // 3. Central Pole Point O(0,0)
+      ctx.beginPath();
+      ctx.arc(cx, cy, 3, 0, Math.PI * 2);
+      ctx.fillStyle = activeLineColor;
+      ctx.fill();
+      ctx.font = 'bold 10px Inter, sans-serif';
+      ctx.fillStyle = palette.text;
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'bottom';
+      ctx.fillText('O (0,0)', cx + 6, cy - 4);
+
       ctx.restore();
       break;
     }
@@ -377,59 +539,189 @@ export function drawPaperTemplate(
     }
 
     case 'engineering-1mm': {
-      // 3-tier Precision Millimeter Graph Paper
+      // 3-Tier High-Precision Millimeter CAD Graph Paper (1mm / 5mm / 10mm)
       ctx.save();
       const originX = 35;
-      const originY = 35;
+      const originY = 55;
       const endX = width - 35;
-      const endY = height - 70;
+      const endY = height - 75;
 
-      // Major 10mm lines
-      ctx.strokeStyle = palette.line;
-      ctx.lineWidth = 1.2;
-      for (let x = originX; x <= endX; x += 38) {
+      const majorStep = customPitch && customPitch >= 20 && customPitch <= 80 ? customPitch : 40;
+      const mediumStep = majorStep / 2; // 5mm
+      const minorStep = majorStep / 10; // 1mm
+
+      // Header
+      ctx.font = 'bold 12px Inter, sans-serif';
+      ctx.fillStyle = palette.text;
+      ctx.fillText('📐 MÜHENDİSLİK TEKNİK ÇİZİM PAFTASI (1mm / 5mm / 10mm CAD GRID)', originX, 38);
+
+      // Clip inside graph bounds
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(originX, originY, endX - originX, endY - originY);
+      ctx.clip();
+
+      // 1. Minor 1mm lines (ultra-fine)
+      ctx.lineWidth = 0.35;
+      ctx.strokeStyle = activeLineColor;
+      ctx.globalAlpha = (lineOpacity ?? 0.8) * 0.45;
+      for (let x = originX; x <= endX; x += minorStep) {
         ctx.beginPath();
         ctx.moveTo(x, originY);
         ctx.lineTo(x, endY);
         ctx.stroke();
       }
-      for (let y = originY; y <= endY; y += 38) {
+      for (let y = originY; y <= endY; y += minorStep) {
         ctx.beginPath();
         ctx.moveTo(originX, y);
         ctx.lineTo(endX, y);
         ctx.stroke();
       }
 
-      // Medium 5mm lines
-      ctx.lineWidth = 0.6;
-      for (let x = originX; x <= endX; x += 19) {
-        if ((x - originX) % 38 !== 0) {
-          ctx.beginPath();
-          ctx.moveTo(x, originY);
-          ctx.lineTo(x, endY);
-          ctx.stroke();
-        }
+      // 2. Medium 5mm lines
+      ctx.lineWidth = 0.75;
+      ctx.globalAlpha = (lineOpacity ?? 0.8) * 0.75;
+      for (let x = originX; x <= endX; x += mediumStep) {
+        ctx.beginPath();
+        ctx.moveTo(x, originY);
+        ctx.lineTo(x, endY);
+        ctx.stroke();
       }
-      for (let y = originY; y <= endY; y += 19) {
-        if ((y - originY) % 38 !== 0) {
+      for (let y = originY; y <= endY; y += mediumStep) {
+        ctx.beginPath();
+        ctx.moveTo(originX, y);
+        ctx.lineTo(endX, y);
+        ctx.stroke();
+      }
+
+      // 3. Major 10mm lines
+      ctx.lineWidth = 1.35;
+      ctx.globalAlpha = lineOpacity ?? 0.8;
+      for (let x = originX; x <= endX; x += majorStep) {
+        ctx.beginPath();
+        ctx.moveTo(x, originY);
+        ctx.lineTo(x, endY);
+        ctx.stroke();
+      }
+      for (let y = originY; y <= endY; y += majorStep) {
+        ctx.beginPath();
+        ctx.moveTo(originX, y);
+        ctx.lineTo(endX, y);
+        ctx.stroke();
+      }
+      ctx.restore();
+
+      // Outer Border
+      ctx.lineWidth = 2.0;
+      ctx.strokeStyle = activeLineColor;
+      ctx.strokeRect(originX, originY, endX - originX, endY - originY);
+
+      // Engineering Title Block (Antet) in bottom right
+      const tbW = Math.min(320, endX - originX - 40);
+      const tbH = 50;
+      const tbX = endX - tbW;
+      const tbY = endY + 12;
+
+      ctx.fillStyle = palette.bg;
+      ctx.fillRect(tbX, tbY, tbW, tbH);
+      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = activeLineColor;
+      ctx.strokeRect(tbX, tbY, tbW, tbH);
+
+      // Dividing lines inside title block
+      ctx.lineWidth = 0.8;
+      ctx.beginPath();
+      ctx.moveTo(tbX, tbY + 25);
+      ctx.lineTo(tbX + tbW, tbY + 25);
+      ctx.moveTo(tbX + tbW * 0.6, tbY + 25);
+      ctx.lineTo(tbX + tbW * 0.6, tbY + tbH);
+      ctx.stroke();
+
+      ctx.font = 'bold 10px Inter, monospace';
+      ctx.fillStyle = palette.text;
+      ctx.fillText('PROJE: NOTFREE TEKNİK ÇİZİM', tbX + 8, tbY + 16);
+      ctx.font = '9px Inter, monospace';
+      ctx.fillText('ÖLÇEK: 1:1 (10mm=1cm)', tbX + 8, tbY + 41);
+      ctx.fillText('PAFTA: A4-CAD', tbX + tbW * 0.6 + 8, tbY + 41);
+
+      ctx.restore();
+      break;
+    }
+
+    case 'logarithmic-grid': {
+      // Semi-Logarithmic Scientific & Engineering Graph Paper (Linear X, Logarithmic Y)
+      ctx.save();
+      const originX = 55;
+      const originY = 60;
+      const endX = width - 40;
+      const endY = height - 50;
+      const graphW = endX - originX;
+      const graphH = endY - originY;
+
+      // Header
+      ctx.font = 'bold 12px Inter, sans-serif';
+      ctx.fillStyle = palette.text;
+      ctx.fillText('📈 YARI-LOGARİTMİK GRAFİK KAĞIDI (SEMI-LOG / 3 DEKAD FREKANS & ÜSSEL)', originX, 40);
+
+      // 1. Linear X Columns (10 major divisions, e.g. 0 to 100)
+      const numXCols = 10;
+      const colW = graphW / numXCols;
+
+      for (let i = 0; i <= numXCols; i++) {
+        const x = originX + i * colW;
+        ctx.beginPath();
+        ctx.moveTo(x, originY);
+        ctx.lineTo(x, endY);
+        ctx.lineWidth = i === 0 || i === numXCols ? 1.5 : 0.8;
+        ctx.strokeStyle = activeLineColor;
+        ctx.stroke();
+
+        // X Axis labels
+        ctx.font = '9px Inter, monospace';
+        ctx.fillStyle = palette.text;
+        ctx.textAlign = 'center';
+        ctx.fillText(`${i * 10}`, x, endY + 16);
+      }
+
+      // 2. Logarithmic Y Decades (3 full decades: 10^0, 10^1, 10^2, 10^3)
+      const decades = 3;
+      const decadeH = graphH / decades;
+
+      for (let d = 0; d < decades; d++) {
+        const decadeBaseY = endY - d * decadeH;
+
+        for (let n = 1; n <= 10; n++) {
+          const logVal = Math.log10(n);
+          const y = decadeBaseY - logVal * decadeH;
+
+          const isMajor = n === 1 || n === 10;
           ctx.beginPath();
           ctx.moveTo(originX, y);
           ctx.lineTo(endX, y);
+          ctx.lineWidth = isMajor ? 1.4 : 0.6;
+          ctx.strokeStyle = activeLineColor;
           ctx.stroke();
+
+          // Y Axis Decade labels
+          ctx.textAlign = 'right';
+          ctx.textBaseline = 'middle';
+          if (isMajor) {
+            ctx.font = 'bold 10px Inter, monospace';
+            ctx.fillStyle = palette.text;
+            const exp = d + (n === 10 ? 1 : 0);
+            ctx.fillText(`10^${exp}`, originX - 8, y);
+          } else {
+            ctx.font = '8px Inter, monospace';
+            ctx.fillStyle = palette.text;
+            ctx.fillText(`${n}`, originX - 8, y);
+          }
         }
       }
 
-      // Border and Engineering Title Block
-      ctx.lineWidth = 2;
-      ctx.strokeRect(originX, originY, endX - originX, endY - originY);
-
-      // Title block box at bottom
-      const tbX = endX - 240;
-      const tbY = endY + 8;
-      ctx.strokeRect(tbX, tbY, 240, 50);
-      ctx.font = '10px Inter, monospace';
-      ctx.fillText('MÜHENDİSLİK TEKNİK ÇİZİM', tbX + 10, tbY + 20);
-      ctx.fillText('ÖLÇEK: 1:1  |  NOTFREE CAD', tbX + 10, tbY + 38);
+      // Outer graph frame
+      ctx.lineWidth = 1.8;
+      ctx.strokeStyle = activeLineColor;
+      ctx.strokeRect(originX, originY, graphW, graphH);
 
       ctx.restore();
       break;

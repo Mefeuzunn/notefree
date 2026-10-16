@@ -36,9 +36,12 @@ const TEMPLATES: TemplateItem[] = [
   { id: 'blank', name: 'Düz Beyaz', desc: 'Tamamen boş serbest tuval', icon: '📄', category: 'classic' },
 
   // STEM & Engineering
+  { id: 'isometric-3d', name: 'İzometrik 3D Çizim', desc: '30°/90°/150° teknik perspektif kağıdı', icon: '🎲', category: 'stem' },
+  { id: 'isometric-dots', name: 'İzometrik 3D Noktalı', desc: '3D çizim ve eskiz dot-matrix ağı', icon: '⁖', category: 'stem' },
+  { id: 'polar-coordinate', name: 'Polar & Radyal Koordinat', desc: 'Dairesel radyal açılar & trigonometri', icon: '🎯', category: 'stem' },
+  { id: 'engineering-1mm', name: 'Milimetrik Pafta (1mm CAD)', desc: '1mm/5mm/10mm teknik mühendislik antetli pafta', icon: '📐', category: 'stem' },
+  { id: 'logarithmic-grid', name: 'Yarı-Logaritmik (Semi-Log)', desc: 'Frekans, Bode ve üssel büyüme dekadları', icon: '📈', category: 'stem' },
   { id: 'chemistry-hex', name: 'Organik Kimya & Benzen', desc: 'Benzen halkaları ve moleküler şablon', icon: '⚗️', category: 'stem' },
-  { id: 'engineering-1mm', name: 'Mühendislik Paftası (1mm)', desc: 'Milimetrik teknik CAD ve mimari pafta', icon: '📐', category: 'stem' },
-  { id: 'isometric', name: 'İzometrik 3D Çizim', desc: 'Perspektif ve şematik çizimler', icon: '🎲', category: 'stem' },
   { id: 'hexagonal', name: 'Hekzagonal Petek', desc: 'Petek desenli geometri şablonu', icon: '⬡', category: 'stem' },
 
   // Planner & Productivity
@@ -64,6 +67,8 @@ const COLORS: Array<{ id: PaperColor; name: string; bg: string }> = [
 const PRESET_LINE_COLORS = [
   { label: 'Varsayılan', color: '' },
   { label: 'Grafit', color: '#64748b' },
+  { label: 'Mühendislik Blueprint', color: '#0284c7' },
+  { label: 'Teknik Kiremit', color: '#ea580c' },
   { label: 'Klasik Mavi', color: '#3b82f6' },
   { label: 'Sepia Kahve', color: '#b45309' },
   { label: 'Lavanta', color: '#8b5cf6' },
@@ -250,6 +255,10 @@ export const TemplateSelectorModal: React.FC = () => {
     'grid-5mm',
     'dots',
     'isometric',
+    'isometric-3d',
+    'isometric-dots',
+    'polar-coordinate',
+    'logarithmic-grid',
     'cornell',
     'hexagonal',
   ].includes(selectedTemplate);

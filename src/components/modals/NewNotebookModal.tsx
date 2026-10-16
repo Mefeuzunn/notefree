@@ -106,7 +106,11 @@ export const NewNotebookModal: React.FC = () => {
               <option value="cornell">Cornell Not Alma Metodu</option>
               <option value="planner-weekly">Haftalık Ajanda / Planlayıcı</option>
               <option value="planner-daily">Günlük Saatlik Planlayıcı</option>
-              <option value="isometric">İzometrik 3D Çizim</option>
+              <option value="isometric-3d">İzometrik 3D Çizim</option>
+              <option value="isometric-dots">İzometrik 3D Noktalı</option>
+              <option value="polar-coordinate">Polar Radyal Koordinat</option>
+              <option value="engineering-1mm">Milimetrik Pafta (1mm CAD)</option>
+              <option value="logarithmic-grid">Yarı-Logaritmik (Semi-Log)</option>
               <option value="music">Müzik Portesi (Dizek)</option>
               <option value="blank">Düz Beyaz</option>
             </select>
