@@ -13,7 +13,10 @@ import {
   Plus,
   X,
   Languages,
+  RotateCcw,
+  RotateCw,
 } from 'lucide-react';
+import { triggerHaptic } from '../../engine/hapticFeedback';
 
 export const AudioPlayerBar: React.FC = () => {
   const {
@@ -27,6 +30,8 @@ export const AudioPlayerBar: React.FC = () => {
     setAudioPlaybackTimeMs,
     audioPlaying,
     setAudioPlaying,
+    audioSyncReplay,
+    toggleAudioSyncReplay,
     liveTranscript,
     isTranscribing,
     startSpeechTranscription,
@@ -111,6 +116,17 @@ export const AudioPlayerBar: React.FC = () => {
     }
   };
 
+  const skipSeconds = (seconds: number) => {
+    if (!audioRef.current || !currentRecording) return;
+    const newTime = Math.max(
+      0,
+      Math.min(currentRecording.durationMs / 1000, audioRef.current.currentTime + seconds)
+    );
+    audioRef.current.currentTime = newTime;
+    setAudioPlaybackTimeMs(Math.floor(newTime * 1000));
+    triggerHaptic('light');
+  };
+
   const activeTranscriptText =
     liveTranscript || currentRecording?.transcript || '';
 
@@ -177,13 +193,32 @@ export const AudioPlayerBar: React.FC = () => {
 
       {/* Playback Controls if a recording exists */}
       {!isRecordingAudio && currentRecording?.audioDataUrl && (
-        <div className="flex items-center bg-slate-800/90 border border-slate-700/80 rounded-xl px-2 py-1 gap-2 shadow-inner">
+        <div className="flex items-center bg-slate-800/90 border border-slate-700/80 rounded-xl px-2 py-1 gap-1.5 shadow-inner">
+          {/* Rewind 10s */}
+          <button
+            onClick={() => skipSeconds(-10)}
+            className="p-1 rounded text-slate-400 hover:text-white hover:bg-slate-750 transition-colors"
+            title="10 saniye geri atla"
+          >
+            <RotateCcw size={12} />
+          </button>
+
+          {/* Play/Pause */}
           <button
             onClick={togglePlay}
             className="p-1 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white transition-colors"
             title={audioPlaying ? 'Duraklat' : 'Ses Kaydını Oynat'}
           >
             {audioPlaying ? <Pause size={12} /> : <Play size={12} className="fill-white" />}
+          </button>
+
+          {/* Fast-Forward 10s */}
+          <button
+            onClick={() => skipSeconds(10)}
+            className="p-1 rounded text-slate-400 hover:text-white hover:bg-slate-750 transition-colors"
+            title="10 saniye ileri atla"
+          >
+            <RotateCw size={12} />
           </button>
 
           <span className="font-mono text-[10px] text-slate-300">
@@ -196,24 +231,37 @@ export const AudioPlayerBar: React.FC = () => {
             max={currentRecording.durationMs}
             value={audioPlaybackTimeMs}
             onChange={handleSeek}
-            className="w-16 sm:w-24 h-1.5 accent-indigo-500 rounded-lg cursor-pointer bg-slate-700"
+            className="w-14 sm:w-24 h-1.5 accent-indigo-500 rounded-lg cursor-pointer bg-slate-700"
           />
 
           <button
             onClick={cyclePlaybackRate}
-            className="font-mono text-[10px] font-bold text-slate-400 hover:text-white px-1 py-0.5 rounded hover:bg-slate-700"
+            className="font-mono text-[10px] font-bold text-slate-400 hover:text-white px-1 py-0.5 rounded hover:bg-slate-750"
             title="Oynatma Hızı"
           >
             {playbackRate}x
           </button>
 
-          <span
-            className="hidden md:inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300 text-[10px] font-semibold border border-indigo-500/30"
-            title="Tuvaldeki herhangi bir nota tıklayarak tam o yazılma anına atlayabilirsiniz"
+          {/* Karaoke Sync Inking Toggle Button */}
+          <button
+            onClick={() => {
+              toggleAudioSyncReplay();
+              triggerHaptic('light');
+            }}
+            className={`hidden sm:inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold border transition-all ${
+              audioSyncReplay
+                ? 'bg-indigo-500/25 text-indigo-300 border-indigo-500/40 shadow-xs'
+                : 'bg-slate-800 text-slate-400 border-slate-700 hover:text-slate-200'
+            }`}
+            title={
+              audioSyncReplay
+                ? 'Karaoke El Yazısı Senkronizasyonu Aktif (Tıkla ve Kapat)'
+                : 'Karaoke El Yazısı Senkronizasyonu Kapalı (Tıkla ve Aç)'
+            }
           >
-            <Sparkles size={10} />
-            <span>Vuruşa Tıkla & Dinle</span>
-          </span>
+            <Sparkles size={10} className={audioSyncReplay ? 'text-indigo-400 animate-pulse' : ''} />
+            <span>Karaoke</span>
+          </button>
         </div>
       )}
 

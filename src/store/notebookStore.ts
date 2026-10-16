@@ -144,6 +144,8 @@ interface NotebookStoreState {
   recordingDurationMs: number;
   audioPlaybackTimeMs: number;
   audioPlaying: boolean;
+  audioSyncReplay: boolean;
+  toggleAudioSyncReplay: () => void;
 
   // History Stacks
   undoStack: Stroke[][];
@@ -778,6 +780,7 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
   recordingDurationMs: 0,
   audioPlaybackTimeMs: 0,
   audioPlaying: false,
+  audioSyncReplay: true,
 
   // Faz C Initial State
   liveTranscript: '',
@@ -2805,6 +2808,10 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
 
   setAudioPlaying: (playing: boolean) => {
     set({ audioPlaying: playing });
+  },
+
+  toggleAudioSyncReplay: () => {
+    set((state) => ({ audioSyncReplay: !state.audioSyncReplay }));
   },
 
   // RULER & LASER

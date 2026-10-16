@@ -121,6 +121,9 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
     setActivePageIndex,
     audioPlaybackTimeMs,
     audioPlaying,
+    audioSyncReplay,
+    isRecordingAudio,
+    recordingDurationMs,
     setAudioPlaybackTimeMs,
     addTextAnnotation,
     updateTextAnnotation,
@@ -335,18 +338,18 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
       if (stroke.tool === 'highlighter' && !layers.highlighters) continue;
       if (stroke.tool !== 'highlighter' && !layers.strokes) continue;
 
-      if (audioPlaying && stroke.audioTimestamp !== undefined) {
+      if (audioPlaying && audioSyncReplay && stroke.audioTimestamp !== undefined) {
         if (stroke.audioTimestamp > audioPlaybackTimeMs) {
           ctx.save();
-          ctx.globalAlpha = 0.15;
+          ctx.globalAlpha = 0.18;
           drawStrokeOnCanvas(ctx, stroke, toolSettings.streamline);
           ctx.restore();
           continue;
-        } else if (Math.abs(stroke.audioTimestamp - audioPlaybackTimeMs) < 1500) {
-          // Audio synchronous highlight pulse
+        } else if (Math.abs(stroke.audioTimestamp - audioPlaybackTimeMs) < 1800) {
+          // Audio synchronous karaoke highlight pulse
           ctx.save();
-          ctx.shadowColor = '#6366f1';
-          ctx.shadowBlur = 12;
+          ctx.shadowColor = stroke.color || '#6366f1';
+          ctx.shadowBlur = 14;
           drawStrokeOnCanvas(ctx, stroke, toolSettings.streamline);
           ctx.restore();
           continue;
@@ -1782,6 +1785,7 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
       bounds,
       timestamp: Date.now(),
       videoTimestamp: youtube.isOpen ? Math.floor(youtube.currentTime) : undefined,
+      audioTimestamp: isRecordingAudio ? recordingDurationMs : undefined,
       // Faz I & L: shape editing and fill metadata
       ...(committedShapeType && {
         shapeType: committedShapeType,
@@ -1814,6 +1818,7 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
         id: `sym_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
         points: mirroredPoints,
         bounds: mirrorBounds,
+        audioTimestamp: isRecordingAudio ? recordingDurationMs : undefined,
       };
       addStrokeToCurrentPage(mirrorStroke);
     }

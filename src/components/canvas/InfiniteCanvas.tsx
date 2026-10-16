@@ -48,6 +48,8 @@ export const InfiniteCanvas: React.FC = () => {
     addStrokeToCurrentPage,
     eraseStrokesOnCurrentPage,
     addFillToCurrentPage,
+    isRecordingAudio,
+    recordingDurationMs,
     removeFillFromCurrentPage,
     layers,
     layerLocks,
@@ -646,6 +648,7 @@ export const InfiniteCanvas: React.FC = () => {
       points: finalPoints,
       bounds,
       timestamp: Date.now(),
+      audioTimestamp: isRecordingAudio ? recordingDurationMs : undefined,
     };
 
     addStrokeToCurrentPage(newStroke);
