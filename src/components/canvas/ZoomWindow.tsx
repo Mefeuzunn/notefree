@@ -1,17 +1,19 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { useNotebookStore } from '../../store/notebookStore';
-import { drawStrokeOnCanvas } from '../../engine/strokeRenderer';
+import { drawStrokeOnCanvas, isPointNearStroke } from '../../engine/strokeRenderer';
 import { drawPaperTemplate } from '../../engine/paperTemplates';
 import { StrokePoint, Stroke } from '../../types/notebook';
 import {
   ChevronLeft,
   ChevronRight,
   CornerDownLeft,
-  Maximize2,
   X,
   Sparkles,
   Move,
+  Eraser,
+  PenTool,
 } from 'lucide-react';
+import { triggerHaptic } from '../../engine/hapticFeedback';
 
 export const ZoomWindow: React.FC = () => {
   const {
@@ -21,6 +23,8 @@ export const ZoomWindow: React.FC = () => {
     setZoomWindowPos,
     zoomBoxWidth,
     zoomBoxHeight,
+    zoomScale,
+    setZoomScale,
     advanceZoomWindow,
     rewindZoomWindow,
     newLineZoomWindow,
@@ -30,21 +34,37 @@ export const ZoomWindow: React.FC = () => {
     activeTool,
     toolSettings,
     addStrokeToCurrentPage,
+    eraseStrokesOnCurrentPage,
   } = useNotebookStore();
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const liveCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const currentPointsRef = useRef<StrokePoint[]>([]);
+  const bgImgRef = useRef<HTMLImageElement | null>(null);
 
   const activeNotebook = notebooks.find((n) => n.id === activeNotebookId);
   const currentPage = activeNotebook?.pages[activePageIndex];
 
-  const MAGNIFICATION = 2.4;
-  const windowWidth = 680;
-  const windowHeight = 220;
+  const scaleFactor = zoomScale || 2.4;
+  const windowWidth = 720;
+  const windowHeight = 230;
 
-  // Redraw zoom background and existing strokes
+  // Pre-load background image if present
+  useEffect(() => {
+    if (currentPage?.backgroundImageUrl) {
+      const img = new Image();
+      img.src = currentPage.backgroundImageUrl;
+      img.onload = () => {
+        bgImgRef.current = img;
+        renderZoomContent();
+      };
+    } else {
+      bgImgRef.current = null;
+    }
+  }, [currentPage?.backgroundImageUrl]);
+
+  // Redraw zoom background, template and existing strokes
   const renderZoomContent = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas || !currentPage) return;
@@ -57,7 +77,7 @@ export const ZoomWindow: React.FC = () => {
     ctx.save();
     ctx.scale(dpr, dpr);
 
-    // Fill background
+    // Paper color background fill
     const paperColorHex =
       currentPage.paperColor === 'dark'
         ? '#181b26'
@@ -72,36 +92,41 @@ export const ZoomWindow: React.FC = () => {
     ctx.fillStyle = paperColorHex;
     ctx.fillRect(0, 0, windowWidth, windowHeight);
 
-    // Apply translation & zoom scale based on focus box
+    // Magnification & translation
     ctx.save();
-    ctx.scale(MAGNIFICATION, MAGNIFICATION);
+    ctx.scale(scaleFactor, scaleFactor);
     ctx.translate(-zoomWindowPos.x, -zoomWindowPos.y);
 
-    // Draw page paper template
-    drawPaperTemplate(
-      ctx,
-      currentPage.width,
-      currentPage.height,
-      currentPage.template,
-      currentPage.paperColor,
-      currentPage.customPitch,
-      currentPage.customLineColor,
-      currentPage.lineOpacity
-    );
+    // Draw background image if page has imported PDF/image
+    if (bgImgRef.current) {
+      ctx.drawImage(bgImgRef.current, 0, 0, currentPage.width, currentPage.height);
+    } else {
+      // Draw standard paper template
+      drawPaperTemplate(
+        ctx,
+        currentPage.width,
+        currentPage.height,
+        currentPage.template,
+        currentPage.paperColor,
+        currentPage.customPitch,
+        currentPage.customLineColor,
+        currentPage.lineOpacity
+      );
+    }
 
-    // Draw strokes that overlap the zoom box
+    // Draw existing strokes inside the focus area
     for (const stroke of currentPage.strokes) {
       drawStrokeOnCanvas(ctx, stroke);
     }
 
     ctx.restore();
 
-    // Draw auto-advance jump boundary line at right 22%
+    // Auto-advance shaded strip at right 22%
     const jumpBoundaryX = windowWidth * 0.78;
-    ctx.fillStyle = 'rgba(99, 102, 241, 0.05)';
+    ctx.fillStyle = 'rgba(99, 102, 241, 0.08)';
     ctx.fillRect(jumpBoundaryX, 0, windowWidth - jumpBoundaryX, windowHeight);
 
-    ctx.strokeStyle = 'rgba(99, 102, 241, 0.35)';
+    ctx.strokeStyle = 'rgba(99, 102, 241, 0.4)';
     ctx.setLineDash([4, 4]);
     ctx.lineWidth = 1.5;
     ctx.beginPath();
@@ -110,7 +135,7 @@ export const ZoomWindow: React.FC = () => {
     ctx.stroke();
 
     ctx.restore();
-  }, [currentPage, zoomWindowPos, windowWidth, windowHeight]);
+  }, [currentPage, zoomWindowPos, windowWidth, windowHeight, scaleFactor]);
 
   useEffect(() => {
     if (zoomWindowOpen) {
@@ -128,8 +153,8 @@ export const ZoomWindow: React.FC = () => {
     const localX = (e.clientX - rect.left) / (rect.width / windowWidth);
     const localY = (e.clientY - rect.top) / (rect.height / windowHeight);
 
-    const pageX = zoomWindowPos.x + localX / MAGNIFICATION;
-    const pageY = zoomWindowPos.y + localY / MAGNIFICATION;
+    const pageX = zoomWindowPos.x + localX / scaleFactor;
+    const pageY = zoomWindowPos.y + localY / scaleFactor;
     return { x: pageX, y: pageY };
   };
 
@@ -137,8 +162,28 @@ export const ZoomWindow: React.FC = () => {
     e.currentTarget.setPointerCapture(e.pointerId);
     setIsDrawing(true);
     const { x, y } = getPageCoords(e);
+
+    // Eraser mode inside zoom window
+    if (activeTool === 'eraser') {
+      const strokesToErase = currentPage.strokes.filter((s) => isPointNearStroke({ x, y }, s, 22));
+      if (strokesToErase.length > 0) {
+        triggerHaptic('light');
+        eraseStrokesOnCurrentPage(strokesToErase.map((s) => s.id));
+      }
+      return;
+    }
+
     const pressure = e.pressure > 0 && e.pressure !== 0.5 ? e.pressure : 0.6;
-    currentPointsRef.current = [{ x, y, pressure, timestamp: Date.now() }];
+    currentPointsRef.current = [
+      {
+        x,
+        y,
+        pressure,
+        timestamp: Date.now(),
+        tiltX: e.tiltX,
+        tiltY: e.tiltY,
+      },
+    ];
 
     const liveCanvas = liveCanvasRef.current;
     if (liveCanvas) {
@@ -150,8 +195,26 @@ export const ZoomWindow: React.FC = () => {
   const handlePointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
     if (!isDrawing) return;
     const { x, y } = getPageCoords(e);
+
+    // Eraser mode move
+    if (activeTool === 'eraser') {
+      const strokesToErase = currentPage.strokes.filter((s) => isPointNearStroke({ x, y }, s, 22));
+      if (strokesToErase.length > 0) {
+        triggerHaptic('light');
+        eraseStrokesOnCurrentPage(strokesToErase.map((s) => s.id));
+      }
+      return;
+    }
+
     const pressure = e.pressure > 0 && e.pressure !== 0.5 ? e.pressure : 0.6;
-    currentPointsRef.current.push({ x, y, pressure, timestamp: Date.now() });
+    currentPointsRef.current.push({
+      x,
+      y,
+      pressure,
+      timestamp: Date.now(),
+      tiltX: e.tiltX,
+      tiltY: e.tiltY,
+    });
 
     const liveCanvas = liveCanvasRef.current;
     if (!liveCanvas) return;
@@ -163,13 +226,15 @@ export const ZoomWindow: React.FC = () => {
     ctx.save();
     ctx.scale(dpr, dpr);
 
-    ctx.scale(MAGNIFICATION, MAGNIFICATION);
+    ctx.scale(scaleFactor, scaleFactor);
     ctx.translate(-zoomWindowPos.x, -zoomWindowPos.y);
 
+    const effectiveTool = ['pen', 'ballpoint', 'fountain', 'brush', 'pencil', 'fineliner', 'highlighter'].includes(activeTool)
+      ? activeTool
+      : 'ballpoint';
+
     drawStrokeOnCanvas(ctx, {
-      tool: (['ballpoint', 'fountain', 'brush', 'highlighter'].includes(activeTool)
-        ? activeTool
-        : 'ballpoint') as any,
+      tool: effectiveTool as any,
       color: toolSettings.color,
       size: toolSettings.size,
       points: currentPointsRef.current,
@@ -188,7 +253,7 @@ export const ZoomWindow: React.FC = () => {
       if (ctx) ctx.clearRect(0, 0, liveCanvas.width, liveCanvas.height);
     }
 
-    if (currentPointsRef.current.length < 2) {
+    if (activeTool === 'eraser' || currentPointsRef.current.length < 2) {
       currentPointsRef.current = [];
       return;
     }
@@ -198,11 +263,13 @@ export const ZoomWindow: React.FC = () => {
     const minY = Math.min(...currentPointsRef.current.map((p) => p.y));
     const maxY = Math.max(...currentPointsRef.current.map((p) => p.y));
 
+    const effectiveTool = ['pen', 'ballpoint', 'fountain', 'brush', 'pencil', 'fineliner', 'highlighter'].includes(activeTool)
+      ? activeTool
+      : 'ballpoint';
+
     const newStroke: Stroke = {
       id: `stroke_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
-      tool: (['ballpoint', 'fountain', 'brush', 'highlighter'].includes(activeTool)
-        ? activeTool
-        : 'ballpoint') as any,
+      tool: effectiveTool as any,
       color: toolSettings.color,
       size: toolSettings.size,
       points: [...currentPointsRef.current],
@@ -212,10 +279,11 @@ export const ZoomWindow: React.FC = () => {
 
     addStrokeToCurrentPage(newStroke);
 
-    // Check if stroke was made in the auto-advance margin (right 22%)
+    // ⏩ Check if stroke ended in the auto-advance margin (right 22%)
     const lastPt = currentPointsRef.current[currentPointsRef.current.length - 1];
-    const localLastX = (lastPt.x - zoomWindowPos.x) * MAGNIFICATION;
+    const localLastX = (lastPt.x - zoomWindowPos.x) * scaleFactor;
     if (localLastX > windowWidth * 0.76) {
+      triggerHaptic('light');
       advanceZoomWindow();
     }
 
@@ -225,21 +293,41 @@ export const ZoomWindow: React.FC = () => {
   const dpr = typeof window !== 'undefined' ? Math.min(window.devicePixelRatio || 1, 2) : 1;
 
   return (
-    <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 bg-slate-900/95 backdrop-blur-xl border border-indigo-500/40 rounded-2xl shadow-2xl overflow-hidden flex flex-col w-[700px] max-w-[95vw] animate-in slide-in-from-bottom duration-200">
+    <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 bg-slate-900/95 backdrop-blur-xl border border-indigo-500/40 rounded-2xl shadow-2xl overflow-hidden flex flex-col w-[720px] max-w-[95vw] animate-in slide-in-from-bottom duration-200 ring-1 ring-black/40">
       {/* Zoom Window Header Controls */}
-      <div className="flex items-center justify-between px-3 py-2 bg-slate-850/80 border-b border-slate-800 text-xs text-slate-300">
+      <div className="flex items-center justify-between px-3.5 py-2 bg-slate-850/80 border-b border-slate-800 text-xs text-slate-300">
         <div className="flex items-center gap-2">
           <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
           <span className="font-semibold text-indigo-400">Büyüteç Yazım Penceresi</span>
-          <span className="text-[11px] text-slate-500 bg-slate-800 px-2 py-0.5 rounded-full font-mono">
-            2.4x Yakınlaştırma
-          </span>
+
+          {/* Magnification Switcher */}
+          <div className="flex items-center bg-slate-800 rounded-lg p-0.5 ml-1">
+            {[2.0, 2.4, 3.0].map((scale) => (
+              <button
+                key={scale}
+                onClick={() => {
+                  triggerHaptic('light');
+                  setZoomScale(scale);
+                }}
+                className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-medium transition-colors ${
+                  scaleFactor === scale
+                    ? 'bg-indigo-600 text-white shadow-sm'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                {scale}x
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Jump Controls */}
         <div className="flex items-center gap-1.5">
           <button
-            onClick={rewindZoomWindow}
+            onClick={() => {
+              triggerHaptic('light');
+              rewindZoomWindow();
+            }}
             className="p-1.5 rounded-lg hover:bg-slate-700/60 text-slate-300 hover:text-white transition-colors"
             title="Geri Kaydır"
           >
@@ -247,7 +335,10 @@ export const ZoomWindow: React.FC = () => {
           </button>
 
           <button
-            onClick={advanceZoomWindow}
+            onClick={() => {
+              triggerHaptic('light');
+              advanceZoomWindow();
+            }}
             className="p-1.5 rounded-lg hover:bg-slate-700/60 text-slate-300 hover:text-white transition-colors"
             title="İleri Kaydır"
           >
@@ -255,7 +346,10 @@ export const ZoomWindow: React.FC = () => {
           </button>
 
           <button
-            onClick={newLineZoomWindow}
+            onClick={() => {
+              triggerHaptic('medium');
+              newLineZoomWindow();
+            }}
             className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-600/30 hover:bg-indigo-600/40 text-indigo-300 border border-indigo-500/30 font-medium transition-colors"
             title="Yeni Satıra Geç"
           >
@@ -266,7 +360,10 @@ export const ZoomWindow: React.FC = () => {
           <div className="h-4 w-px bg-slate-700 mx-1" />
 
           <button
-            onClick={toggleZoomWindow}
+            onClick={() => {
+              triggerHaptic('light');
+              toggleZoomWindow();
+            }}
             className="p-1.5 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-slate-200 transition-colors"
             title="Büyüteci Kapat"
           >
@@ -276,7 +373,7 @@ export const ZoomWindow: React.FC = () => {
       </div>
 
       {/* Interactive Writing Area */}
-      <div className="relative w-full h-[220px] bg-white cursor-crosshair overflow-hidden touch-none">
+      <div className="relative w-full h-[230px] bg-white cursor-crosshair overflow-hidden touch-none select-none">
         <canvas
           ref={canvasRef}
           width={windowWidth * dpr}
@@ -293,9 +390,10 @@ export const ZoomWindow: React.FC = () => {
           className="absolute inset-0 w-full h-full"
         />
 
-        {/* Helper Badge */}
-        <div className="absolute bottom-2 right-3 pointer-events-none text-[10px] text-indigo-600/70 font-medium bg-white/80 backdrop-blur-sm px-2 py-0.5 rounded shadow-sm border border-indigo-200">
-          Mavi alana yazınca otomatik ilerler →
+        {/* Auto-Advance Helper Notice */}
+        <div className="absolute bottom-2 right-3 pointer-events-none text-[10px] text-indigo-600/80 font-medium bg-white/85 backdrop-blur-sm px-2 py-0.5 rounded shadow-sm border border-indigo-200 flex items-center gap-1">
+          <Sparkles size={11} className="text-amber-500" />
+          <span>Mavi şeride yazınca otomatik ilerler →</span>
         </div>
       </div>
     </div>

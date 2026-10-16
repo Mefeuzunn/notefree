@@ -116,6 +116,7 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
     setZoomWindowPos,
     zoomBoxWidth,
     zoomBoxHeight,
+    setZoomBoxSize,
     toggleTapeReveal,
     addTapeToCurrentPage,
     removeTapeFromCurrentPage,
@@ -1767,6 +1768,30 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
               İLERLE
             </span>
           </div>
+
+          {/* Draggable Corner Resize Handle */}
+          <div
+            className="absolute -bottom-1.5 -right-1.5 w-4 h-4 bg-white border-2 border-indigo-600 rounded-full cursor-se-resize z-30 shadow-md hover:scale-125 transition-transform"
+            title="Odak Kutusunu Yeniden Boyutlandır"
+            onPointerDown={(e) => {
+              e.stopPropagation();
+              const startX = e.clientX;
+              const startY = e.clientY;
+              const origW = zoomBoxWidth;
+              const origH = zoomBoxHeight;
+              const handleMove = (moveEv: PointerEvent) => {
+                const dw = (moveEv.clientX - startX) / scale;
+                const dh = (moveEv.clientY - startY) / scale;
+                setZoomBoxSize(origW + dw, origH + dh);
+              };
+              const handleUp = () => {
+                window.removeEventListener('pointermove', handleMove);
+                window.removeEventListener('pointerup', handleUp);
+              };
+              window.addEventListener('pointermove', handleMove);
+              window.addEventListener('pointerup', handleUp);
+            }}
+          />
         </div>
       )}
 

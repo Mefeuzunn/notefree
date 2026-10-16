@@ -114,6 +114,7 @@ interface NotebookStoreState {
   zoomWindowPos: { x: number; y: number };
   zoomBoxWidth: number;
   zoomBoxHeight: number;
+  zoomScale: number;
 
   // Stickers / Elements Drawer
   stickersDrawerOpen: boolean;
@@ -257,6 +258,8 @@ interface NotebookStoreState {
   // Zoom Window Controls
   toggleZoomWindow: () => void;
   setZoomWindowPos: (pos: { x: number; y: number }) => void;
+  setZoomBoxSize: (width: number, height: number) => void;
+  setZoomScale: (scale: number) => void;
   advanceZoomWindow: () => void;
   rewindZoomWindow: () => void;
   newLineZoomWindow: () => void;
@@ -647,6 +650,7 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
   zoomWindowPos: { x: 80, y: 160 },
   zoomBoxWidth: 280,
   zoomBoxHeight: 140,
+  zoomScale: 2.4,
 
   stickersDrawerOpen: false,
   customStickers: [],
@@ -3214,26 +3218,54 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
     set({ zoomWindowPos: pos });
   },
 
+  setZoomBoxSize: (width: number, height: number) => {
+    set({
+      zoomBoxWidth: Math.max(160, Math.min(600, width)),
+      zoomBoxHeight: Math.max(80, Math.min(350, height)),
+    });
+  },
+
+  setZoomScale: (scale: number) => {
+    set({ zoomScale: Math.max(1.5, Math.min(4.0, scale)) });
+  },
+
   advanceZoomWindow: () => {
-    const { zoomWindowPos, zoomBoxWidth } = get();
+    const { zoomWindowPos, zoomBoxWidth, activeNotebookId, notebooks, activePageIndex } = get();
+    const currentNb = notebooks.find((n) => n.id === activeNotebookId);
+    const currentPage = currentNb?.pages[activePageIndex];
+    const pageWidth = currentPage?.width || 800;
+
     const nextX = zoomWindowPos.x + zoomBoxWidth * 0.72;
-    if (nextX + zoomBoxWidth > 760) {
+    if (nextX + zoomBoxWidth * 0.45 > pageWidth - 30) {
       get().newLineZoomWindow();
     } else {
-      set({ zoomWindowPos: { ...zoomWindowPos, x: nextX } });
+      set({ zoomWindowPos: { ...zoomWindowPos, x: Math.min(pageWidth - zoomBoxWidth, nextX) } });
     }
   },
 
   rewindZoomWindow: () => {
-    const { zoomWindowPos, zoomBoxWidth } = get();
-    const prevX = Math.max(50, zoomWindowPos.x - zoomBoxWidth * 0.72);
+    const { zoomWindowPos, zoomBoxWidth, activeNotebookId, notebooks, activePageIndex } = get();
+    const currentNb = notebooks.find((n) => n.id === activeNotebookId);
+    const currentPage = currentNb?.pages[activePageIndex];
+    const minLeft = currentPage?.template === 'lined-margin' ? 90 : 40;
+
+    const prevX = Math.max(minLeft, zoomWindowPos.x - zoomBoxWidth * 0.72);
     set({ zoomWindowPos: { ...zoomWindowPos, x: prevX } });
   },
 
   newLineZoomWindow: () => {
-    const { zoomWindowPos, zoomBoxHeight } = get();
-    const nextY = Math.min(1000, zoomWindowPos.y + zoomBoxHeight * 0.85);
-    set({ zoomWindowPos: { x: 60, y: nextY } });
+    const { zoomWindowPos, zoomBoxHeight, activeNotebookId, notebooks, activePageIndex } = get();
+    const currentNb = notebooks.find((n) => n.id === activeNotebookId);
+    const currentPage = currentNb?.pages[activePageIndex];
+    const pageHeight = currentPage?.height || 1130;
+
+    const startX = currentPage?.template === 'lined-margin' ? 95 : 45;
+    const linePitch = currentPage?.customPitch || 32;
+    const linesPerBox = Math.max(1, Math.round(zoomBoxHeight / linePitch));
+    const stepY = linesPerBox * linePitch;
+
+    const nextY = Math.min(pageHeight - zoomBoxHeight - 20, zoomWindowPos.y + stepY);
+    set({ zoomWindowPos: { x: startX, y: nextY } });
   },
 
   // Study Sets / Flashcards Actions
