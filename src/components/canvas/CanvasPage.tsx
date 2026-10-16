@@ -33,6 +33,7 @@ import {
 import { TextBoxOverlay } from './TextBoxOverlay';
 import { StickyNoteOverlay } from './StickyNoteOverlay';
 import { PageLinkOverlay } from './PageLinkOverlay';
+import { StickerItemOverlay } from './StickerItemOverlay';
 import { SymmetryGuide } from './SymmetryGuide';
 import { ShapeNodeEditor } from './ShapeNodeEditor';
 import { getSnapToRulerPoint, formatRulerMeasurement } from '../../engine/rulerHelper';
@@ -1715,34 +1716,15 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
         className="absolute inset-0 w-full h-full pointer-events-none"
       />
 
-      {/* Layer 0.5: Stickers */}
+      {/* Layer 0.5: Faz AC Interactive Stickers & Rubber Stamps */}
       {layers.stickers &&
         page.stickers &&
         page.stickers.map((stk) => (
-          <div
+          <StickerItemOverlay
             key={stk.id}
-            className="absolute z-10 group cursor-move hover:ring-2 hover:ring-indigo-400/50 rounded"
-            style={{
-              left: `${stk.x * scale}px`,
-              top: `${stk.y * scale}px`,
-              width: `${stk.width * scale}px`,
-              height: `${stk.height * scale}px`,
-            }}
-          >
-            <div
-              className="w-full h-full"
-              dangerouslySetInnerHTML={{ __html: stk.content }}
-            />
-            {!layerLocks.stickers && (
-              <button
-                onClick={() => removeStickerFromCurrentPage(stk.id)}
-                className="absolute -top-2 -right-2 bg-rose-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 shadow transition-opacity"
-                title="Sticker'ı Kaldır"
-              >
-                <X size={12} />
-              </button>
-            )}
-          </div>
+            sticker={stk}
+            scale={scale}
+          />
         ))}
 
       {/* Layer 0.6: Text Annotations */}

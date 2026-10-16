@@ -61,6 +61,7 @@ import {
   Bookmark,
   Link2,
   TrendingUp,
+  Stamp,
 } from 'lucide-react';
 import { PenType, ShapeType, ToolType, StylusDoubleTapAction } from '../../types/notebook';
 import { AudioPlayerBar } from '../audio/AudioPlayerBar';
@@ -167,6 +168,8 @@ export const Toolbar: React.FC = () => {
     togglePlannerTabs,
     openLinkModal,
     addPageLinkToCurrentPage,
+    stampCreatorModalOpen,
+    setStampCreatorModalOpen,
   } = useNotebookStore();
 
   const [activeColorSlot, setActiveColorSlot] = useState<number | null>(null);
@@ -806,6 +809,19 @@ export const Toolbar: React.FC = () => {
           title="Yapışkan Not (Post-It - Sayfaya tıklayarak veya basarak 3D renkli yapışkan not ekle)"
         >
           <StickyNote size={16} />
+        </button>
+
+        {/* 🔲 Faz AC: Dinamik Kaşe & Mühür Tasarımcı */}
+        <button
+          onClick={() => setStampCreatorModalOpen(true)}
+          className={`p-2 rounded-xl transition-all flex items-center justify-center ${
+            stampCreatorModalOpen
+              ? 'bg-rose-600 text-white shadow-md shadow-rose-600/40 scale-105 ring-1 ring-rose-400 font-bold'
+              : 'text-slate-400 hover:text-rose-400 hover:bg-slate-700/50'
+          }`}
+          title="Dinamik Kaşe & Mühür Tasarla (ONAYLANDI, ÖNEMLİ, ÇÖZÜLDÜ Damgaları)"
+        >
+          <Stamp size={16} />
         </button>
 
         {/* GoodNotes Handwriting Zoom Window Box */}

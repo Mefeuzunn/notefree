@@ -288,12 +288,21 @@ interface NotebookStoreState {
   deleteFlashcard: (cardId: string) => void;
   rateFlashcard: (cardId: string, rating: 'again' | 'hard' | 'good' | 'easy') => void;
 
-  // Stickers Actions
+  // Stickers & Rubber Stamps Actions (Faz AC)
   setStickersDrawerOpen: (open: boolean) => void;
-  addStickerToCurrentPage: (sticker: StickerItem) => void;
+  addStickerToCurrentPage: (
+    sticker: StickerItem,
+    customPos?: { x?: number; y?: number; width?: number; height?: number; rotation?: number }
+  ) => void;
   removeStickerFromCurrentPage: (pageStickerId: string) => void;
+  updateStickerOnCurrentPage: (pageStickerId: string, partial: Partial<PageSticker>) => void;
+  duplicateStickerOnCurrentPage: (pageStickerId: string) => void;
   addCustomSticker: (sticker: StickerItem) => void;
   deleteCustomSticker: (stickerId: string) => void;
+  stickerCreatorModalOpen: boolean;
+  setStickerCreatorModalOpen: (open: boolean) => void;
+  stampCreatorModalOpen: boolean;
+  setStampCreatorModalOpen: (open: boolean) => void;
 
   // GoodNotes 6 Tape Actions
   toggleTapeReveal: (pageIndex: number, tapeId: string) => void;
@@ -736,6 +745,8 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
 
   stickersDrawerOpen: false,
   customStickers: [],
+  stickerCreatorModalOpen: false,
+  stampCreatorModalOpen: false,
 
   isRecordingAudio: false,
   recordingDurationMs: 0,
@@ -2274,7 +2285,10 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
     set({ stickersDrawerOpen: open });
   },
 
-  addStickerToCurrentPage: (sticker: StickerItem) => {
+  addStickerToCurrentPage: (
+    sticker: StickerItem,
+    customPos?: { x?: number; y?: number; width?: number; height?: number; rotation?: number }
+  ) => {
     const { activeNotebookId, notebooks, activePageIndex } = get();
     if (!activeNotebookId) return;
     const currentNb = notebooks.find((n) => n.id === activeNotebookId);
@@ -2283,13 +2297,13 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
     if (!currentPage) return;
 
     const newPageSticker: PageSticker = {
-      id: `pstk_${Date.now()}`,
+      id: `pstk_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
       stickerId: sticker.id,
-      x: 100,
-      y: 150,
-      width: sticker.width,
-      height: sticker.height,
-      rotation: 0,
+      x: customPos?.x !== undefined ? customPos.x : 100,
+      y: customPos?.y !== undefined ? customPos.y : 150,
+      width: customPos?.width !== undefined ? customPos.width : sticker.width,
+      height: customPos?.height !== undefined ? customPos.height : sticker.height,
+      rotation: customPos?.rotation !== undefined ? customPos.rotation : 0,
       content: sticker.content,
       category: sticker.category,
     };
@@ -2308,6 +2322,56 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
     });
 
     saveNotebookToDB(updatedNotebook);
+  },
+
+  updateStickerOnCurrentPage: (pageStickerId: string, partial: Partial<PageSticker>) => {
+    const { activeNotebookId, notebooks, activePageIndex } = get();
+    if (!activeNotebookId) return;
+    const currentNb = notebooks.find((n) => n.id === activeNotebookId);
+    if (!currentNb) return;
+    const currentPage = currentNb.pages[activePageIndex];
+    if (!currentPage) return;
+
+    const updatedStickers = (currentPage.stickers || []).map((s) =>
+      s.id === pageStickerId ? { ...s, ...partial } : s
+    );
+    const updatedPages = currentNb.pages.map((p, idx) =>
+      idx === activePageIndex ? { ...p, stickers: updatedStickers } : p
+    );
+    const updatedNotebook = { ...currentNb, pages: updatedPages, updatedAt: Date.now() };
+    set({
+      notebooks: notebooks.map((n) => (n.id === activeNotebookId ? updatedNotebook : n)),
+    });
+    saveNotebookToDB(updatedNotebook).catch(console.error);
+  },
+
+  duplicateStickerOnCurrentPage: (pageStickerId: string) => {
+    const { activeNotebookId, notebooks, activePageIndex } = get();
+    if (!activeNotebookId) return;
+    const currentNb = notebooks.find((n) => n.id === activeNotebookId);
+    if (!currentNb) return;
+    const currentPage = currentNb.pages[activePageIndex];
+    if (!currentPage) return;
+
+    const target = (currentPage.stickers || []).find((s) => s.id === pageStickerId);
+    if (!target) return;
+
+    const cloned: PageSticker = {
+      ...target,
+      id: `pstk_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+      x: target.x + 30,
+      y: target.y + 30,
+    };
+
+    const updatedStickers = [...(currentPage.stickers || []), cloned];
+    const updatedPages = currentNb.pages.map((p, idx) =>
+      idx === activePageIndex ? { ...p, stickers: updatedStickers } : p
+    );
+    const updatedNotebook = { ...currentNb, pages: updatedPages, updatedAt: Date.now() };
+    set({
+      notebooks: notebooks.map((n) => (n.id === activeNotebookId ? updatedNotebook : n)),
+    });
+    saveNotebookToDB(updatedNotebook).catch(console.error);
   },
 
   removeStickerFromCurrentPage: (pageStickerId: string) => {
@@ -2345,6 +2409,14 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
     set((state) => ({
       customStickers: state.customStickers.filter((s) => s.id !== stickerId),
     }));
+  },
+
+  setStickerCreatorModalOpen: (open: boolean) => {
+    set({ stickerCreatorModalOpen: open });
+  },
+
+  setStampCreatorModalOpen: (open: boolean) => {
+    set({ stampCreatorModalOpen: open });
   },
 
   // TEXT ANNOTATIONS ACTIONS

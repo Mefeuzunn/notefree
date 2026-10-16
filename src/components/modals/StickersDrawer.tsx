@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { useNotebookStore } from '../../store/notebookStore';
 import { PRESET_STICKERS } from '../../engine/stickersLibrary';
+import { PRESET_RUBBER_STAMPS, generateRubberStampSVG } from '../../engine/rubberStamps';
 import { StickerItem } from '../../types/notebook';
 import {
   X,
@@ -12,6 +13,8 @@ import {
   FolderPlus,
   Check,
   Crop,
+  Stamp,
+  Paintbrush,
 } from 'lucide-react';
 import { ImageCropModal } from './ImageCropModal';
 
@@ -23,6 +26,8 @@ export const StickersDrawer: React.FC = () => {
     addStickerToCurrentPage,
     addCustomSticker,
     deleteCustomSticker,
+    setStampCreatorModalOpen,
+    setStickerCreatorModalOpen,
   } = useNotebookStore();
 
   const [activeCategory, setActiveCategory] = useState<string>('all');
@@ -67,7 +72,23 @@ export const StickersDrawer: React.FC = () => {
 
   if (!stickersDrawerOpen) return null;
 
-  const allStickers: StickerItem[] = [...PRESET_STICKERS, ...customStickers];
+  const stampStickers: StickerItem[] = PRESET_RUBBER_STAMPS.map((pst) => ({
+    id: pst.id,
+    name: pst.name,
+    category: 'damga',
+    content: generateRubberStampSVG({
+      id: pst.id,
+      title: pst.title,
+      subtitle: pst.subtitle,
+      color: pst.color,
+      style: pst.style,
+      rotationDeg: pst.rotationDeg,
+    }),
+    width: pst.style === 'circular' ? 140 : 200,
+    height: pst.style === 'circular' ? 140 : 100,
+  }));
+
+  const allStickers: StickerItem[] = [...PRESET_STICKERS, ...stampStickers, ...customStickers];
   const filtered =
     activeCategory === 'all'
       ? allStickers
@@ -125,6 +146,26 @@ export const StickersDrawer: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-1.5">
+          {/* 🔲 Faz AC: Stamp Creator Button */}
+          <button
+            onClick={() => setStampCreatorModalOpen(true)}
+            className="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-slate-800 rounded-lg transition-colors flex items-center gap-1 text-[11px] font-semibold"
+            title="Dinamik Kaşe & Mühür Tasarla"
+          >
+            <Stamp size={15} />
+            <span className="hidden sm:inline">Damga</span>
+          </button>
+
+          {/* 🎨 Faz AC: Sticker Drawing Studio Button */}
+          <button
+            onClick={() => setStickerCreatorModalOpen(true)}
+            className="p-1.5 text-slate-400 hover:text-amber-400 hover:bg-slate-800 rounded-lg transition-colors flex items-center gap-1 text-[11px] font-semibold"
+            title="Özel Çıkartma Çiz"
+          >
+            <Paintbrush size={15} />
+            <span className="hidden sm:inline">Çiz</span>
+          </button>
+
           {/* Upload Button */}
           <button
             onClick={() => fileInputRef.current?.click()}
@@ -171,6 +212,7 @@ export const StickersDrawer: React.FC = () => {
         <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
           {[
             { id: 'all', label: 'Tümü' },
+            { id: 'damga', label: 'Damga & Mühür' },
             { id: 'sticky', label: 'Notlar' },
             { id: 'tape', label: 'Bantlar' },
             { id: 'icon', label: 'Rozetler' },

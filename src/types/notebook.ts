@@ -166,6 +166,8 @@ export interface PageSticker {
   rotation: number;
   content: string;
   category: string;
+  flipX?: boolean;
+  opacity?: number;
 }
 
 export interface PageImage {

@@ -40,6 +40,8 @@ import { PageScrubberBar } from './navigation/PageScrubberBar';
 import { PlannerTabsBar } from './planner/PlannerTabsBar';
 import { LinkEditorModal } from './modals/LinkEditorModal';
 import { FunctionPlotterModal } from './modals/FunctionPlotterModal';
+import { RubberStampCreatorModal } from './modals/RubberStampCreatorModal';
+import { StickerDrawStudioModal } from './modals/StickerDrawStudioModal';
 import { triggerHaptic } from '../engine/hapticFeedback';
 
 export const NotebookWorkspace: React.FC = () => {
@@ -934,6 +936,12 @@ export const NotebookWorkspace: React.FC = () => {
 
       {/* 📈 Faz AB: STEM 2D Function Plotter & Coordinate Stamping Modal */}
       <FunctionPlotterModal />
+
+      {/* 🔲 Faz AC: Dynamic Rubber Stamp Creator Modal */}
+      <RubberStampCreatorModal />
+
+      {/* 🎨 Faz AC: Sticker Drawing Studio Modal */}
+      <StickerDrawStudioModal />
     </div>
   );
 };
