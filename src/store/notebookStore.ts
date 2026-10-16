@@ -48,6 +48,7 @@ import {
   alignStrokes,
   AlignmentType,
   pushStrokesDown,
+  straightenHandwritingStrokes,
 } from '../engine/lassoHelper';
 import { PRESET_STICKERS } from '../engine/stickersLibrary';
 import { audioRecorder } from '../services/audioService';
@@ -271,6 +272,7 @@ interface NotebookStoreState {
   flipLassoSelection: (direction: 'horizontal' | 'vertical') => void;
   alignLassoSelection: (alignment: AlignmentType) => void;
   duplicateLassoSelection: () => void;
+  straightenLassoSelection: () => { angleDegrees: number; snappedDeltaY: number } | null;
   pushContentDownOnCurrentPage: (startY: number, amount: number) => void;
 
   // Zoom Window Controls
@@ -2225,6 +2227,56 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
     });
 
     db.pages.update(currentPage.id, { strokes: updatedStrokes });
+  },
+
+  // FAZ AG: Straighten handwriting baseline & snap to nearest notebook rule line
+  straightenLassoSelection: () => {
+    const { lassoSelection, activeNotebookId, notebooks, activePageIndex, undoStack } = get();
+    if (!lassoSelection || !activeNotebookId) return null;
+    const currentNb = notebooks.find((n) => n.id === activeNotebookId);
+    if (!currentNb) return null;
+    const currentPage = currentNb.pages[activePageIndex];
+    if (!currentPage) return null;
+
+    const selectedIdSet = new Set(lassoSelection.strokeIds);
+    const selectedStrokes = currentPage.strokes.filter((s) => selectedIdSet.has(s.id));
+    if (selectedStrokes.length === 0) return null;
+
+    // Run baseline regression and rule-line snapping
+    const result = straightenHandwritingStrokes(
+      selectedStrokes,
+      currentPage.template,
+      currentPage.customPitch
+    );
+
+    const straightenedMap = new Map(result.strokes.map((s) => [s.id, s]));
+    const updatedStrokes = currentPage.strokes.map((s) => straightenedMap.get(s.id) || s);
+
+    const updatedPages = currentNb.pages.map((p, idx) =>
+      idx === activePageIndex ? { ...p, strokes: updatedStrokes } : p
+    );
+
+    const updatedNotebook = { ...currentNb, pages: updatedPages, updatedAt: Date.now() };
+
+    set({
+      notebooks: notebooks.map((n) => (n.id === activeNotebookId ? updatedNotebook : n)),
+      undoStack: [...undoStack, [...currentPage.strokes]],
+      redoStack: [],
+      lassoSelection: {
+        ...lassoSelection,
+        bounds: result.newBounds,
+        originalStrokes: result.strokes,
+        offsetX: 0,
+        offsetY: 0,
+      },
+    });
+
+    db.pages.update(currentPage.id, { strokes: updatedStrokes });
+
+    return {
+      angleDegrees: result.angleDegrees,
+      snappedDeltaY: result.snappedDeltaY,
+    };
   },
 
   // FAZ J: Insert space / push all content below startY downwards by amount

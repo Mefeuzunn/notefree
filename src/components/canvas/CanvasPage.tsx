@@ -65,6 +65,7 @@ import {
   Link2,
   Globe,
   ExternalLink,
+  Baseline,
 } from 'lucide-react';
 
 interface CanvasPageProps {
@@ -105,6 +106,7 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
     flipLassoSelection,
     alignLassoSelection,
     duplicateLassoSelection,
+    straightenLassoSelection,
     pushContentDownOnCurrentPage,
     laserPoints,
     addLaserPoint,
@@ -1950,6 +1952,33 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
             >
               <Type size={13} />
               <span>Metne Dönüştür</span>
+            </button>
+
+            {/* FAZ AG: El Yazısını Düzleştir (Straighten Handwriting) */}
+            <button
+              onClick={() => {
+                triggerHaptic('medium');
+                const res = straightenLassoSelection();
+                if (res) {
+                  if (Math.abs(res.angleDegrees) > 0.35) {
+                    setToastMessage(
+                      `🪶 El Yazısı Düzleştirildi (${res.angleDegrees > 0 ? '-' : '+'}${Math.abs(res.angleDegrees).toFixed(1)}°${
+                        res.snappedDeltaY !== 0 ? ' & Çizgiye Oturtuldu' : ''
+                      })`
+                    );
+                  } else if (res.snappedDeltaY !== 0) {
+                    setToastMessage('🧲 Kılavuz Çizgisine Manyetik Oturtuldu');
+                  } else {
+                    setToastMessage('✨ Yazı Zaten Kusursuz Yatay Düzlemde');
+                  }
+                  setTimeout(() => setToastMessage(null), 2500);
+                }
+              }}
+              className="px-2 py-1 hover:bg-slate-800 text-emerald-300 rounded-lg transition-colors flex items-center gap-1 text-[11px] font-semibold border border-emerald-500/30 bg-emerald-950/40"
+              title="El Yazısını Yatay Taban Çizgisine Düzleştir ve Kılavuza Oturt (Straighten)"
+            >
+              <Baseline size={13} />
+              <span>Düzleştir</span>
             </button>
 
             {/* 🔗 FAZ AA: Seçilen Çizim veya Şekle Sayfa/Web Bağlantısı Ekle */}

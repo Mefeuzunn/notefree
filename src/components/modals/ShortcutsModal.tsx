@@ -49,6 +49,7 @@ const NAV_SHORTCUTS: ShortcutItem[] = [
 ];
 
 const GESTURE_SHORTCUTS: ShortcutItem[] = [
+  { key: 'Kementle Düzleştir', label: 'El Yazısı Taban Çizgisini Düzleştirme (Straighten)', desc: 'Eğri kayan el yazısını kementle seçip "Düzleştir"e dokunarak yatay hizaya ve kılavuza oturt' },
   { key: 'Zikzak Karalama', label: 'Karalayarak Silme (Scribble-to-Erase)', desc: 'Silgiye geçmeden yanlış kelimenin/çizimin üzerini zikzak karalayarak anında sil' },
   { key: 'Daire Çizip Bekleme', label: 'Daireyle Kement (Circle-to-Lasso)', desc: 'Kalemle bir öbeğin etrafına çember çizip 400ms bekleyerek otomatik kement seçimine dönüştür' },
   { key: 'Çizip Bekleme', label: 'Şekil Sabitleme (Hold-to-Snap)', desc: 'Düz çizgi, ok, daire veya dikdörtgen çizip kalemi kaldırmadan bekleyince kusursuz şekle sabitle' },
