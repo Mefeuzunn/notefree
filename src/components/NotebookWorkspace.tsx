@@ -6,6 +6,7 @@ import { Ruler } from './canvas/Ruler';
 import { Protractor } from './canvas/Protractor';
 import { Compass } from './canvas/Compass';
 import { InfiniteCanvas } from './canvas/InfiniteCanvas';
+import { Minimap } from './canvas/Minimap';
 import { NotebookLockModal } from './modals/NotebookLockModal';
 import {
   ZoomIn,
@@ -30,6 +31,7 @@ import {
   Brain,
   SquarePen,
   Keyboard,
+  Map as MapIcon,
 } from 'lucide-react';
 import { ExportModal } from './modals/ExportModal';
 import { MarginStudyWorkspace } from './margin/MarginStudyWorkspace';
@@ -74,6 +76,8 @@ export const NotebookWorkspace: React.FC = () => {
     toggleRuler,
     toggleZoomWindow,
     toggleScratchpad,
+    minimapVisible,
+    toggleMinimap,
     setShortcutsModalOpen,
   } = useNotebookStore();
 
@@ -327,6 +331,12 @@ export const NotebookWorkspace: React.FC = () => {
         toggleMarginWorkspace();
         triggerHaptic('light');
         showShortcutHud('Kenarlık', 'M');
+        return;
+      } else if (key === 'n') {
+        e.preventDefault();
+        toggleMinimap();
+        triggerHaptic('light');
+        showShortcutHud('Tuval Radarı', 'N');
         return;
       }
 
@@ -819,6 +829,27 @@ export const NotebookWorkspace: React.FC = () => {
         <span className="hidden sm:inline">Hızlı Not</span>
         <span className="text-[10px] bg-slate-800 text-amber-300 px-1.5 py-0.5 rounded font-mono font-semibold">Q</span>
       </button>
+
+      {/* 🗺️ Faz Y: Interactive Radar Minimap Launcher (Bottom Right) */}
+      <button
+        onClick={() => {
+          triggerHaptic('light');
+          toggleMinimap();
+        }}
+        className={`fixed bottom-5 right-64 z-30 flex items-center gap-1.5 ${
+          minimapVisible
+            ? 'bg-indigo-600 text-white border-indigo-400'
+            : 'bg-slate-900/90 text-indigo-400 border-indigo-500/30 hover:border-indigo-400'
+        } font-bold text-xs px-3 py-2 rounded-2xl shadow-xl border hover:scale-105 transition-all backdrop-blur-md`}
+        title="Tuval Radarı / Mini Harita Gezgini (N)"
+      >
+        <MapIcon size={15} />
+        <span className="hidden sm:inline">Radar</span>
+        <span className="text-[10px] bg-slate-800 text-indigo-300 px-1.5 py-0.5 rounded font-mono font-semibold">N</span>
+      </button>
+
+      {/* 🗺️ Faz Y: Interactive Radar Minimap & Pan Viewport */}
+      <Minimap containerRef={containerRef} />
 
       {/* ⌨️ Faz W: Power-User Keyboard Shortcut HUD Toast */}
       {shortcutHud && (

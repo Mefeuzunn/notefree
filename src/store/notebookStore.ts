@@ -451,6 +451,9 @@ interface NotebookStoreState {
   // View Controls
   setZoom: (zoom: number) => void;
   resetView: () => void;
+  minimapVisible: boolean;
+  toggleMinimap: () => void;
+  setMinimapVisible: (visible: boolean) => void;
   setSidebarOpen: (open: boolean) => void;
   setLibraryViewOpen: (open: boolean) => void;
   setTemplateModalOpen: (open: boolean) => void;
@@ -653,6 +656,7 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
   presentationMode: false,
   lassoSelection: null,
 
+  minimapVisible: false,
   rulerVisible: false,
   rulerAngle: 0,
   rulerPosition: { x: 180, y: 350 },
@@ -3151,6 +3155,14 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
 
   resetView: () => {
     set({ zoom: 1.0, panOffset: { x: 0, y: 0 } });
+  },
+
+  toggleMinimap: () => {
+    set((state) => ({ minimapVisible: !state.minimapVisible }));
+  },
+
+  setMinimapVisible: (visible: boolean) => {
+    set({ minimapVisible: visible });
   },
 
   setSidebarOpen: (open: boolean) => {

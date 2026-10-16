@@ -22,7 +22,6 @@ import {
   applyPrecisionSnapping,
 } from '../../engine/shapeDetector';
 import { collaborationService } from '../../services/collaborationService';
-import { Minimap } from './Minimap';
 import { StickyNoteOverlay } from './StickyNoteOverlay';
 import { Compass, Move, Users, Maximize2, Sparkles } from 'lucide-react';
 
@@ -645,13 +644,6 @@ export const InfiniteCanvas: React.FC = () => {
             </div>
           );
         })}
-
-      {/* Minimap Overview Navigator (Bottom Right) */}
-      <Minimap
-        strokes={strokes}
-        viewportWidth={containerSize.width}
-        viewportHeight={containerSize.height}
-      />
 
       {/* Mode Indicator Pill (Top Center) */}
       <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 bg-slate-900/90 backdrop-blur-md border border-slate-800 px-3.5 py-1.5 rounded-2xl shadow-xl text-xs font-semibold text-slate-300">

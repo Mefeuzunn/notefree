@@ -57,6 +57,7 @@ import {
   Ban,
   SquarePen,
   Keyboard,
+  Map as MapIcon,
 } from 'lucide-react';
 import { PenType, ShapeType, ToolType, StylusDoubleTapAction } from '../../types/notebook';
 import { AudioPlayerBar } from '../audio/AudioPlayerBar';
@@ -118,6 +119,8 @@ export const Toolbar: React.FC = () => {
     toggleZoomWindow,
     scratchpadOpen,
     toggleScratchpad,
+    minimapVisible,
+    toggleMinimap,
     shortcutsModalOpen,
     setShortcutsModalOpen,
     setStudySetsModalOpen,
@@ -818,6 +821,19 @@ export const Toolbar: React.FC = () => {
           title="Hızlı Karalama Panosu / Quick Notes (Q)"
         >
           <SquarePen size={16} />
+        </button>
+
+        {/* 🗺️ Faz Y: Tuval Radarı & Hassas Gezgin (Radar Minimap) */}
+        <button
+          onClick={toggleMinimap}
+          className={`p-2 rounded-xl transition-all flex items-center justify-center ${
+            minimapVisible
+              ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30 scale-105 ring-1 ring-indigo-400 font-bold'
+              : 'text-slate-400 hover:text-indigo-300 hover:bg-slate-700/50'
+          }`}
+          title="Tuval Radarı / Mini Harita Gezgini (N)"
+        >
+          <MapIcon size={16} />
         </button>
 
         {/* 🎨 Faz 1: Renk Damlalığı (Eyedropper) */}

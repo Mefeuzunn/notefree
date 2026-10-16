@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, Keyboard, Sparkles, PenTool, Eraser, Scissors, Highlighter, Type, StickyNote, Ruler, ZoomIn, Bookmark, Search, RotateCcw, ArrowLeftRight } from 'lucide-react';
+import { X, Keyboard, Sparkles, PenTool, Eraser, Scissors, Highlighter, Type, StickyNote, Ruler, ZoomIn, Bookmark, Search, RotateCcw, ArrowLeftRight, Map as MapIcon } from 'lucide-react';
 import { triggerHaptic } from '../../engine/hapticFeedback';
 
 interface ShortcutsModalProps {
@@ -25,6 +25,7 @@ const DRAWING_SHORTCUTS: ShortcutItem[] = [
 ];
 
 const UTILITY_SHORTCUTS: ShortcutItem[] = [
+  { key: 'N', label: 'Tuval Radarı (Mini Harita)', desc: 'İnteraktif radar mini harita ve hassas gezgini aç/kapat', icon: <MapIcon size={15} /> },
   { key: 'Q', label: 'Hızlı Karalama', desc: 'Yüzen Quick Note penceresini aç/kapat', icon: <Sparkles size={15} /> },
   { key: 'Z', label: 'Büyüteç Penceresi', desc: 'GoodNotes stili büyütülmüş yazma kutusunu aç/kapat', icon: <ZoomIn size={15} /> },
   { key: 'R', label: 'İnteraktif Cetvel', desc: 'Düz çizgi kılavuzu ve açı ölçer cetveli göster/gizle', icon: <Ruler size={15} /> },
