@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { TextAnnotation } from '../../types/notebook';
-import { Trash2, Type, Move, X, Volume2, Link2, ExternalLink } from 'lucide-react';
+import { Trash2, Type, Move, X, Volume2, Link2, ExternalLink, Globe } from 'lucide-react';
 import { textToSpeechService } from '../../services/textToSpeechService';
 import { useNotebookStore } from '../../store/notebookStore';
 
@@ -22,7 +22,7 @@ export const TextBoxOverlay: React.FC<TextBoxOverlayProps> = ({
   const [isEditing, setIsEditing] = useState(false);
   const [showToolbar, setShowToolbar] = useState(false);
 
-  const { notebooks, activeNotebookId, setActivePageIndex } = useNotebookStore();
+  const { notebooks, activeNotebookId, navigateToPage } = useNotebookStore();
   const activeNotebook = notebooks.find((n) => n.id === activeNotebookId);
   const totalPages = activeNotebook?.pages.length || 1;
 
@@ -173,12 +173,12 @@ export const TextBoxOverlay: React.FC<TextBoxOverlayProps> = ({
         }}
       />
 
-      {/* 🔗 Faz E: Clickable Jump Link Badge */}
+      {/* 🔗 Faz E & FAZ AA: Clickable Jump Link Badge */}
       {annotation.pageLink !== undefined && (
         <button
           onClick={(e) => {
             e.stopPropagation();
-            setActivePageIndex(annotation.pageLink!);
+            navigateToPage(annotation.pageLink!);
           }}
           className="absolute -bottom-6 left-0 flex items-center gap-1 px-2 py-0.5 rounded-full bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-bold shadow-md hover:scale-105 transition-all z-20"
           title={`Sayfa ${annotation.pageLink + 1}'e Atla`}
@@ -186,6 +186,20 @@ export const TextBoxOverlay: React.FC<TextBoxOverlayProps> = ({
           <ExternalLink size={10} />
           <span>Sayfa {annotation.pageLink + 1}'e Git</span>
         </button>
+      )}
+
+      {annotation.url && (
+        <a
+          href={annotation.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={(e) => e.stopPropagation()}
+          className="absolute -bottom-6 left-0 flex items-center gap-1 px-2 py-0.5 rounded-full bg-cyan-600 hover:bg-cyan-500 text-white text-[10px] font-bold shadow-md hover:scale-105 transition-all z-20 truncate max-w-[180px]"
+          title={`Web Bağlantısını Aç: ${annotation.url}`}
+        >
+          <Globe size={10} />
+          <span className="truncate">{annotation.url.replace(/^https?:\/\//, '')}</span>
+        </a>
       )}
     </div>
   );

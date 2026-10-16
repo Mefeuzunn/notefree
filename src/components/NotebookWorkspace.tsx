@@ -37,6 +37,8 @@ import { ExportModal } from './modals/ExportModal';
 import { MarginStudyWorkspace } from './margin/MarginStudyWorkspace';
 import { TapeQuizToolbar } from './canvas/TapeQuizToolbar';
 import { PageScrubberBar } from './navigation/PageScrubberBar';
+import { PlannerTabsBar } from './planner/PlannerTabsBar';
+import { LinkEditorModal } from './modals/LinkEditorModal';
 import { triggerHaptic } from '../engine/hapticFeedback';
 
 export const NotebookWorkspace: React.FC = () => {
@@ -78,6 +80,8 @@ export const NotebookWorkspace: React.FC = () => {
     toggleScratchpad,
     minimapVisible,
     toggleMinimap,
+    plannerTabsVisible,
+    togglePlannerTabs,
     setShortcutsModalOpen,
   } = useNotebookStore();
 
@@ -338,6 +342,12 @@ export const NotebookWorkspace: React.FC = () => {
         triggerHaptic('light');
         showShortcutHud('Tuval Radarı', 'N');
         return;
+      } else if (key === 'j') {
+        e.preventDefault();
+        togglePlannerTabs();
+        triggerHaptic('light');
+        showShortcutHud('Ajanda Sekmeleri', 'J');
+        return;
       }
 
       // Page Navigation Arrows (when in paged mode)
@@ -468,7 +478,7 @@ export const NotebookWorkspace: React.FC = () => {
             /* Continuous Scroll: Stack of all pages */
             <div className="flex flex-col items-center gap-10 w-full max-w-full pb-32">
               {pages.map((pg, idx) => (
-                <div key={pg.id} className="relative group">
+                <div key={pg.id} id={`page-card-${idx}`} className="relative group">
                   <CanvasPage
                     page={pg}
                     pageIndex={idx}
@@ -493,7 +503,10 @@ export const NotebookWorkspace: React.FC = () => {
               >
                 {/* Left Page (Even Index) */}
                 {pages[activePageIndex % 2 === 0 ? activePageIndex : activePageIndex - 1] && (
-                  <div className="relative shadow-xl">
+                  <div
+                    id={`page-card-${activePageIndex % 2 === 0 ? activePageIndex : activePageIndex - 1}`}
+                    className="relative shadow-xl"
+                  >
                     <CanvasPage
                       page={pages[activePageIndex % 2 === 0 ? activePageIndex : activePageIndex - 1]}
                       pageIndex={activePageIndex % 2 === 0 ? activePageIndex : activePageIndex - 1}
@@ -510,7 +523,10 @@ export const NotebookWorkspace: React.FC = () => {
 
                 {/* Right Page (Odd Index) */}
                 {pages[(activePageIndex % 2 === 0 ? activePageIndex : activePageIndex - 1) + 1] ? (
-                  <div className="relative shadow-xl">
+                  <div
+                    id={`page-card-${(activePageIndex % 2 === 0 ? activePageIndex : activePageIndex - 1) + 1}`}
+                    className="relative shadow-xl"
+                  >
                     <CanvasPage
                       page={pages[(activePageIndex % 2 === 0 ? activePageIndex : activePageIndex - 1) + 1]}
                       pageIndex={(activePageIndex % 2 === 0 ? activePageIndex : activePageIndex - 1) + 1}
@@ -537,6 +553,7 @@ export const NotebookWorkspace: React.FC = () => {
               {pages[activePageIndex] && (
                 <div
                   key={pages[activePageIndex].id}
+                  id={`page-card-${activePageIndex}`}
                   className={`transition-all duration-200 ${
                     pageFlipDirection === 'next'
                       ? 'animate-in fade-in slide-in-from-right-4'
@@ -771,6 +788,20 @@ export const NotebookWorkspace: React.FC = () => {
           <span className="text-[10px] hidden sm:inline">Kenarlık</span>
         </button>
 
+        {/* 📑 Faz AA: Digital Planner Edge Tabs Toggle */}
+        <button
+          onClick={togglePlannerTabs}
+          className={`p-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5 ${
+            plannerTabsVisible
+              ? 'bg-indigo-600/30 text-indigo-300 border border-indigo-500/50 font-semibold shadow-sm'
+              : 'text-slate-400 hover:text-white hover:bg-slate-800'
+          }`}
+          title="Dijital Ajanda Sekmeleri (Planner Tabs - J)"
+        >
+          <Bookmark size={14} className={plannerTabsVisible ? 'text-indigo-400 fill-indigo-400/30' : ''} />
+          <span className="text-[10px] hidden sm:inline">Ajanda</span>
+        </button>
+
         {/* 🧠 Faz H: Active Recall Tape Quiz Mode Toggle */}
         <button
           onClick={() => setTapeQuizMode(!tapeQuizMode)}
@@ -893,6 +924,12 @@ export const NotebookWorkspace: React.FC = () => {
         isOpen={exportModalOpen}
         onClose={() => setExportModalOpen(false)}
       />
+
+      {/* 📑 Faz AA: Digital Planner Edge Tabs Navigation Bar */}
+      {!isLocked && canvasMode === 'paged' && <PlannerTabsBar />}
+
+      {/* 🔗 Faz AA: Interactive Hyperlink & Jump Editor Modal */}
+      <LinkEditorModal />
     </div>
   );
 };

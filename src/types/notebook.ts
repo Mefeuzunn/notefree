@@ -101,6 +101,8 @@ export interface Stroke {
   controlNodes?: ShapeControlNode[]; // Editable control points for shape morphing
   shapeFillColor?: string; // Optional fill inside closed shapes
   shapeFillOpacity?: number; // Optional opacity (0.0 to 1.0) for fill
+  pageLink?: number; // Target page index for hyperlinks
+  url?: string; // External web link
 }
 
 export interface TextAnnotation {
@@ -115,6 +117,7 @@ export interface TextAnnotation {
   height?: number;
   bg?: string;
   pageLink?: number; // Target page index for hyperlinks
+  url?: string; // External web link
 }
 
 export interface PdfOutlineItem {
@@ -210,6 +213,7 @@ export interface Page {
   tapes?: TapeItem[];
   fills?: FillItem[];
   stickyNotes?: StickyNoteItem[];
+  links?: PageLinkItem[]; // Interactive page hyperlinks & hotspots
   backgroundImageUrl?: string; // Rendered PDF or Word page
   width: number;
   height: number;
@@ -218,6 +222,26 @@ export interface Page {
   customPitch?: number; // Custom line/grid spacing in px (e.g. 20 - 64)
   customLineColor?: string; // Optional custom line hex color
   lineOpacity?: number; // Line opacity (0.1 - 1.0)
+}
+
+export interface PageLinkItem {
+  id: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  targetPageIndex?: number; // Target page index in this notebook (0-indexed)
+  url?: string; // External web link (e.g. https://...)
+  label?: string; // Display title, e.g. "Sayfa 5'e Git"
+  color?: string; // Hex color for hotspot border or badge
+  isHotspot?: boolean; // When true, rendered as transparent clickable hotspot area
+}
+
+export interface PlannerTabItem {
+  id: string;
+  title: string;
+  targetPageIndex: number;
+  color: string; // e.g. '#f43f5e', '#fb923c', '#10b981', '#06b6d4', '#6366f1', '#a855f7'
 }
 
 export type MarginCardColor = 'amber' | 'emerald' | 'sky' | 'rose' | 'purple' | 'slate';
@@ -245,6 +269,8 @@ export interface StickyNoteItem {
   text: string;
   isFolded?: boolean;
   rotation?: number;
+  pageLink?: number;
+  url?: string;
   createdAt: number;
 }
 
@@ -309,6 +335,7 @@ export interface Notebook {
   pinCode?: string;
   twoPageSpread?: boolean;
   marginCards?: MarginExcerptCard[];
+  plannerTabs?: PlannerTabItem[]; // Customizable digital planner index tabs
 }
 
 export interface ExportOptions {

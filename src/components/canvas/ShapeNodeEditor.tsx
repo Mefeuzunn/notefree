@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef } from 'react';
-import { Ban, Trash2, X } from 'lucide-react';
+import { Ban, Trash2, X, Link2 } from 'lucide-react';
 import { ShapeControlNode } from '../../types/notebook';
 
 interface ShapeNodeEditorProps {
@@ -15,6 +15,8 @@ interface ShapeNodeEditorProps {
   onClose: () => void;
   /** Optional callback to delete the shape stroke */
   onDelete?: () => void;
+  /** Optional callback to add/edit page or web link on shape */
+  onLink?: () => void;
   /** FAZ L: Whether this shape has a closed interior that can have fill */
   isClosedShape?: boolean;
   /** Current fill color of the shape */
@@ -67,6 +69,7 @@ export const ShapeNodeEditor: React.FC<ShapeNodeEditorProps> = ({
   onNodeDrag,
   onClose,
   onDelete,
+  onLink,
   isClosedShape,
   fillColor,
   fillOpacity = 0.25,
@@ -209,6 +212,16 @@ export const ShapeNodeEditor: React.FC<ShapeNodeEditorProps> = ({
         )}
 
         <div className="flex items-center gap-1 pl-1 border-l border-slate-700/80">
+          {onLink && (
+            <button
+              type="button"
+              onClick={onLink}
+              className="p-1 hover:text-indigo-400 text-slate-400 transition rounded hover:bg-slate-800"
+              title="Şekle Sayfa/Web Bağlantısı Ekle"
+            >
+              <Link2 size={13} />
+            </button>
+          )}
           {onDelete && (
             <button
               type="button"

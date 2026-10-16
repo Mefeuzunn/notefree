@@ -58,6 +58,8 @@ import {
   SquarePen,
   Keyboard,
   Map as MapIcon,
+  Bookmark,
+  Link2,
 } from 'lucide-react';
 import { PenType, ShapeType, ToolType, StylusDoubleTapAction } from '../../types/notebook';
 import { AudioPlayerBar } from '../audio/AudioPlayerBar';
@@ -158,6 +160,10 @@ export const Toolbar: React.FC = () => {
     toggleSymmetry,
     addStickyNoteToCurrentPage,
     setExportModalOpen,
+    plannerTabsVisible,
+    togglePlannerTabs,
+    openLinkModal,
+    addPageLinkToCurrentPage,
   } = useNotebookStore();
 
   const [activeColorSlot, setActiveColorSlot] = useState<number | null>(null);
@@ -836,6 +842,48 @@ export const Toolbar: React.FC = () => {
           title="Tuval Radarı / Mini Harita Gezgini (N)"
         >
           <MapIcon size={16} />
+        </button>
+
+        {/* 📑 Faz AA: Dijital Ajanda Sekmeleri (Planner Tabs - J) */}
+        <button
+          onClick={togglePlannerTabs}
+          className={`p-2 rounded-xl transition-all flex items-center justify-center ${
+            plannerTabsVisible
+              ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30 scale-105 ring-1 ring-indigo-400 font-bold'
+              : 'text-slate-400 hover:text-indigo-300 hover:bg-slate-700/50'
+          }`}
+          title="Dijital Ajanda Sekmeleri (Planner Edge Tabs - J)"
+        >
+          <Bookmark size={16} />
+        </button>
+
+        {/* 🔗 Faz AA: İnteraktif Sayfa Köprüsü / Hotspot Ekle */}
+        <button
+          onClick={() => {
+            openLinkModal({
+              initialTargetPage: 0,
+              initialLabel: 'Sayfa Bağlantısı',
+              initialColor: '#6366f1',
+              onSave: ({ targetPageIndex, url, label, color }) => {
+                addPageLinkToCurrentPage({
+                  id: `link_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+                  x: 180,
+                  y: 200,
+                  width: 160,
+                  height: 48,
+                  targetPageIndex,
+                  url,
+                  label,
+                  color,
+                  isHotspot: true,
+                });
+              },
+            });
+          }}
+          className="p-2 rounded-xl transition-all flex items-center justify-center text-slate-400 hover:text-indigo-300 hover:bg-slate-700/50"
+          title="İnteraktif Sayfa Köprüsü / Hotspot Alanı Ekle"
+        >
+          <Link2 size={16} />
         </button>
 
         {/* 🎨 Faz 1: Renk Damlalığı (Eyedropper) */}

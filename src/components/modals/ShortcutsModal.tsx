@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, Keyboard, Sparkles, PenTool, Eraser, Scissors, Highlighter, Type, StickyNote, Ruler, ZoomIn, Bookmark, Search, RotateCcw, ArrowLeftRight, Map as MapIcon } from 'lucide-react';
+import { X, Keyboard, Sparkles, PenTool, Eraser, Scissors, Highlighter, Type, StickyNote, Ruler, ZoomIn, Bookmark, Search, RotateCcw, ArrowLeftRight, Map as MapIcon, Link2 } from 'lucide-react';
 import { triggerHaptic } from '../../engine/hapticFeedback';
 
 interface ShortcutsModalProps {
@@ -25,6 +25,7 @@ const DRAWING_SHORTCUTS: ShortcutItem[] = [
 ];
 
 const UTILITY_SHORTCUTS: ShortcutItem[] = [
+  { key: 'J', label: 'Ajanda Sekmeleri (Tabs)', desc: 'Dijital ajanda fihrist ve kenar sekmelerini göster/gizle', icon: <Bookmark size={15} /> },
   { key: 'N', label: 'Tuval Radarı (Mini Harita)', desc: 'İnteraktif radar mini harita ve hassas gezgini aç/kapat', icon: <MapIcon size={15} /> },
   { key: 'Q', label: 'Hızlı Karalama', desc: 'Yüzen Quick Note penceresini aç/kapat', icon: <Sparkles size={15} /> },
   { key: 'Z', label: 'Büyüteç Penceresi', desc: 'GoodNotes stili büyütülmüş yazma kutusunu aç/kapat', icon: <ZoomIn size={15} /> },
@@ -37,6 +38,7 @@ const UTILITY_SHORTCUTS: ShortcutItem[] = [
 const NAV_SHORTCUTS: ShortcutItem[] = [
   { key: '← / PageUp', label: 'Önceki Sayfa', desc: 'Bir önceki sayfaya yumuşak geçiş yap' },
   { key: '→ / PageDown', label: 'Sonraki Sayfa', desc: 'Bir sonraki sayfaya yumuşak geçiş yap' },
+  { key: '🔗 Köprü / Hotspot', label: 'İnteraktif Sayfa Köprüleri', desc: 'Metin, şekil, not veya çizimlere tıklanabilir sayfa geçiş ve web linkleri bağlama', icon: <Link2 size={15} /> },
   { key: '2 Parmak Kaydırma', label: 'Sayfa Çevirme', desc: 'Trackpad veya dokunmatik ekranda yatay kaydırarak sayfa çevir' },
   { key: '⌘ / Ctrl + Z', label: 'Geri Al', desc: 'Son çizimi veya işlemi geri al', icon: <RotateCcw size={15} /> },
   { key: '⌘ + ⇧ + Z / Ctrl + Y', label: 'İleri Al', desc: 'Geri alınan işlemi tekrar uygula' },

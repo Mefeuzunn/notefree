@@ -32,6 +32,8 @@ import {
   RulerUnit,
   CustomTemplateItem,
   StickyNoteColor,
+  PageLinkItem,
+  PlannerTabItem,
 } from '../types/notebook';
 import { collaborationService } from '../services/collaborationService';
 import { db, initStorage, saveNotebookToDB, importNotebookFromNotefree } from '../services/storage';
@@ -51,6 +53,15 @@ import { speechTranscriptionService } from '../services/speechTranscriptionServi
 import { exportEntireVault, importEntireVault } from '../services/vaultBackupService';
 import { ambientAudioService, AmbientSoundType } from '../services/ambientAudioService';
 import { textToSpeechService } from '../services/textToSpeechService';
+
+export const DEFAULT_PLANNER_TABS: PlannerTabItem[] = [
+  { id: 'tab_intro', title: 'Giriş', targetPageIndex: 0, color: '#6366f1' },
+  { id: 'tab_sec1', title: 'Bölüm 1', targetPageIndex: 1, color: '#38bdf8' },
+  { id: 'tab_sec2', title: 'Bölüm 2', targetPageIndex: 2, color: '#10b981' },
+  { id: 'tab_sec3', title: 'Bölüm 3', targetPageIndex: 3, color: '#f59e0b' },
+  { id: 'tab_summary', title: 'Özet', targetPageIndex: 4, color: '#ec4899' },
+  { id: 'tab_notes', title: 'Notlar', targetPageIndex: 5, color: '#8b5cf6' },
+];
 
 interface YouTubeState {
   isOpen: boolean;
@@ -463,6 +474,41 @@ interface NotebookStoreState {
   setNewNotebookModalOpen: (open: boolean) => void;
   setPageManagerModalOpen: (open: boolean) => void;
 
+  // Faz AA: Interactive Hyperlinks & Digital Planner Tabs
+  plannerTabsVisible: boolean;
+  togglePlannerTabs: () => void;
+  setPlannerTabsVisible: (visible: boolean) => void;
+  addPlannerTab: (tab: PlannerTabItem) => void;
+  updatePlannerTab: (tabId: string, partial: Partial<PlannerTabItem>) => void;
+  removePlannerTab: (tabId: string) => void;
+  reorderPlannerTabs: (tabs: PlannerTabItem[]) => void;
+  navigateToPage: (targetIndex: number) => void;
+  addPageLinkToCurrentPage: (link: PageLinkItem) => void;
+  removePageLinkFromCurrentPage: (linkId: string) => void;
+  updatePageLinkOnCurrentPage: (linkId: string, partial: Partial<PageLinkItem>) => void;
+  linkModalState: {
+    isOpen: boolean;
+    elementId?: string;
+    elementType?: 'text' | 'sticky' | 'shape' | 'hotspot';
+    initialTargetPage?: number;
+    initialUrl?: string;
+    initialLabel?: string;
+    initialColor?: string;
+    onSave?: (link: { targetPageIndex?: number; url?: string; label?: string; color?: string }) => void;
+    onRemove?: () => void;
+  };
+  openLinkModal: (params: {
+    elementId?: string;
+    elementType?: 'text' | 'sticky' | 'shape' | 'hotspot';
+    initialTargetPage?: number;
+    initialUrl?: string;
+    initialLabel?: string;
+    initialColor?: string;
+    onSave?: (link: { targetPageIndex?: number; url?: string; label?: string; color?: string }) => void;
+    onRemove?: () => void;
+  }) => void;
+  closeLinkModal: () => void;
+
   // Faz W: Floating Quick Scratchpad
   scratchpadOpen: boolean;
   scratchpadMinimized: boolean;
@@ -661,6 +707,10 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
   lassoSelection: null,
 
   minimapVisible: false,
+  plannerTabsVisible: false,
+  linkModalState: {
+    isOpen: false,
+  },
   rulerVisible: false,
   rulerAngle: 0,
   rulerPosition: { x: 180, y: 350 },
@@ -3167,6 +3217,168 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
 
   setMinimapVisible: (visible: boolean) => {
     set({ minimapVisible: visible });
+  },
+
+  togglePlannerTabs: () => {
+    set((state) => ({ plannerTabsVisible: !state.plannerTabsVisible }));
+  },
+
+  setPlannerTabsVisible: (visible: boolean) => {
+    set({ plannerTabsVisible: visible });
+  },
+
+  openLinkModal: (params) => {
+    set({
+      linkModalState: {
+        isOpen: true,
+        ...params,
+      },
+    });
+  },
+
+  closeLinkModal: () => {
+    set({
+      linkModalState: {
+        isOpen: false,
+      },
+    });
+  },
+
+  navigateToPage: (targetIndex: number) => {
+    const { notebooks, activeNotebookId, viewMode } = get();
+    if (!activeNotebookId) return;
+    const currentNb = notebooks.find((n) => n.id === activeNotebookId);
+    if (!currentNb || !currentNb.pages.length) return;
+    const boundedIndex = Math.max(0, Math.min(currentNb.pages.length - 1, targetIndex));
+    set({ activePageIndex: boundedIndex });
+    if (viewMode === 'continuous') {
+      setTimeout(() => {
+        const el = document.getElementById(`page-card-${boundedIndex}`);
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }, 50);
+    }
+  },
+
+  addPageLinkToCurrentPage: (link: PageLinkItem) => {
+    const { notebooks, activeNotebookId, activePageIndex } = get();
+    if (!activeNotebookId) return;
+    const currentNb = notebooks.find((n) => n.id === activeNotebookId);
+    if (!currentNb || !currentNb.pages[activePageIndex]) return;
+
+    const page = currentNb.pages[activePageIndex];
+    const updatedLinks = [...(page.links || []), link];
+    const updatedPages = currentNb.pages.map((p, idx) =>
+      idx === activePageIndex ? { ...p, links: updatedLinks } : p
+    );
+    const updatedNotebook = { ...currentNb, pages: updatedPages, updatedAt: Date.now() };
+
+    set({
+      notebooks: notebooks.map((n) => (n.id === activeNotebookId ? updatedNotebook : n)),
+    });
+    saveNotebookToDB(updatedNotebook).catch(console.error);
+  },
+
+  removePageLinkFromCurrentPage: (linkId: string) => {
+    const { notebooks, activeNotebookId, activePageIndex } = get();
+    if (!activeNotebookId) return;
+    const currentNb = notebooks.find((n) => n.id === activeNotebookId);
+    if (!currentNb || !currentNb.pages[activePageIndex]) return;
+
+    const page = currentNb.pages[activePageIndex];
+    const updatedLinks = (page.links || []).filter((l) => l.id !== linkId);
+    const updatedPages = currentNb.pages.map((p, idx) =>
+      idx === activePageIndex ? { ...p, links: updatedLinks } : p
+    );
+    const updatedNotebook = { ...currentNb, pages: updatedPages, updatedAt: Date.now() };
+
+    set({
+      notebooks: notebooks.map((n) => (n.id === activeNotebookId ? updatedNotebook : n)),
+    });
+    saveNotebookToDB(updatedNotebook).catch(console.error);
+  },
+
+  updatePageLinkOnCurrentPage: (linkId: string, partial: Partial<PageLinkItem>) => {
+    const { notebooks, activeNotebookId, activePageIndex } = get();
+    if (!activeNotebookId) return;
+    const currentNb = notebooks.find((n) => n.id === activeNotebookId);
+    if (!currentNb || !currentNb.pages[activePageIndex]) return;
+
+    const page = currentNb.pages[activePageIndex];
+    const updatedLinks = (page.links || []).map((l) =>
+      l.id === linkId ? { ...l, ...partial } : l
+    );
+    const updatedPages = currentNb.pages.map((p, idx) =>
+      idx === activePageIndex ? { ...p, links: updatedLinks } : p
+    );
+    const updatedNotebook = { ...currentNb, pages: updatedPages, updatedAt: Date.now() };
+
+    set({
+      notebooks: notebooks.map((n) => (n.id === activeNotebookId ? updatedNotebook : n)),
+    });
+    saveNotebookToDB(updatedNotebook).catch(console.error);
+  },
+
+  addPlannerTab: (tab: PlannerTabItem) => {
+    const { notebooks, activeNotebookId } = get();
+    if (!activeNotebookId) return;
+    const currentNb = notebooks.find((n) => n.id === activeNotebookId);
+    if (!currentNb) return;
+
+    const currentTabs = currentNb.plannerTabs || DEFAULT_PLANNER_TABS;
+    const updatedTabs = [...currentTabs, tab];
+    const updatedNotebook = { ...currentNb, plannerTabs: updatedTabs, updatedAt: Date.now() };
+
+    set({
+      notebooks: notebooks.map((n) => (n.id === activeNotebookId ? updatedNotebook : n)),
+    });
+    saveNotebookToDB(updatedNotebook).catch(console.error);
+  },
+
+  updatePlannerTab: (tabId: string, partial: Partial<PlannerTabItem>) => {
+    const { notebooks, activeNotebookId } = get();
+    if (!activeNotebookId) return;
+    const currentNb = notebooks.find((n) => n.id === activeNotebookId);
+    if (!currentNb) return;
+
+    const currentTabs = currentNb.plannerTabs || DEFAULT_PLANNER_TABS;
+    const updatedTabs = currentTabs.map((t) => (t.id === tabId ? { ...t, ...partial } : t));
+    const updatedNotebook = { ...currentNb, plannerTabs: updatedTabs, updatedAt: Date.now() };
+
+    set({
+      notebooks: notebooks.map((n) => (n.id === activeNotebookId ? updatedNotebook : n)),
+    });
+    saveNotebookToDB(updatedNotebook).catch(console.error);
+  },
+
+  removePlannerTab: (tabId: string) => {
+    const { notebooks, activeNotebookId } = get();
+    if (!activeNotebookId) return;
+    const currentNb = notebooks.find((n) => n.id === activeNotebookId);
+    if (!currentNb) return;
+
+    const currentTabs = currentNb.plannerTabs || DEFAULT_PLANNER_TABS;
+    const updatedTabs = currentTabs.filter((t) => t.id !== tabId);
+    const updatedNotebook = { ...currentNb, plannerTabs: updatedTabs, updatedAt: Date.now() };
+
+    set({
+      notebooks: notebooks.map((n) => (n.id === activeNotebookId ? updatedNotebook : n)),
+    });
+    saveNotebookToDB(updatedNotebook).catch(console.error);
+  },
+
+  reorderPlannerTabs: (tabs: PlannerTabItem[]) => {
+    const { notebooks, activeNotebookId } = get();
+    if (!activeNotebookId) return;
+    const currentNb = notebooks.find((n) => n.id === activeNotebookId);
+    if (!currentNb) return;
+
+    const updatedNotebook = { ...currentNb, plannerTabs: tabs, updatedAt: Date.now() };
+    set({
+      notebooks: notebooks.map((n) => (n.id === activeNotebookId ? updatedNotebook : n)),
+    });
+    saveNotebookToDB(updatedNotebook).catch(console.error);
   },
 
   setSidebarOpen: (open: boolean) => {

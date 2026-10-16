@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { StickyNoteItem, StickyNoteColor } from '../../types/notebook';
 import { useNotebookStore } from '../../store/notebookStore';
-import { Trash2, GripHorizontal, Palette, Volume2 } from 'lucide-react';
+import { Trash2, GripHorizontal, Palette, Volume2, Link2, ExternalLink, Globe } from 'lucide-react';
 import { textToSpeechService } from '../../services/textToSpeechService';
 
 interface StickyNoteOverlayProps {
@@ -63,7 +63,12 @@ const COLOR_MAP: Record<
 };
 
 export const StickyNoteOverlay: React.FC<StickyNoteOverlayProps> = ({ note, scale = 1.0 }) => {
-  const { updateStickyNoteOnCurrentPage, removeStickyNoteFromCurrentPage } = useNotebookStore();
+  const {
+    updateStickyNoteOnCurrentPage,
+    removeStickyNoteFromCurrentPage,
+    openLinkModal,
+    navigateToPage,
+  } = useNotebookStore();
 
   const [isDragging, setIsDragging] = useState(false);
   const [showColorPicker, setShowColorPicker] = useState(false);
@@ -185,6 +190,33 @@ export const StickyNoteOverlay: React.FC<StickyNoteOverlayProps> = ({ note, scal
               )}
             </div>
 
+            {/* 🔗 Faz AA: Link to Page or URL */}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                openLinkModal({
+                  elementId: note.id,
+                  elementType: 'sticky',
+                  initialTargetPage: note.pageLink,
+                  initialUrl: note.url,
+                  onSave: (saved) => {
+                    updateStickyNoteOnCurrentPage(note.id, {
+                      pageLink: saved.targetPageIndex,
+                      url: saved.url,
+                    });
+                  },
+                });
+              }}
+              className={`p-1 rounded transition-colors ${
+                note.pageLink !== undefined || note.url
+                  ? 'text-indigo-600 bg-indigo-500/20 font-bold opacity-100 ring-1 ring-indigo-400'
+                  : 'hover:bg-black/10 opacity-70 hover:opacity-100'
+              }`}
+              title="Sayfaya veya Web Adresine Bağla (Köprü)"
+            >
+              <Link2 size={12} />
+            </button>
+
             {/* 🔊 Faz D: TTS Read Aloud */}
             <button
               onClick={(e) => {
@@ -212,7 +244,7 @@ export const StickyNoteOverlay: React.FC<StickyNoteOverlayProps> = ({ note, scal
         </div>
 
         {/* Text Content Area */}
-        <div className="flex-1 p-2.5 flex flex-col">
+        <div className="flex-1 p-2.5 flex flex-col relative">
           <textarea
             value={note.text}
             onChange={(e) => updateStickyNoteOnCurrentPage(note.id, { text: e.target.value })}
@@ -225,6 +257,35 @@ export const StickyNoteOverlay: React.FC<StickyNoteOverlayProps> = ({ note, scal
               lineHeight: '1.4',
             }}
           />
+
+          {/* 🔗 Faz AA: Clickable Jump Link Badge at bottom */}
+          {note.pageLink !== undefined && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                navigateToPage(note.pageLink!);
+              }}
+              className="mt-1 self-start flex items-center gap-1 px-2 py-0.5 rounded-full bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-bold shadow-md hover:scale-105 transition-all z-20"
+              title={`Sayfa ${note.pageLink + 1}'e Atla`}
+            >
+              <ExternalLink size={10} />
+              <span>Sayfa {note.pageLink + 1}'e Git</span>
+            </button>
+          )}
+
+          {note.url && (
+            <a
+              href={note.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className="mt-1 self-start flex items-center gap-1 px-2 py-0.5 rounded-full bg-cyan-600 hover:bg-cyan-500 text-white text-[10px] font-bold shadow-md hover:scale-105 transition-all z-20 truncate max-w-[160px]"
+              title={`Web Bağlantısını Aç: ${note.url}`}
+            >
+              <Globe size={10} />
+              <span className="truncate">{note.url.replace(/^https?:\/\//, '')}</span>
+            </a>
+          )}
         </div>
       </div>
     </div>

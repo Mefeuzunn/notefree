@@ -32,6 +32,7 @@ import {
 } from '../../engine/lassoHelper';
 import { TextBoxOverlay } from './TextBoxOverlay';
 import { StickyNoteOverlay } from './StickyNoteOverlay';
+import { PageLinkOverlay } from './PageLinkOverlay';
 import { SymmetryGuide } from './SymmetryGuide';
 import { ShapeNodeEditor } from './ShapeNodeEditor';
 import { getSnapToRulerPoint, formatRulerMeasurement } from '../../engine/rulerHelper';
@@ -59,6 +60,9 @@ import {
   AlignRight,
   ArrowDownToLine,
   Copy,
+  Link2,
+  Globe,
+  ExternalLink,
 } from 'lucide-react';
 
 interface CanvasPageProps {
@@ -145,6 +149,8 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
     rulerAngle,
     rulerUnit,
     rulerEdgeSnap,
+    openLinkModal,
+    navigateToPage,
   } = useNotebookStore();
 
   const [isDrawing, setIsDrawing] = useState(false);
@@ -1762,6 +1768,58 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
           />
         ))}
 
+      {/* 🔗 Layer 0.8: Interactive Page Links & Hotspots */}
+      {page.links &&
+        page.links.map((link) => (
+          <PageLinkOverlay key={link.id} link={link} scale={scale} />
+        ))}
+
+      {/* 🔗 Layer 0.9: Clickable Jump Link Badges for Linked Strokes / Shapes */}
+      {page.strokes &&
+        page.strokes
+          .filter((s) => s.pageLink !== undefined || s.url)
+          .map((s) => {
+            const centerX = (s.bounds.minX + s.bounds.maxX) / 2;
+            const topY = s.bounds.minY;
+            return (
+              <div
+                key={`link_${s.id}`}
+                style={{
+                  left: `${centerX * scale}px`,
+                  top: `${Math.max(0, topY - 24) * scale}px`,
+                }}
+                className="absolute z-20 -translate-x-1/2 pointer-events-auto select-none"
+              >
+                {s.pageLink !== undefined ? (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      triggerHaptic('medium');
+                      navigateToPage(s.pageLink!);
+                    }}
+                    className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-bold shadow-lg hover:scale-105 transition-all"
+                    title={`Sayfa ${s.pageLink + 1}'e Atla`}
+                  >
+                    <ExternalLink size={10} />
+                    <span>Sayfa {s.pageLink + 1}'e Git</span>
+                  </button>
+                ) : (
+                  <a
+                    href={s.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-cyan-600 hover:bg-cyan-500 text-white text-[10px] font-bold shadow-lg hover:scale-105 transition-all truncate max-w-[140px]"
+                    title={`Web Bağlantısını Aç: ${s.url}`}
+                  >
+                    <Globe size={10} />
+                    <span className="truncate">{s.url?.replace(/^https?:\/\//, '')}</span>
+                  </a>
+                )}
+              </div>
+            );
+          })}
+
       {/* Layer 1: Committed Strokes */}
       <canvas
         ref={strokesCanvasRef}
@@ -1898,6 +1956,34 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
             >
               <Type size={13} />
               <span>Metne Dönüştür</span>
+            </button>
+
+            {/* 🔗 FAZ AA: Seçilen Çizim veya Şekle Sayfa/Web Bağlantısı Ekle */}
+            <button
+              onClick={() => {
+                const firstStroke = lassoSelection.originalStrokes[0];
+                openLinkModal({
+                  elementId: firstStroke?.id,
+                  elementType: 'shape',
+                  initialTargetPage: firstStroke?.pageLink,
+                  initialUrl: firstStroke?.url,
+                  onSave: (saved) => {
+                    lassoSelection.strokeIds.forEach((id) => {
+                      updateStrokeOnCurrentPage(id, {
+                        pageLink: saved.targetPageIndex,
+                        url: saved.url,
+                      });
+                    });
+                    setToastMessage('🔗 Çizime Bağlantı Eklendi');
+                    setTimeout(() => setToastMessage(null), 1500);
+                  },
+                });
+              }}
+              className="px-2 py-1 hover:bg-slate-800 text-indigo-300 rounded-lg transition-colors flex items-center gap-1 text-[11px] font-semibold border border-indigo-500/30 bg-indigo-950/40"
+              title="Seçilen Çizim veya Şekle Köprü Bağlantısı Ekle"
+            >
+              <Link2 size={13} />
+              <span>Bağlantı</span>
             </button>
 
             <div className="w-px h-4 bg-slate-750" />
@@ -2256,6 +2342,22 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
               updateStrokeOnCurrentPage(selectedShapeStroke.id, {
                 shapeFillColor: color,
                 shapeFillOpacity: opacity,
+              });
+            }}
+            onLink={() => {
+              openLinkModal({
+                elementId: selectedShapeStroke.id,
+                elementType: 'shape',
+                initialTargetPage: selectedShapeStroke.pageLink,
+                initialUrl: selectedShapeStroke.url,
+                onSave: (saved) => {
+                  updateStrokeOnCurrentPage(selectedShapeStroke.id, {
+                    pageLink: saved.targetPageIndex,
+                    url: saved.url,
+                  });
+                  setToastMessage('🔗 Şekle Bağlantı Eklendi');
+                  setTimeout(() => setToastMessage(null), 1500);
+                },
               });
             }}
             onClose={() => setSelectedShapeStrokeId(null)}
