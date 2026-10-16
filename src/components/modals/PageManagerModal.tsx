@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { triggerHaptic } from '../../engine/hapticFeedback';
 import { MiniPagePreview } from '../navigation/PageScrubberBar';
+import { formatPageRange } from '../../services/exportService';
 
 interface PageManagerModalProps {
   isOpen: boolean;
@@ -154,8 +155,9 @@ export const PageManagerModal: React.FC<PageManagerModalProps> = ({ isOpen, onCl
 
   const handleBatchExport = () => {
     triggerHaptic('light');
+    const rangeStr = formatPageRange(Array.from(selectedIndices));
     onClose();
-    setExportModalOpen(true);
+    setExportModalOpen(true, rangeStr);
   };
 
   return (

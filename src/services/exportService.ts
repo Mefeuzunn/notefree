@@ -1,8 +1,293 @@
 import { PDFDocument } from 'pdf-lib';
-import { Page, ExportOptions, Notebook } from '../types/notebook';
-import { drawStrokeOnCanvas, drawTapeOnCanvas, drawFillOnCanvas, getStrokeOptions } from '../engine/strokeRenderer';
+import {
+  Page,
+  ExportOptions,
+  Notebook,
+  PageSticker,
+  WatermarkOptions,
+  HeaderFooterOptions,
+} from '../types/notebook';
+import {
+  drawStrokeOnCanvas,
+  drawTapeOnCanvas,
+  drawFillOnCanvas,
+  getStrokeOptions,
+} from '../engine/strokeRenderer';
 import { drawPaperTemplate } from '../engine/paperTemplates';
 
+/**
+ * Parses page range string (e.g. "1-3, 5, 8-10") into zero-indexed sorted array of unique page numbers.
+ */
+export function parsePageRange(rangeStr: string, totalPages: number): number[] {
+  if (!rangeStr || !rangeStr.trim()) return [];
+  const parts = rangeStr.split(',').map((p) => p.trim()).filter(Boolean);
+  const resultSet = new Set<number>();
+
+  for (const part of parts) {
+    if (part.includes('-')) {
+      const [startStr, endStr] = part.split('-').map((s) => s.trim());
+      const start = parseInt(startStr, 10);
+      const end = parseInt(endStr, 10);
+      if (!isNaN(start) && !isNaN(end)) {
+        const min = Math.max(1, Math.min(start, end));
+        const max = Math.min(totalPages, Math.max(start, end));
+        for (let i = min; i <= max; i++) {
+          resultSet.add(i - 1);
+        }
+      }
+    } else {
+      const pageNum = parseInt(part, 10);
+      if (!isNaN(pageNum) && pageNum >= 1 && pageNum <= totalPages) {
+        resultSet.add(pageNum - 1);
+      }
+    }
+  }
+
+  return Array.from(resultSet).sort((a, b) => a - b);
+}
+
+/**
+ * Converts zero-based page indices array to compact string format (e.g. [0,1,2,4,7,8] -> "1-3, 5, 8-9")
+ */
+export function formatPageRange(indices: number[]): string {
+  if (!indices || indices.length === 0) return '';
+  const sorted = Array.from(new Set(indices)).sort((a, b) => a - b).map((n) => n + 1);
+  const ranges: string[] = [];
+  let start = sorted[0];
+  let prev = sorted[0];
+
+  for (let i = 1; i < sorted.length; i++) {
+    const cur = sorted[i];
+    if (cur === prev + 1) {
+      prev = cur;
+    } else {
+      ranges.push(start === prev ? `${start}` : `${start}-${prev}`);
+      start = cur;
+      prev = cur;
+    }
+  }
+  ranges.push(start === prev ? `${start}` : `${start}-${prev}`);
+  return ranges.join(', ');
+}
+
+/**
+ * Helper to asynchronously load image element
+ */
+function loadImage(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => resolve(img);
+    img.onerror = reject;
+    img.src = src;
+  });
+}
+
+/**
+ * Draws custom sticker / stamp with SVG, rotation, flipX, and opacity support
+ */
+async function drawStickerToCanvas(
+  ctx: CanvasRenderingContext2D,
+  stk: PageSticker
+): Promise<void> {
+  try {
+    let img: HTMLImageElement | null = null;
+    const content = stk.content.trim();
+
+    if (content.startsWith('<svg') || content.includes('<svg')) {
+      let svgStr = content;
+      if (!svgStr.includes('xmlns="http://www.w3.org/2000/svg"')) {
+        svgStr = svgStr.replace('<svg', '<svg xmlns="http://www.w3.org/2000/svg"');
+      }
+      const blob = new Blob([svgStr], { type: 'image/svg+xml;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      img = await loadImage(url);
+      URL.revokeObjectURL(url);
+    } else if (content.startsWith('data:image') || content.startsWith('http')) {
+      img = await loadImage(content);
+    } else {
+      // Emoji or short string
+      const svgWrap = `<svg xmlns="http://www.w3.org/2000/svg" width="${stk.width}" height="${stk.height}">
+        <text x="50%" y="50%" dominant-baseline="central" text-anchor="middle" font-size="${Math.min(stk.width, stk.height) * 0.75}px">
+          ${content}
+        </text>
+      </svg>`;
+      const blob = new Blob([svgWrap], { type: 'image/svg+xml;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      img = await loadImage(url);
+      URL.revokeObjectURL(url);
+    }
+
+    if (img) {
+      ctx.save();
+      ctx.translate(stk.x + stk.width / 2, stk.y + stk.height / 2);
+      if (stk.rotation) {
+        ctx.rotate((stk.rotation * Math.PI) / 180);
+      }
+      if (stk.flipX) {
+        ctx.scale(-1, 1);
+      }
+      if (stk.opacity !== undefined) {
+        ctx.globalAlpha = stk.opacity;
+      }
+      ctx.drawImage(img, -stk.width / 2, -stk.height / 2, stk.width, stk.height);
+      ctx.restore();
+    }
+  } catch (err) {
+    console.warn('Failed to render sticker to export canvas:', err);
+  }
+}
+
+/**
+ * Draws diagonal or tiled semi-transparent watermark text
+ */
+function drawWatermarkToCanvas(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  watermark: WatermarkOptions
+) {
+  if (!watermark.enabled || !watermark.text.trim()) return;
+
+  ctx.save();
+  ctx.globalAlpha = Math.max(0.02, Math.min(0.9, watermark.opacity));
+  ctx.fillStyle = watermark.color || '#94a3b8';
+  ctx.font = `bold ${watermark.fontSize || 48}px sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+
+  const rotRad = ((watermark.rotation || -45) * Math.PI) / 180;
+
+  if (watermark.tiled) {
+    // Tiled diagonal pattern across the whole page
+    const stepX = Math.max(180, (watermark.fontSize || 48) * 4.2);
+    const stepY = Math.max(120, (watermark.fontSize || 48) * 2.8);
+
+    for (let x = -width * 0.5; x < width * 1.5; x += stepX) {
+      for (let y = -height * 0.5; y < height * 1.5; y += stepY) {
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(rotRad);
+        ctx.fillText(watermark.text, 0, 0);
+        ctx.restore();
+      }
+    }
+  } else {
+    // Single centered watermark
+    ctx.translate(width / 2, height / 2);
+    ctx.rotate(rotRad);
+    ctx.fillText(watermark.text, 0, 0);
+  }
+
+  ctx.restore();
+}
+
+/**
+ * Draws Bates numbering, page numbers, or header/footer details
+ */
+function drawHeaderFooterToCanvas(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  headerFooter: HeaderFooterOptions,
+  meta: { pageIndex: number; totalPages: number; title: string }
+) {
+  if (!headerFooter.enabled) return;
+
+  let text = '';
+  const pageNum = meta.pageIndex + 1;
+  const total = meta.totalPages;
+
+  switch (headerFooter.format) {
+    case 'bates': {
+      const prefix = headerFooter.batesPrefix ?? 'PAGE ';
+      const digits = headerFooter.batesDigits ?? 3;
+      const batesNum = String(pageNum).padStart(digits, '0');
+      const batesTot = String(total).padStart(digits, '0');
+      text = `${prefix}${batesNum} / ${batesTot}`;
+      break;
+    }
+    case 'title-page': {
+      text = `${meta.title} • Sayfa ${pageNum} / ${total}`;
+      break;
+    }
+    case 'date-page': {
+      const dateStr = new Date().toLocaleDateString('tr-TR');
+      text = `${dateStr} • Sayfa ${pageNum} / ${total}`;
+      break;
+    }
+    case 'custom': {
+      const template = headerFooter.customTemplate || '{title} • Sayfa {n} / {total}';
+      const dateStr = new Date().toLocaleDateString('tr-TR');
+      const digits = headerFooter.batesDigits ?? 3;
+      const batesNum = String(pageNum).padStart(digits, '0');
+      text = template
+        .replace(/\{n\}/g, String(pageNum))
+        .replace(/\{total\}/g, String(total))
+        .replace(/\{title\}/g, meta.title)
+        .replace(/\{date\}/g, dateStr)
+        .replace(/\{bates\}/g, batesNum);
+      break;
+    }
+    case 'page-of-total':
+    default: {
+      text = `Sayfa ${pageNum} / ${total}`;
+      break;
+    }
+  }
+
+  const margin = 28;
+  let posX = width / 2;
+  let posY = height - margin;
+  let align: CanvasTextAlign = 'center';
+  let baseline: CanvasTextBaseline = 'bottom';
+
+  switch (headerFooter.position) {
+    case 'top-left':
+      posX = margin;
+      posY = margin;
+      align = 'left';
+      baseline = 'top';
+      break;
+    case 'top-right':
+      posX = width - margin;
+      posY = margin;
+      align = 'right';
+      baseline = 'top';
+      break;
+    case 'bottom-left':
+      posX = margin;
+      posY = height - margin;
+      align = 'left';
+      baseline = 'bottom';
+      break;
+    case 'bottom-right':
+      posX = width - margin;
+      posY = height - margin;
+      align = 'right';
+      baseline = 'bottom';
+      break;
+    case 'bottom-center':
+    default:
+      posX = width / 2;
+      posY = height - margin;
+      align = 'center';
+      baseline = 'bottom';
+      break;
+  }
+
+  ctx.save();
+  ctx.fillStyle = headerFooter.color || '#64748b';
+  ctx.font = `${headerFooter.fontSize || 12}px sans-serif`;
+  ctx.textAlign = align;
+  ctx.textBaseline = baseline;
+  ctx.fillText(text, posX, posY);
+  ctx.restore();
+}
+
+/**
+ * Renders a single page with all layers, stickers, watermark, and header/footer to an HTML5 Canvas.
+ */
 export async function renderPageToCanvas(
   page: Page,
   options: {
@@ -11,12 +296,18 @@ export async function renderPageToCanvas(
     includeTemplate?: boolean;
     includeStickyNotes?: boolean;
     includeTexts?: boolean;
+    includeStickers?: boolean;
+    watermark?: WatermarkOptions;
+    headerFooter?: HeaderFooterOptions;
+    pageIndex?: number;
+    totalPages?: number;
+    notebookTitle?: string;
   } = {}
 ): Promise<HTMLCanvasElement> {
   const scale = options.scale ?? 2;
   const canvas = document.createElement('canvas');
-  canvas.width = page.width * scale;
-  canvas.height = page.height * scale;
+  canvas.width = Math.round(page.width * scale);
+  canvas.height = Math.round(page.height * scale);
   const ctx = canvas.getContext('2d');
   if (!ctx) return canvas;
 
@@ -105,7 +396,7 @@ export async function renderPageToCanvas(
     }
   }
 
-  // 7. Strokes (Ink)
+  // 7. Strokes (Handwriting & Shapes)
   if (page.strokes && page.strokes.length > 0) {
     for (const stroke of page.strokes) {
       drawStrokeOnCanvas(
@@ -188,17 +479,28 @@ export async function renderPageToCanvas(
     }
   }
 
-  return canvas;
-}
+  // 10. Stickers & Rubber Stamps
+  if (options.includeStickers !== false && page.stickers && page.stickers.length > 0) {
+    for (const stk of page.stickers) {
+      await drawStickerToCanvas(ctx, stk);
+    }
+  }
 
-function loadImage(src: string): Promise<HTMLImageElement> {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-    img.onload = () => resolve(img);
-    img.onerror = reject;
-    img.src = src;
-  });
+  // 11. Watermark Security Overlay
+  if (options.watermark && options.watermark.enabled) {
+    drawWatermarkToCanvas(ctx, page.width, page.height, options.watermark);
+  }
+
+  // 12. Bates & Page Numbering (Header / Footer)
+  if (options.headerFooter && options.headerFooter.enabled) {
+    drawHeaderFooterToCanvas(ctx, page.width, page.height, options.headerFooter, {
+      pageIndex: options.pageIndex ?? page.pageNumber - 1,
+      totalPages: options.totalPages ?? 1,
+      title: options.notebookTitle ?? '',
+    });
+  }
+
+  return canvas;
 }
 
 /**
@@ -206,7 +508,8 @@ function loadImage(src: string): Promise<HTMLImageElement> {
  */
 export async function exportPageAsImage(
   page: Page,
-  options: ExportOptions
+  options: ExportOptions,
+  meta?: { pageIndex?: number; totalPages?: number; notebookTitle?: string }
 ): Promise<Blob> {
   const canvas = await renderPageToCanvas(page, {
     scale: options.scale,
@@ -214,6 +517,12 @@ export async function exportPageAsImage(
     includeTemplate: options.includeTemplate,
     includeStickyNotes: options.includeStickyNotes,
     includeTexts: options.includeTexts,
+    includeStickers: options.includeStickers,
+    watermark: options.watermark,
+    headerFooter: options.headerFooter,
+    pageIndex: meta?.pageIndex ?? page.pageNumber - 1,
+    totalPages: meta?.totalPages ?? 1,
+    notebookTitle: meta?.notebookTitle ?? '',
   });
 
   return new Promise((resolve, reject) => {
@@ -231,25 +540,45 @@ export async function exportPageAsImage(
 }
 
 /**
- * Exports full notebook or single page to a crisp PDF document with all layers included
+ * Exports full notebook or page range to a crisp PDF document with all layers included
  */
 export async function exportNotebookWithAllLayers(
   notebook: Notebook,
   options: ExportOptions
 ): Promise<Blob> {
   const pdfDoc = await PDFDocument.create();
-  const pagesToExport =
-    options.scope === 'current'
-      ? [notebook.pages[notebook.activePageIndex] || notebook.pages[0]]
-      : notebook.pages;
 
-  for (const page of pagesToExport) {
+  let pagesToExport: Page[] = [];
+
+  if (options.scope === 'current') {
+    pagesToExport = [notebook.pages[notebook.activePageIndex] || notebook.pages[0]];
+  } else if (options.scope === 'custom') {
+    const validIndices = parsePageRange(options.pageRange || '', notebook.pages.length);
+    if (validIndices.length > 0) {
+      pagesToExport = validIndices.map((idx) => notebook.pages[idx]).filter(Boolean);
+    } else {
+      pagesToExport = [notebook.pages[notebook.activePageIndex] || notebook.pages[0]];
+    }
+  } else {
+    pagesToExport = notebook.pages;
+  }
+
+  const totalPages = notebook.pages.length;
+
+  for (let i = 0; i < pagesToExport.length; i++) {
+    const page = pagesToExport[i];
     const canvas = await renderPageToCanvas(page, {
       scale: options.scale,
       transparentBg: false,
       includeTemplate: options.includeTemplate,
       includeStickyNotes: options.includeStickyNotes,
       includeTexts: options.includeTexts,
+      includeStickers: options.includeStickers,
+      watermark: options.watermark,
+      headerFooter: options.headerFooter,
+      pageIndex: page.pageNumber - 1,
+      totalPages: totalPages,
+      notebookTitle: notebook.title,
     });
 
     const dataUrl = canvas.toDataURL('image/jpeg', 0.92);

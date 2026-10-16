@@ -340,14 +340,44 @@ export interface Notebook {
   plannerTabs?: PlannerTabItem[]; // Customizable digital planner index tabs
 }
 
+export interface WatermarkOptions {
+  enabled: boolean;
+  text: string;
+  opacity: number; // 0.05 - 0.80
+  color: string;
+  fontSize: number;
+  rotation: number; // degrees, e.g. -45, 0, 45
+  tiled: boolean; // pattern repeat across page
+}
+
+export type HeaderFooterFormat = 'page-of-total' | 'bates' | 'title-page' | 'date-page' | 'custom';
+export type HeaderFooterPosition = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-center' | 'bottom-right';
+
+export interface HeaderFooterOptions {
+  enabled: boolean;
+  format: HeaderFooterFormat;
+  customTemplate?: string;
+  position: HeaderFooterPosition;
+  fontSize: number;
+  color: string;
+  includeDate?: boolean;
+  includeTitle?: boolean;
+  batesPrefix?: string;
+  batesDigits?: number;
+}
+
 export interface ExportOptions {
   format: 'pdf' | 'png' | 'jpeg';
-  scope: 'current' | 'all';
+  scope: 'current' | 'all' | 'custom';
+  pageRange?: string;
   scale: 1 | 2 | 3;
   transparentBg: boolean;
   includeTemplate: boolean;
   includeStickyNotes: boolean;
   includeTexts: boolean;
+  includeStickers?: boolean;
+  watermark?: WatermarkOptions;
+  headerFooter?: HeaderFooterOptions;
 }
 
 export interface LibraryVaultBackup {

@@ -399,11 +399,12 @@ interface NotebookStoreState {
   toggleAmbience: (type: AmbientSoundType) => void;
   setAmbienceVolume: (volume: number) => void;
 
-  // Faz E: Two-Page Book Spread & Export Studio
+  // Faz E & Faz AD: Two-Page Book Spread & Export Studio
   twoPageSpread: boolean;
   toggleTwoPageSpread: () => void;
   exportModalOpen: boolean;
-  setExportModalOpen: (open: boolean) => void;
+  exportInitialPageRange?: string;
+  setExportModalOpen: (open: boolean, initialRange?: string) => void;
 
   // Faz F: LiquidText Study Margin & Excerpt Workspace
   marginWorkspaceOpen: boolean;
@@ -776,9 +777,10 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
   activeAmbience: null,
   ambienceVolume: 0.5,
 
-  // Faz E Initial State
+  // Faz E & Faz AD Initial State
   twoPageSpread: false,
   exportModalOpen: false,
+  exportInitialPageRange: undefined,
 
   // Faz F & H Initial State
   marginWorkspaceOpen: false,
@@ -2820,8 +2822,11 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
     set((state) => ({ twoPageSpread: !state.twoPageSpread }));
   },
 
-  setExportModalOpen: (open: boolean) => {
-    set({ exportModalOpen: open });
+  setExportModalOpen: (open: boolean, initialRange?: string) => {
+    set({
+      exportModalOpen: open,
+      exportInitialPageRange: open ? initialRange : undefined,
+    });
   },
 
   // Faz F: LiquidText Study Margin & Excerpt Workspace Actions
