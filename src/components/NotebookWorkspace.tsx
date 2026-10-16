@@ -85,6 +85,8 @@ export const NotebookWorkspace: React.FC = () => {
     toggleMinimap,
     plannerTabsVisible,
     togglePlannerTabs,
+    outlineDrawerOpen,
+    setOutlineDrawerOpen,
     setShortcutsModalOpen,
   } = useNotebookStore();
 
@@ -357,6 +359,12 @@ export const NotebookWorkspace: React.FC = () => {
         togglePlannerTabs();
         triggerHaptic('light');
         showShortcutHud('Ajanda Sekmeleri', 'J');
+        return;
+      } else if (key === 'o') {
+        e.preventDefault();
+        setOutlineDrawerOpen(!outlineDrawerOpen);
+        triggerHaptic('light');
+        showShortcutHud('İçindekiler & Fihrist', 'O');
         return;
       }
 

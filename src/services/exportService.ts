@@ -1,8 +1,9 @@
-import { PDFDocument } from 'pdf-lib';
+import { PDFDocument, PDFName, PDFHexString, PDFRef } from 'pdf-lib';
 import {
   Page,
   ExportOptions,
   Notebook,
+  PdfOutlineItem,
   PageSticker,
   PageTableItem,
   PageConnectorItem,
@@ -557,11 +558,203 @@ export async function exportPageAsImage(
 /**
  * Exports full notebook or page range to a crisp PDF document with all layers included
  */
+/**
+ * FAZ AK: Embeds native hierarchical PDF bookmarks (outline tree) into the PDF catalog.
+ * Compatible with Adobe Acrobat, Apple Books, GoodNotes, and Chromium PDF viewer.
+ */
+function embedPdfBookmarks(
+  pdfDoc: PDFDocument,
+  pageRefs: PDFRef[],
+  outlineItems: PdfOutlineItem[],
+  pageOffset: number = 0
+) {
+  if (!outlineItems || outlineItems.length === 0 || pageRefs.length === 0) return;
+
+  const validItems = outlineItems
+    .filter((item) => {
+      const targetIdx = item.pageIndex + pageOffset;
+      return targetIdx >= 0 && targetIdx < pageRefs.length && item.title.trim().length > 0;
+    })
+    .sort((a, b) => a.pageIndex - b.pageIndex || a.level - b.level);
+
+  if (validItems.length === 0) return;
+
+  const outlinesDictRef = pdfDoc.context.nextRef();
+  const itemRefs: PDFRef[] = validItems.map(() => pdfDoc.context.nextRef());
+
+  for (let i = 0; i < validItems.length; i++) {
+    const item = validItems[i];
+    const targetIdx = item.pageIndex + pageOffset;
+    const targetPageRef = pageRefs[targetIdx];
+    const itemRef = itemRefs[i];
+
+    const dictObj: Record<string, any> = {
+      Title: PDFHexString.fromText(item.title),
+      Parent: outlinesDictRef,
+      Dest: [targetPageRef, 'Fit'],
+    };
+
+    if (i > 0) {
+      dictObj.Prev = itemRefs[i - 1];
+    }
+    if (i < validItems.length - 1) {
+      dictObj.Next = itemRefs[i + 1];
+    }
+
+    const dict = pdfDoc.context.obj(dictObj);
+    pdfDoc.context.assign(itemRef, dict);
+  }
+
+  const outlinesDict = pdfDoc.context.obj({
+    Type: 'Outlines',
+    First: itemRefs[0],
+    Last: itemRefs[itemRefs.length - 1],
+    Count: validItems.length,
+  });
+
+  pdfDoc.context.assign(outlinesDictRef, outlinesDict);
+  pdfDoc.catalog.set(PDFName.of('Outlines'), outlinesDictRef);
+}
+
+/**
+ * FAZ AK: Renders a beautifully styled Table of Contents page with paper background,
+ * decorative headers, dotted leaders, and page numbers.
+ */
+export async function renderTableOfContentsPage(
+  notebook: Notebook,
+  outlineItems: PdfOutlineItem[],
+  options: { width: number; height: number; scale: number }
+): Promise<HTMLCanvasElement> {
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.round(options.width * options.scale);
+  canvas.height = Math.round(options.height * options.scale);
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return canvas;
+
+  ctx.scale(options.scale, options.scale);
+
+  // Background
+  const paperColors: Record<string, string> = {
+    white: '#ffffff',
+    cream: '#fdfbf7',
+    'yellow-pad': '#fef9c3',
+    dark: '#1e293b',
+    kraft: '#f5ebe0',
+  };
+  const baseBg = paperColors[notebook.pages[0]?.paperColor || 'cream'] || '#ffffff';
+  ctx.fillStyle = baseBg;
+  ctx.fillRect(0, 0, options.width, options.height);
+
+  const isDark = notebook.pages[0]?.paperColor === 'dark';
+  const textColor = isDark ? '#f8fafc' : '#1e293b';
+  const mutedColor = isDark ? '#94a3b8' : '#64748b';
+  const dotColor = isDark ? '#475569' : '#cbd5e1';
+  const accentColor = '#6366f1';
+
+  const marginX = Math.round(options.width * 0.09);
+  let curY = Math.round(options.height * 0.08);
+
+  // Header
+  ctx.fillStyle = accentColor;
+  ctx.font = 'bold 12px Inter, sans-serif';
+  ctx.fillText(notebook.title.toUpperCase(), marginX, curY);
+
+  curY += 28;
+  ctx.fillStyle = textColor;
+  ctx.font = 'bold 26px Inter, sans-serif';
+  ctx.fillText('İÇİNDEKİLER / TABLE OF CONTENTS', marginX, curY);
+
+  curY += 14;
+  // Divider line
+  ctx.strokeStyle = isDark ? '#334155' : '#e2e8f0';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(marginX, curY);
+  ctx.lineTo(options.width - marginX, curY);
+  ctx.stroke();
+
+  curY += 34;
+
+  // Items
+  const lineHeight = 32;
+  const maxItemsPerPage = Math.floor((options.height - curY - 50) / lineHeight);
+  const itemsToRender = outlineItems.slice(0, maxItemsPerPage);
+
+  for (const item of itemsToRender) {
+    const indent = (item.level || 0) * 22;
+    const itemX = marginX + indent;
+    const pageNumText = `s. ${item.pageIndex + 1}`;
+
+    if (item.level === 0) {
+      ctx.font = 'bold 14px Inter, sans-serif';
+      ctx.fillStyle = textColor;
+    } else if (item.level === 1) {
+      ctx.font = '500 13px Inter, sans-serif';
+      ctx.fillStyle = textColor;
+    } else {
+      ctx.font = 'normal 12px Inter, sans-serif';
+      ctx.fillStyle = mutedColor;
+    }
+
+    const titleMetrics = ctx.measureText(item.title);
+    ctx.font = '600 12px Inter, sans-serif';
+    const pageMetrics = ctx.measureText(pageNumText);
+
+    if (item.level === 0) {
+      ctx.font = 'bold 14px Inter, sans-serif';
+      ctx.fillStyle = textColor;
+    } else if (item.level === 1) {
+      ctx.font = '500 13px Inter, sans-serif';
+      ctx.fillStyle = textColor;
+    } else {
+      ctx.font = 'normal 12px Inter, sans-serif';
+      ctx.fillStyle = mutedColor;
+    }
+    ctx.fillText(item.title, itemX, curY);
+
+    // Page number
+    const pageNumX = options.width - marginX - pageMetrics.width;
+    ctx.font = '600 12px Inter, sans-serif';
+    ctx.fillStyle = accentColor;
+    ctx.fillText(pageNumText, pageNumX, curY);
+
+    // Dotted leader
+    const dotStartX = itemX + titleMetrics.width + 12;
+    const dotEndX = pageNumX - 12;
+    if (dotEndX > dotStartX) {
+      ctx.save();
+      ctx.setLineDash([2, 5]);
+      ctx.strokeStyle = dotColor;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(dotStartX, curY - 3);
+      ctx.lineTo(dotEndX, curY - 3);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    curY += lineHeight;
+  }
+
+  // Footer Note
+  ctx.font = 'italic 10px Inter, sans-serif';
+  ctx.fillStyle = mutedColor;
+  ctx.textAlign = 'center';
+  ctx.fillText('Notefree Fihrist & Doküman İndeksi Motoru', options.width / 2, options.height - 24);
+
+  return canvas;
+}
+
+/**
+ * Exports full notebook or page range to a crisp PDF document with all layers included,
+ * embedding native PDF Bookmarks / Outline tree and optional visual Table of Contents page.
+ */
 export async function exportNotebookWithAllLayers(
   notebook: Notebook,
   options: ExportOptions
 ): Promise<Blob> {
   const pdfDoc = await PDFDocument.create();
+  const pageRefs: PDFRef[] = [];
 
   let pagesToExport: Page[] = [];
 
@@ -579,6 +772,35 @@ export async function exportNotebookWithAllLayers(
   }
 
   const totalPages = notebook.pages.length;
+  let tocPageOffset = 0;
+
+  // FAZ AK: Optional Visual Table of Contents Page at page 0
+  if (
+    options.insertTableOfContentsPage &&
+    notebook.pdfOutline &&
+    notebook.pdfOutline.length > 0
+  ) {
+    const refPage = notebook.pages[0] || { width: 800, height: 1100 };
+    const tocCanvas = await renderTableOfContentsPage(notebook, notebook.pdfOutline, {
+      width: refPage.width,
+      height: refPage.height,
+      scale: options.scale,
+    });
+
+    const tocDataUrl = tocCanvas.toDataURL('image/jpeg', 0.94);
+    const tocImgBytes = await fetch(tocDataUrl).then((r) => r.arrayBuffer());
+    const embeddedTocImg = await pdfDoc.embedJpg(tocImgBytes);
+
+    const tocPdfPage = pdfDoc.addPage([refPage.width, refPage.height]);
+    pageRefs.push(tocPdfPage.ref);
+    tocPdfPage.drawImage(embeddedTocImg, {
+      x: 0,
+      y: 0,
+      width: refPage.width,
+      height: refPage.height,
+    });
+    tocPageOffset = 1;
+  }
 
   for (let i = 0; i < pagesToExport.length; i++) {
     const page = pagesToExport[i];
@@ -601,12 +823,32 @@ export async function exportNotebookWithAllLayers(
     const embeddedImg = await pdfDoc.embedJpg(imgBytes);
 
     const pdfPage = pdfDoc.addPage([page.width, page.height]);
+    pageRefs.push(pdfPage.ref);
     pdfPage.drawImage(embeddedImg, {
       x: 0,
       y: 0,
       width: page.width,
       height: page.height,
     });
+  }
+
+  // FAZ AK: Embed standard PDF Bookmarks / Outline tree in PDF Catalog
+  if (options.includePdfBookmarks !== false) {
+    const outlineItems: PdfOutlineItem[] =
+      notebook.pdfOutline && notebook.pdfOutline.length > 0
+        ? notebook.pdfOutline
+        : notebook.pages
+            .map((pg, idx) => ({
+              id: `p_bm_${idx}`,
+              title: pg.title || (pg.isBookmarked ? `Sayfa ${idx + 1} ★` : ''),
+              pageIndex: idx,
+              level: 0,
+            }))
+            .filter((it) => it.title.trim().length > 0);
+
+    if (outlineItems.length > 0) {
+      embedPdfBookmarks(pdfDoc, pageRefs, outlineItems, tocPageOffset);
+    }
   }
 
   const pdfBytes = await pdfDoc.save();

@@ -18,6 +18,7 @@ import {
   Youtube,
   Trash2,
   Layers,
+  ListTree,
   LayoutTemplate,
   Users,
   Menu,
@@ -164,6 +165,8 @@ export const Toolbar: React.FC = () => {
     closeDualNotebook,
     layersDrawerOpen,
     setLayersDrawerOpen,
+    outlineDrawerOpen,
+    setOutlineDrawerOpen,
     toggleAngleSnap,
     toggleGridSnap,
     toggleAutoDetectShape,
@@ -1293,6 +1296,20 @@ export const Toolbar: React.FC = () => {
               <Layers size={17} />
             </button>
 
+            {/* FAZ AK: Outline & Table of Contents Drawer */}
+            <button
+              type="button"
+              onClick={() => setOutlineDrawerOpen(!outlineDrawerOpen)}
+              className={`p-2 rounded-xl transition-all ${
+                outlineDrawerOpen
+                  ? 'bg-indigo-600 text-white'
+                  : 'text-slate-400 hover:text-indigo-400 hover:bg-slate-800'
+              }`}
+              title="İçindekiler & Fihrist (O)"
+            >
+              <ListTree size={17} />
+            </button>
+
             {/* Template Selector */}
             <button
               type="button"
@@ -1435,6 +1452,18 @@ export const Toolbar: React.FC = () => {
                     >
                       <Layers size={15} className="text-cyan-400 shrink-0" />
                       <span className="truncate">Katmanlar</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setOutlineDrawerOpen(true);
+                        closeDropdown();
+                      }}
+                      className="p-2 bg-slate-800/60 hover:bg-slate-800 border border-slate-750 rounded-xl flex items-center gap-2 text-slate-300 hover:text-white text-left"
+                    >
+                      <ListTree size={15} className="text-indigo-400 shrink-0" />
+                      <span className="truncate">İçindekiler</span>
                     </button>
 
                     <button

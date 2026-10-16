@@ -38,6 +38,8 @@ export const Sidebar: React.FC = () => {
     setPageTitle,
     addOutlineItem,
     deleteOutlineItem,
+    setOutlineDrawerOpen,
+    generateAutoOutlineFromNotebook,
     isNotebookSessionUnlocked,
   } = useNotebookStore();
 
@@ -389,6 +391,27 @@ export const Sidebar: React.FC = () => {
         {/* 4. Outline (Table of Contents) Tab */}
         {activeTab === 'outline' && (
           <div className="space-y-3">
+            {/* Quick Actions Header */}
+            <div className="flex items-center gap-1.5 pb-2 border-b border-slate-800">
+              <button
+                onClick={() => {
+                  generateAutoOutlineFromNotebook();
+                }}
+                className="flex-1 py-1.5 px-2 bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/30 text-indigo-300 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-all"
+                title="Sayfalardan ve yer imlerinden otomatik üret"
+              >
+                <Sparkles size={13} className="text-indigo-400" />
+                <span>Otomatik Üret</span>
+              </button>
+              <button
+                onClick={() => setOutlineDrawerOpen(true)}
+                className="p-1.5 bg-slate-800 hover:bg-slate-750 text-slate-300 hover:text-white border border-slate-700 rounded-xl text-xs font-semibold flex items-center gap-1 transition-all"
+                title="Gelişmiş Fihrist Stüdyosu Çekmecesini Aç"
+              >
+                <ListTree size={14} className="text-indigo-400" />
+              </button>
+            </div>
+
             {/* 4.1 PDF Hierarchical Outline / Bookmarks Tree (if present) */}
             {activeNotebook?.pdfOutline && activeNotebook.pdfOutline.length > 0 && (
               <div className="space-y-1.5 pb-2 border-b border-slate-800">

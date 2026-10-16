@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, Keyboard, Sparkles, PenTool, Eraser, Scissors, Highlighter, Type, StickyNote, Ruler, ZoomIn, Bookmark, Search, RotateCcw, ArrowLeftRight, Map as MapIcon, Link2, TrendingUp, Stamp, FileDown, Table2, Workflow } from 'lucide-react';
+import { X, Keyboard, Sparkles, PenTool, Eraser, Scissors, Highlighter, Type, StickyNote, Ruler, ZoomIn, Bookmark, Search, RotateCcw, ArrowLeftRight, Map as MapIcon, Link2, TrendingUp, Stamp, FileDown, Table2, Workflow, ListTree } from 'lucide-react';
 import { triggerHaptic } from '../../engine/hapticFeedback';
 
 interface ShortcutsModalProps {
@@ -30,6 +30,7 @@ const UTILITY_SHORTCUTS: ShortcutItem[] = [
   { key: 'Dışa Aktar', label: 'PDF / Belge Dışa Aktarma Stüdyosu', desc: 'Filigranlı, Bates numaralı, çok katmanlı PDF veya Retina PNG/JPEG olarak dışa aktar', icon: <FileDown size={15} /> },
   { key: 'Damga & Kaşe', label: 'Dinamik Kaşe & Mühür Stüdyosu', desc: 'Gerçekçi mühür efektli onay/dikkat damgaları ve kişisel çizim çıkartmalar tasarla', icon: <Stamp size={15} /> },
   { key: 'Grafik Çizici', label: 'STEM 2D Fonksiyon Çizici', desc: 'Matematiksel fonksiyon grafikleri çiz, kökleri analiz et ve sayfaya vektör olarak damgala', icon: <TrendingUp size={15} /> },
+  { key: 'O', label: 'İçindekiler & Fihrist (Outline)', desc: 'Otomatik başlık hiyerarşisi, sayfa fihristi ve PDF yer imleri çekmecesini aç/kapat', icon: <ListTree size={15} /> },
   { key: 'J', label: 'Ajanda Sekmeleri (Tabs)', desc: 'Dijital ajanda fihrist ve kenar sekmelerini göster/gizle', icon: <Bookmark size={15} /> },
   { key: 'N', label: 'Tuval Radarı (Mini Harita)', desc: 'İnteraktif radar mini harita ve hassas gezgini aç/kapat', icon: <MapIcon size={15} /> },
   { key: 'Q', label: 'Hızlı Karalama', desc: 'Yüzen Quick Note penceresini aç/kapat', icon: <Sparkles size={15} /> },

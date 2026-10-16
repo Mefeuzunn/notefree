@@ -15,6 +15,7 @@ import { StudySetsModal } from './components/flashcards/StudySetsModal';
 import { MathSolverModal } from './components/modals/MathSolverModal';
 import { SearchModal } from './components/modals/SearchModal';
 import { LayersDrawer } from './components/modals/LayersDrawer';
+import { OutlineDrawer } from './components/modals/OutlineDrawer';
 import { CollaborationModal } from './components/modals/CollaborationModal';
 import { FloatingScratchpad } from './components/scratchpad/FloatingScratchpad';
 import { ShortcutsModal } from './components/modals/ShortcutsModal';
@@ -171,6 +172,7 @@ export const App: React.FC = () => {
       <NewNotebookModal />
       <StickersDrawer />
       <LayersDrawer />
+      <OutlineDrawer />
       <StudySetsModal />
       <MathSolverModal />
       <SearchModal />

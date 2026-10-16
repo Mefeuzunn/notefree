@@ -94,6 +94,8 @@ export const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose }) => 
   const [includeStickyNotes, setIncludeStickyNotes] = useState<boolean>(true);
   const [includeTexts, setIncludeTexts] = useState<boolean>(true);
   const [includeStickers, setIncludeStickers] = useState<boolean>(true);
+  const [includePdfBookmarks, setIncludePdfBookmarks] = useState<boolean>(true);
+  const [insertTableOfContentsPage, setInsertTableOfContentsPage] = useState<boolean>(false);
 
   // Watermark Options
   const [watermarkEnabled, setWatermarkEnabled] = useState<boolean>(false);
@@ -288,6 +290,8 @@ export const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose }) => 
         includeStickyNotes,
         includeTexts,
         includeStickers,
+        includePdfBookmarks,
+        insertTableOfContentsPage,
         watermark: watermarkOpts,
         headerFooter: headerFooterOpts,
       };
@@ -677,6 +681,37 @@ export const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose }) => 
                       className="rounded accent-indigo-500 w-4 h-4 cursor-pointer"
                     />
                   </label>
+
+                  {format === 'pdf' && (
+                    <>
+                      <div className="pt-1.5 border-t border-slate-750/70" />
+                      <label className="flex items-center justify-between text-xs cursor-pointer select-none">
+                        <div>
+                          <span className="text-slate-200 font-medium block">PDF Yer İmleri (Bookmarks & Outline)</span>
+                          <span className="text-[10px] text-slate-400">Acrobat ve Apple Books için yerel başlık ağacı</span>
+                        </div>
+                        <input
+                          type="checkbox"
+                          checked={includePdfBookmarks}
+                          onChange={(e) => setIncludePdfBookmarks(e.target.checked)}
+                          className="rounded accent-indigo-500 w-4 h-4 cursor-pointer"
+                        />
+                      </label>
+
+                      <label className="flex items-center justify-between text-xs cursor-pointer select-none">
+                        <div>
+                          <span className="text-slate-200 font-medium block">İçindekiler Tablosu Sayfası Ekle</span>
+                          <span className="text-[10px] text-slate-400">İlk sayfaya görsel fihrist dizini ekler</span>
+                        </div>
+                        <input
+                          type="checkbox"
+                          checked={insertTableOfContentsPage}
+                          onChange={(e) => setInsertTableOfContentsPage(e.target.checked)}
+                          className="rounded accent-indigo-500 w-4 h-4 cursor-pointer"
+                        />
+                      </label>
+                    </>
+                  )}
                 </div>
               </div>
             )}
