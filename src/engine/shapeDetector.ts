@@ -280,7 +280,224 @@ export function generateFreeTrianglePoints(
 }
 
 /**
- * FAZ I – Shape Vertex Editor
+ * FAZ AI – Generates regular or deformed polygon points (Pentagon, Hexagon, Diamond)
+ */
+export function generatePolygonPoints(
+  cx: number,
+  cy: number,
+  rx: number,
+  ry: number,
+  sides: number,
+  startAngle: number = -Math.PI / 2
+): StrokePoint[] {
+  const vertices: { x: number; y: number }[] = [];
+  for (let i = 0; i < sides; i++) {
+    const a = startAngle + (i * 2 * Math.PI) / sides;
+    vertices.push({
+      x: cx + rx * Math.cos(a),
+      y: cy + ry * Math.sin(a),
+    });
+  }
+  vertices.push(vertices[0]); // close loop
+  const pts: StrokePoint[] = [];
+  for (let i = 0; i < sides; i++) {
+    const p1 = vertices[i];
+    const p2 = vertices[i + 1];
+    for (let step = 0; step < 10; step++) {
+      const t = step / 10;
+      pts.push({
+        x: p1.x + (p2.x - p1.x) * t,
+        y: p1.y + (p2.y - p1.y) * t,
+        pressure: 0.5,
+      });
+    }
+  }
+  pts.push({ x: vertices[0].x, y: vertices[0].y, pressure: 0.5 });
+  return pts;
+}
+
+/**
+ * FAZ AI – Generates 5-pointed star points
+ */
+export function generateStarPoints(
+  cx: number,
+  cy: number,
+  outerRx: number,
+  outerRy: number,
+  pointsCount: number = 5
+): StrokePoint[] {
+  const innerRx = outerRx * 0.42;
+  const innerRy = outerRy * 0.42;
+  const totalVertices = pointsCount * 2;
+  const vertices: { x: number; y: number }[] = [];
+  const startAngle = -Math.PI / 2;
+
+  for (let i = 0; i < totalVertices; i++) {
+    const a = startAngle + (i * Math.PI) / pointsCount;
+    const rX = i % 2 === 0 ? outerRx : innerRx;
+    const rY = i % 2 === 0 ? outerRy : innerRy;
+    vertices.push({
+      x: cx + rX * Math.cos(a),
+      y: cy + rY * Math.sin(a),
+    });
+  }
+  vertices.push(vertices[0]); // close loop
+  const pts: StrokePoint[] = [];
+  for (let i = 0; i < totalVertices; i++) {
+    const p1 = vertices[i];
+    const p2 = vertices[i + 1];
+    for (let step = 0; step < 8; step++) {
+      const t = step / 8;
+      pts.push({
+        x: p1.x + (p2.x - p1.x) * t,
+        y: p1.y + (p2.y - p1.y) * t,
+        pressure: 0.5,
+      });
+    }
+  }
+  pts.push({ x: vertices[0].x, y: vertices[0].y, pressure: 0.5 });
+  return pts;
+}
+
+/**
+ * FAZ AI – Generates comic / callout speech bubble points
+ */
+export function generateCalloutPoints(
+  minX: number,
+  minY: number,
+  maxX: number,
+  maxY: number,
+  tailX?: number,
+  tailY?: number
+): StrokePoint[] {
+  const tailH = Math.min(30, (maxY - minY) * 0.25);
+  const boxBottom = maxY - tailH;
+  const tX = tailX !== undefined ? tailX : minX + 20;
+  const tY = tailY !== undefined ? tailY : maxY;
+
+  const corners = [
+    { x: minX, y: minY },
+    { x: maxX, y: minY },
+    { x: maxX, y: boxBottom },
+    { x: minX + 50, y: boxBottom },
+    { x: tX, y: tY }, // speech tail tip
+    { x: minX + 25, y: boxBottom },
+    { x: minX, y: boxBottom },
+    { x: minX, y: minY },
+  ];
+
+  const pts: StrokePoint[] = [];
+  for (let i = 0; i < corners.length - 1; i++) {
+    const p1 = corners[i];
+    const p2 = corners[i + 1];
+    for (let step = 0; step < 10; step++) {
+      const t = step / 10;
+      pts.push({
+        x: p1.x + (p2.x - p1.x) * t,
+        y: p1.y + (p2.y - p1.y) * t,
+        pressure: 0.5,
+      });
+    }
+  }
+  pts.push({ x: corners[0].x, y: corners[0].y, pressure: 0.5 });
+  return pts;
+}
+
+/**
+ * FAZ AI – Generates curly bracket points for mathematics, grouping, and formula notes
+ */
+export function generateCurlyBracketPoints(
+  topX: number,
+  topY: number,
+  botX: number,
+  botY: number,
+  depth: number = 18,
+  side: 'left' | 'right' = 'left'
+): StrokePoint[] {
+  const dir = side === 'left' ? -1 : 1;
+  const midY = (topY + botY) / 2;
+  const midX = (topX + botX) / 2;
+  const cuspX = midX + dir * depth;
+  const halfH = Math.abs(botY - topY) / 2;
+
+  const pts: StrokePoint[] = [];
+  const steps = 16;
+
+  // Top half curve to cusp
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    const p0 = { x: topX, y: topY };
+    const p1 = { x: topX + dir * (depth * 0.7), y: topY };
+    const p2 = { x: cuspX - dir * (depth * 0.3), y: midY - halfH * 0.2 };
+    const p3 = { x: cuspX, y: midY };
+
+    const it = 1 - t;
+    const x = it ** 3 * p0.x + 3 * it ** 2 * t * p1.x + 3 * it * t ** 2 * p2.x + t ** 3 * p3.x;
+    const y = it ** 3 * p0.y + 3 * it ** 2 * t * p1.y + 3 * it * t ** 2 * p2.y + t ** 3 * p3.y;
+    pts.push({ x, y, pressure: 0.5 });
+  }
+
+  // Bottom half curve from cusp to bottom
+  for (let i = 1; i <= steps; i++) {
+    const t = i / steps;
+    const p0 = { x: cuspX, y: midY };
+    const p1 = { x: cuspX - dir * (depth * 0.3), y: midY + halfH * 0.2 };
+    const p2 = { x: botX + dir * (depth * 0.7), y: botY };
+    const p3 = { x: botX, y: botY };
+
+    const it = 1 - t;
+    const x = it ** 3 * p0.x + 3 * it ** 2 * t * p1.x + 3 * it * t ** 2 * p2.x + t ** 3 * p3.x;
+    const y = it ** 3 * p0.y + 3 * it ** 2 * t * p1.y + 3 * it * t ** 2 * p2.y + t ** 3 * p3.y;
+    pts.push({ x, y, pressure: 0.5 });
+  }
+
+  return pts;
+}
+
+/**
+ * FAZ AI – Generates circular / curved arc points
+ */
+export function generateArcPoints(
+  start: StrokePoint,
+  end: StrokePoint,
+  apex?: StrokePoint
+): StrokePoint[] {
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+  const dist = Math.hypot(dx, dy);
+
+  let cp: { x: number; y: number };
+  if (apex) {
+    cp = {
+      x: 2 * apex.x - 0.5 * start.x - 0.5 * end.x,
+      y: 2 * apex.y - 0.5 * start.y - 0.5 * end.y,
+    };
+  } else {
+    const midX = (start.x + end.x) / 2;
+    const midY = (start.y + end.y) / 2;
+    const normX = dist > 0 ? -dy / dist : 0;
+    const normY = dist > 0 ? dx / dist : 0;
+    const sagitta = dist * 0.25;
+    cp = {
+      x: midX + normX * sagitta,
+      y: midY + normY * sagitta,
+    };
+  }
+
+  const pts: StrokePoint[] = [];
+  const steps = 30;
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    const it = 1 - t;
+    const x = it * it * start.x + 2 * it * t * cp.x + t * t * end.x;
+    const y = it * it * start.y + 2 * it * t * cp.y + t * t * end.y;
+    pts.push({ x, y, pressure: 0.5 });
+  }
+  return pts;
+}
+
+/**
+ * FAZ I & FAZ AI – Shape Vertex Editor
  * Rebuilds the StrokePoint array for a shape from its (possibly edited) control nodes.
  * This allows dragging a corner handle to morph the shape after it has been drawn.
  */
@@ -345,6 +562,94 @@ export function rebuildShapeFromNodes(
         { x: apex.x, y: apex.y, pressure: 0.5 },
         { x: br.x, y: br.y, pressure: 0.5 },
         { x: bl.x, y: bl.y, pressure: 0.5 }
+      );
+    }
+
+    case 'pentagon':
+    case 'hexagon': {
+      const vNodes = nodes.filter((n) => n.id.startsWith('v'));
+      if (vNodes.length < 3) return [];
+      const pts: StrokePoint[] = [];
+      for (let i = 0; i < vNodes.length; i++) {
+        const p1 = vNodes[i];
+        const p2 = vNodes[(i + 1) % vNodes.length];
+        for (let step = 0; step < 10; step++) {
+          const t = step / 10;
+          pts.push({
+            x: p1.x + (p2.x - p1.x) * t,
+            y: p1.y + (p2.y - p1.y) * t,
+            pressure: 0.5,
+          });
+        }
+      }
+      pts.push({ x: vNodes[0].x, y: vNodes[0].y, pressure: 0.5 });
+      return pts;
+    }
+
+    case 'diamond': {
+      const top = find('top');
+      const right = find('right');
+      const bottom = find('bottom');
+      const left = find('left');
+      if (!top || !right || !bottom || !left) return [];
+      const corners = [top, right, bottom, left, top];
+      const pts: StrokePoint[] = [];
+      for (let i = 0; i < 4; i++) {
+        const p1 = corners[i];
+        const p2 = corners[i + 1];
+        for (let step = 0; step < 10; step++) {
+          const t = step / 10;
+          pts.push({
+            x: p1.x + (p2.x - p1.x) * t,
+            y: p1.y + (p2.y - p1.y) * t,
+            pressure: 0.5,
+          });
+        }
+      }
+      pts.push({ x: top.x, y: top.y, pressure: 0.5 });
+      return pts;
+    }
+
+    case 'star': {
+      const cxNode = find('cx') || find('center');
+      const cx = cxNode ? cxNode.x : 0;
+      const cy = cxNode ? cxNode.y : 0;
+      const tip0 = find('tip0');
+      const rx = tip0 ? Math.hypot(tip0.x - cx, tip0.y - cy) : 50;
+      return generateStarPoints(cx, cy, rx, rx);
+    }
+
+    case 'callout': {
+      const tl = find('tl');
+      const br = find('br');
+      const tail = find('tail');
+      if (!tl || !br) return [];
+      const minX = Math.min(tl.x, br.x);
+      const maxX = Math.max(tl.x, br.x);
+      const minY = Math.min(tl.y, br.y);
+      const maxY = Math.max(tl.y, br.y);
+      return generateCalloutPoints(minX, minY, maxX, maxY, tail?.x, tail?.y);
+    }
+
+    case 'bracket': {
+      const top = find('top');
+      const bottom = find('bottom');
+      const cusp = find('cusp');
+      if (!top || !bottom) return [];
+      const depth = cusp ? Math.abs(cusp.x - (top.x + bottom.x) / 2) : 18;
+      const side = cusp && cusp.x > (top.x + bottom.x) / 2 ? 'right' : 'left';
+      return generateCurlyBracketPoints(top.x, top.y, bottom.x, bottom.y, depth, side);
+    }
+
+    case 'arc': {
+      const s = find('start');
+      const e = find('end');
+      const apex = find('apex');
+      if (!s || !e) return [];
+      return generateArcPoints(
+        { x: s.x, y: s.y, pressure: 0.5 },
+        { x: e.x, y: e.y, pressure: 0.5 },
+        apex ? { x: apex.x, y: apex.y, pressure: 0.5 } : undefined
       );
     }
 
@@ -465,6 +770,55 @@ export function rebuildShapeAndNodesFromDrag(
         { x: updatedBl.x, y: updatedBl.y, pressure: 0.5 }
       );
       return { points, nodes };
+    }
+
+    case 'pentagon':
+    case 'hexagon': {
+      const updatedNodes = currentNodes.map((n) =>
+        n.id === draggedNodeId ? { ...n, x: newPos.x, y: newPos.y } : n
+      );
+      const points = rebuildShapeFromNodes(shapeType, updatedNodes);
+      return { points, nodes: updatedNodes };
+    }
+
+    case 'diamond': {
+      const updatedNodes = currentNodes.map((n) =>
+        n.id === draggedNodeId ? { ...n, x: newPos.x, y: newPos.y } : n
+      );
+      const points = rebuildShapeFromNodes('diamond', updatedNodes);
+      return { points, nodes: updatedNodes };
+    }
+
+    case 'star': {
+      const updatedNodes = currentNodes.map((n) =>
+        n.id === draggedNodeId ? { ...n, x: newPos.x, y: newPos.y } : n
+      );
+      const points = rebuildShapeFromNodes('star', updatedNodes);
+      return { points, nodes: updatedNodes };
+    }
+
+    case 'callout': {
+      const updatedNodes = currentNodes.map((n) =>
+        n.id === draggedNodeId ? { ...n, x: newPos.x, y: newPos.y } : n
+      );
+      const points = rebuildShapeFromNodes('callout', updatedNodes);
+      return { points, nodes: updatedNodes };
+    }
+
+    case 'bracket': {
+      const updatedNodes = currentNodes.map((n) =>
+        n.id === draggedNodeId ? { ...n, x: newPos.x, y: newPos.y } : n
+      );
+      const points = rebuildShapeFromNodes('bracket', updatedNodes);
+      return { points, nodes: updatedNodes };
+    }
+
+    case 'arc': {
+      const updatedNodes = currentNodes.map((n) =>
+        n.id === draggedNodeId ? { ...n, x: newPos.x, y: newPos.y } : n
+      );
+      const points = rebuildShapeFromNodes('arc', updatedNodes);
+      return { points, nodes: updatedNodes };
     }
 
     default:

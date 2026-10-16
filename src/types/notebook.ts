@@ -30,7 +30,19 @@ export type EraserMode = 'stroke' | 'pixel';
 
 export type RulerUnit = 'cm' | 'mm' | 'in' | 'px';
 
-export type ShapeType = 'line' | 'rectangle' | 'circle' | 'triangle' | 'arrow';
+export type ShapeType =
+  | 'line'
+  | 'rectangle'
+  | 'circle'
+  | 'triangle'
+  | 'arrow'
+  | 'pentagon'
+  | 'hexagon'
+  | 'diamond'
+  | 'star'
+  | 'callout'
+  | 'bracket'
+  | 'arc';
 
 export type PageTemplate =
   | 'blank'
@@ -88,7 +100,7 @@ export interface ShapeControlNode {
   id: string;    // e.g. 'tl' | 'tr' | 'bl' | 'br' | 'start' | 'end' | 'cx' | 'cy' | 'rx' | 'ry' | 'apex' | 'mid-l' | 'mid-r'
   x: number;
   y: number;
-  role: 'corner' | 'edge' | 'center' | 'apex' | 'radius' | 'endpoint' | 'barb';
+  role: 'corner' | 'edge' | 'center' | 'apex' | 'radius' | 'endpoint' | 'barb' | 'tip' | 'tail' | 'cusp' | 'vertex';
 }
 
 export interface Stroke {

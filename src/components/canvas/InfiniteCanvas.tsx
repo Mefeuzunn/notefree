@@ -18,6 +18,11 @@ import {
   generateEllipsePoints,
   generateRectanglePoints,
   generateTrianglePoints,
+  generatePolygonPoints,
+  generateStarPoints,
+  generateCalloutPoints,
+  generateCurlyBracketPoints,
+  generateArcPoints,
   interpolateLine,
   applyPrecisionSnapping,
 } from '../../engine/shapeDetector';
@@ -277,6 +282,56 @@ export const InfiniteCanvas: React.FC = () => {
           Math.max(start.y, end.y)
         );
         break;
+      case 'pentagon': {
+        const cx = (start.x + end.x) / 2;
+        const cy = (start.y + end.y) / 2;
+        const rx = Math.abs(end.x - start.x) / 2;
+        const ry = Math.abs(end.y - start.y) / 2;
+        shapePoints = generatePolygonPoints(cx, cy, rx, ry, 5);
+        break;
+      }
+      case 'hexagon': {
+        const cx = (start.x + end.x) / 2;
+        const cy = (start.y + end.y) / 2;
+        const rx = Math.abs(end.x - start.x) / 2;
+        const ry = Math.abs(end.y - start.y) / 2;
+        shapePoints = generatePolygonPoints(cx, cy, rx, ry, 6);
+        break;
+      }
+      case 'diamond': {
+        const cx = (start.x + end.x) / 2;
+        const cy = (start.y + end.y) / 2;
+        const rx = Math.abs(end.x - start.x) / 2;
+        const ry = Math.abs(end.y - start.y) / 2;
+        shapePoints = generatePolygonPoints(cx, cy, rx, ry, 4, -Math.PI / 2);
+        break;
+      }
+      case 'star': {
+        const cx = (start.x + end.x) / 2;
+        const cy = (start.y + end.y) / 2;
+        const rx = Math.abs(end.x - start.x) / 2;
+        const ry = Math.abs(end.y - start.y) / 2;
+        shapePoints = generateStarPoints(cx, cy, rx, ry, 5);
+        break;
+      }
+      case 'callout':
+        shapePoints = generateCalloutPoints(
+          Math.min(start.x, end.x),
+          Math.min(start.y, end.y),
+          Math.max(start.x, end.x),
+          Math.max(start.y, end.y)
+        );
+        break;
+      case 'bracket': {
+        const cx = (start.x + end.x) / 2;
+        const topY = Math.min(start.y, end.y);
+        const botY = Math.max(start.y, end.y);
+        shapePoints = generateCurlyBracketPoints(cx, topY, cx, botY, 18, 'left');
+        break;
+      }
+      case 'arc':
+        shapePoints = generateArcPoints(start, end);
+        break;
     }
 
     drawStrokeOnCanvas(ctx, {
@@ -518,6 +573,56 @@ export const InfiniteCanvas: React.FC = () => {
             Math.max(start.x, end.x),
             Math.max(start.y, end.y)
           );
+          break;
+        case 'pentagon': {
+          const cx = (start.x + end.x) / 2;
+          const cy = (start.y + end.y) / 2;
+          const rx = Math.abs(end.x - start.x) / 2;
+          const ry = Math.abs(end.y - start.y) / 2;
+          finalPoints = generatePolygonPoints(cx, cy, rx, ry, 5);
+          break;
+        }
+        case 'hexagon': {
+          const cx = (start.x + end.x) / 2;
+          const cy = (start.y + end.y) / 2;
+          const rx = Math.abs(end.x - start.x) / 2;
+          const ry = Math.abs(end.y - start.y) / 2;
+          finalPoints = generatePolygonPoints(cx, cy, rx, ry, 6);
+          break;
+        }
+        case 'diamond': {
+          const cx = (start.x + end.x) / 2;
+          const cy = (start.y + end.y) / 2;
+          const rx = Math.abs(end.x - start.x) / 2;
+          const ry = Math.abs(end.y - start.y) / 2;
+          finalPoints = generatePolygonPoints(cx, cy, rx, ry, 4, -Math.PI / 2);
+          break;
+        }
+        case 'star': {
+          const cx = (start.x + end.x) / 2;
+          const cy = (start.y + end.y) / 2;
+          const rx = Math.abs(end.x - start.x) / 2;
+          const ry = Math.abs(end.y - start.y) / 2;
+          finalPoints = generateStarPoints(cx, cy, rx, ry, 5);
+          break;
+        }
+        case 'callout':
+          finalPoints = generateCalloutPoints(
+            Math.min(start.x, end.x),
+            Math.min(start.y, end.y),
+            Math.max(start.x, end.x),
+            Math.max(start.y, end.y)
+          );
+          break;
+        case 'bracket': {
+          const cx = (start.x + end.x) / 2;
+          const topY = Math.min(start.y, end.y);
+          const botY = Math.max(start.y, end.y);
+          finalPoints = generateCurlyBracketPoints(cx, topY, cx, botY, 18, 'left');
+          break;
+        }
+        case 'arc':
+          finalPoints = generateArcPoints(start, end);
           break;
       }
     } else if (toolSettings.autoDetectShape) {

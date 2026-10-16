@@ -45,6 +45,10 @@ const ROLE_COLORS: Record<string, string> = {
   'rx-handle': 'border-rose-400 bg-rose-100',
   'ry-handle': 'border-rose-400 bg-rose-100',
   apex:      'border-purple-400 bg-purple-100',
+  vertex:    'border-indigo-400 bg-white',
+  tip:       'border-amber-400 bg-amber-100',
+  cusp:      'border-purple-400 bg-purple-100',
+  tail:      'border-orange-400 bg-orange-100',
   // named corners for rectangle
   tl: 'border-indigo-400 bg-white',
   tr: 'border-indigo-400 bg-white',

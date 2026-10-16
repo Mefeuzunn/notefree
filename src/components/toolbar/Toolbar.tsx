@@ -59,6 +59,16 @@ import {
   Stamp,
   Table2,
   Workflow,
+  Minus,
+  ArrowRight,
+  Square,
+  Circle,
+  Triangle,
+  Diamond,
+  Pentagon,
+  Hexagon,
+  MessageSquare,
+  Braces,
   MoreHorizontal,
   X,
   ChevronDown,
@@ -81,6 +91,21 @@ const COLOR_PALETTE = [
   '#4ade80', // Highlighter mint
   '#ffffff', // Pure white
   '#64748b', // Slate gray
+];
+
+const SHAPE_BUTTONS: { type: ShapeType; label: string; icon: React.ReactNode }[] = [
+  { type: 'line', label: 'Çizgi', icon: <Minus size={14} /> },
+  { type: 'arrow', label: 'Ok', icon: <ArrowRight size={14} /> },
+  { type: 'rectangle', label: 'Kare', icon: <Square size={14} /> },
+  { type: 'circle', label: 'Daire', icon: <Circle size={14} /> },
+  { type: 'triangle', label: 'Üçgen', icon: <Triangle size={14} /> },
+  { type: 'diamond', label: 'Baklava', icon: <Diamond size={14} /> },
+  { type: 'pentagon', label: 'Beşgen', icon: <Pentagon size={14} /> },
+  { type: 'hexagon', label: 'Altıgen', icon: <Hexagon size={14} /> },
+  { type: 'star', label: 'Yıldız', icon: <Star size={14} /> },
+  { type: 'callout', label: 'Balon', icon: <MessageSquare size={14} /> },
+  { type: 'bracket', label: 'Parantez', icon: <Braces size={14} /> },
+  { type: 'arc', label: 'Yay', icon: <Spline size={14} /> },
 ];
 
 export const Toolbar: React.FC = () => {
@@ -571,34 +596,26 @@ export const Toolbar: React.FC = () => {
                 <div className="text-[11px] font-semibold text-slate-400 px-1 uppercase tracking-wider">
                   Şekil Türü
                 </div>
-                <div className="flex gap-1">
-                  {(['line', 'arrow', 'rectangle', 'circle', 'triangle'] as ShapeType[]).map(
-                    (shp) => (
-                      <button
-                        key={shp}
-                        type="button"
-                        onClick={() => {
-                          setSelectedShape(shp);
-                          closeDropdown();
-                        }}
-                        className={`flex-1 py-1.5 text-xs rounded-lg capitalize transition-colors font-medium text-center ${
-                          toolSettings.selectedShape === shp
-                            ? 'bg-indigo-600 text-white shadow'
-                            : 'text-slate-300 hover:bg-slate-750'
-                        }`}
-                      >
-                        {shp === 'line'
-                          ? 'Çizgi'
-                          : shp === 'arrow'
-                          ? 'Ok'
-                          : shp === 'rectangle'
-                          ? 'Kare'
-                          : shp === 'circle'
-                          ? 'Daire'
-                          : 'Üçgen'}
-                      </button>
-                    )
-                  )}
+                <div className="grid grid-cols-4 gap-1.5">
+                  {SHAPE_BUTTONS.map((shp) => (
+                    <button
+                      key={shp.type}
+                      type="button"
+                      onClick={() => {
+                        setSelectedShape(shp.type);
+                        closeDropdown();
+                      }}
+                      className={`flex items-center justify-center gap-1.5 py-1.5 px-2 text-[11px] rounded-lg transition-colors font-medium ${
+                        toolSettings.selectedShape === shp.type
+                          ? 'bg-indigo-600 text-white shadow-sm ring-1 ring-indigo-400'
+                          : 'text-slate-300 hover:bg-slate-750 bg-slate-800/40 border border-slate-700/50'
+                      }`}
+                      title={shp.label}
+                    >
+                      {shp.icon}
+                      <span className="truncate">{shp.label}</span>
+                    </button>
+                  ))}
                 </div>
 
                 <div className="h-px bg-slate-750 my-0.5" />
@@ -1948,22 +1965,24 @@ export const Toolbar: React.FC = () => {
             <div className="text-[11px] font-semibold text-slate-400 px-1 uppercase tracking-wider">
               Şekil Türü
             </div>
-            <div className="flex gap-1">
-              {(['line', 'arrow', 'rectangle', 'circle', 'triangle'] as ShapeType[]).map((shp) => (
+            <div className="grid grid-cols-4 gap-1.5">
+              {SHAPE_BUTTONS.map((shp) => (
                 <button
-                  key={shp}
+                  key={shp.type}
                   type="button"
                   onClick={() => {
-                    setSelectedShape(shp);
+                    setSelectedShape(shp.type);
                     closeDropdown();
                   }}
-                  className={`flex-1 py-1.5 text-xs rounded-lg capitalize transition-colors font-medium text-center ${
-                    toolSettings.selectedShape === shp
-                      ? 'bg-indigo-600 text-white shadow'
-                      : 'text-slate-300 hover:bg-slate-750'
+                  className={`flex items-center justify-center gap-1.5 py-1.5 px-2 text-[11px] rounded-lg transition-colors font-medium ${
+                    toolSettings.selectedShape === shp.type
+                      ? 'bg-indigo-600 text-white shadow-sm ring-1 ring-indigo-400'
+                      : 'text-slate-300 hover:bg-slate-750 bg-slate-800/40 border border-slate-700/50'
                   }`}
+                  title={shp.label}
                 >
-                  {shp === 'line' ? 'Çizgi' : shp === 'arrow' ? 'Ok' : shp === 'rectangle' ? 'Kare' : shp === 'circle' ? 'Daire' : 'Üçgen'}
+                  {shp.icon}
+                  <span className="truncate">{shp.label}</span>
                 </button>
               ))}
             </div>

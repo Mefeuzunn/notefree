@@ -20,6 +20,11 @@ import {
   generateEllipsePoints,
   generateRectanglePoints,
   generateTrianglePoints,
+  generatePolygonPoints,
+  generateStarPoints,
+  generateCalloutPoints,
+  generateCurlyBracketPoints,
+  generateArcPoints,
   interpolateLine,
   applyPrecisionSnapping,
   rebuildShapeFromNodes,
@@ -920,6 +925,13 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
                     rectangle: 'Dikdörtgen',
                     circle: 'Daire / Elips',
                     triangle: 'Üçgen',
+                    pentagon: 'Beşgen',
+                    hexagon: 'Altıgen',
+                    diamond: 'Eşkenar Dörtgen',
+                    star: 'Yıldız',
+                    callout: 'Konuşma Balonu',
+                    bracket: 'Süslü Parantez',
+                    arc: 'Dairesel Yay',
                   };
                   setToastMessage(`📐 Şekil Sabitlendi: ${shapeNames[detected.type] || detected.type}`);
                   setTimeout(() => setToastMessage(null), 1400);
@@ -1252,12 +1264,64 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
           Math.max(start.y, end.y)
         );
         break;
+      case 'pentagon': {
+        const cx = (start.x + end.x) / 2;
+        const cy = (start.y + end.y) / 2;
+        const rx = Math.abs(end.x - start.x) / 2;
+        const ry = Math.abs(end.y - start.y) / 2;
+        shapePoints = generatePolygonPoints(cx, cy, rx, ry, 5);
+        break;
+      }
+      case 'hexagon': {
+        const cx = (start.x + end.x) / 2;
+        const cy = (start.y + end.y) / 2;
+        const rx = Math.abs(end.x - start.x) / 2;
+        const ry = Math.abs(end.y - start.y) / 2;
+        shapePoints = generatePolygonPoints(cx, cy, rx, ry, 6);
+        break;
+      }
+      case 'diamond': {
+        const cx = (start.x + end.x) / 2;
+        const cy = (start.y + end.y) / 2;
+        const rx = Math.abs(end.x - start.x) / 2;
+        const ry = Math.abs(end.y - start.y) / 2;
+        shapePoints = generatePolygonPoints(cx, cy, rx, ry, 4, -Math.PI / 2);
+        break;
+      }
+      case 'star': {
+        const cx = (start.x + end.x) / 2;
+        const cy = (start.y + end.y) / 2;
+        const rx = Math.abs(end.x - start.x) / 2;
+        const ry = Math.abs(end.y - start.y) / 2;
+        shapePoints = generateStarPoints(cx, cy, rx, ry, 5);
+        break;
+      }
+      case 'callout':
+        shapePoints = generateCalloutPoints(
+          Math.min(start.x, end.x),
+          Math.min(start.y, end.y),
+          Math.max(start.x, end.x),
+          Math.max(start.y, end.y)
+        );
+        break;
+      case 'bracket': {
+        const cx = (start.x + end.x) / 2;
+        const topY = Math.min(start.y, end.y);
+        const botY = Math.max(start.y, end.y);
+        shapePoints = generateCurlyBracketPoints(cx, topY, cx, botY, 18, 'left');
+        break;
+      }
+      case 'arc':
+        shapePoints = generateArcPoints(start, end);
+        break;
     }
 
     // FAZ L: Live shape fill preview during drawing
     if (
       toolSettings.shapeFillColor &&
-      ['rectangle', 'circle', 'triangle'].includes(toolSettings.selectedShape) &&
+      ['rectangle', 'circle', 'triangle', 'pentagon', 'hexagon', 'diamond', 'star', 'callout'].includes(
+        toolSettings.selectedShape
+      ) &&
       shapePoints.length >= 3
     ) {
       ctx.save();
@@ -1535,6 +1599,56 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
             Math.max(start.y, end.y)
           );
           break;
+        case 'pentagon': {
+          const cx = (start.x + end.x) / 2;
+          const cy = (start.y + end.y) / 2;
+          const rx = Math.abs(end.x - start.x) / 2;
+          const ry = Math.abs(end.y - start.y) / 2;
+          finalPoints = generatePolygonPoints(cx, cy, rx, ry, 5);
+          break;
+        }
+        case 'hexagon': {
+          const cx = (start.x + end.x) / 2;
+          const cy = (start.y + end.y) / 2;
+          const rx = Math.abs(end.x - start.x) / 2;
+          const ry = Math.abs(end.y - start.y) / 2;
+          finalPoints = generatePolygonPoints(cx, cy, rx, ry, 6);
+          break;
+        }
+        case 'diamond': {
+          const cx = (start.x + end.x) / 2;
+          const cy = (start.y + end.y) / 2;
+          const rx = Math.abs(end.x - start.x) / 2;
+          const ry = Math.abs(end.y - start.y) / 2;
+          finalPoints = generatePolygonPoints(cx, cy, rx, ry, 4, -Math.PI / 2);
+          break;
+        }
+        case 'star': {
+          const cx = (start.x + end.x) / 2;
+          const cy = (start.y + end.y) / 2;
+          const rx = Math.abs(end.x - start.x) / 2;
+          const ry = Math.abs(end.y - start.y) / 2;
+          finalPoints = generateStarPoints(cx, cy, rx, ry, 5);
+          break;
+        }
+        case 'callout':
+          finalPoints = generateCalloutPoints(
+            Math.min(start.x, end.x),
+            Math.min(start.y, end.y),
+            Math.max(start.x, end.x),
+            Math.max(start.y, end.y)
+          );
+          break;
+        case 'bracket': {
+          const cx = (start.x + end.x) / 2;
+          const topY = Math.min(start.y, end.y);
+          const botY = Math.max(start.y, end.y);
+          finalPoints = generateCurlyBracketPoints(cx, topY, cx, botY, 18, 'left');
+          break;
+        }
+        case 'arc':
+          finalPoints = generateArcPoints(start, end);
+          break;
       }
     } else if (committedShapeType) {
       // Shape was already committed via Hold-to-Snap or Ruler, no need to re-detect
@@ -1596,6 +1710,60 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
             { id: 'apex', x: cx, y: minY, role: 'apex' },
             { id: 'br', x: maxX, y: maxY, role: 'corner' },
             { id: 'bl', x: minX, y: maxY, role: 'corner' },
+          ];
+        case 'pentagon': {
+          const nodes: ShapeControlNode[] = [{ id: 'center', x: cx, y: cy, role: 'center' }];
+          for (let i = 0; i < 5; i++) {
+            const a = -Math.PI / 2 + (i * 2 * Math.PI) / 5;
+            nodes.push({ id: `v${i}`, x: cx + rx * Math.cos(a), y: cy + ry * Math.sin(a), role: 'corner' });
+          }
+          return nodes;
+        }
+        case 'hexagon': {
+          const nodes: ShapeControlNode[] = [{ id: 'center', x: cx, y: cy, role: 'center' }];
+          for (let i = 0; i < 6; i++) {
+            const a = -Math.PI / 2 + (i * 2 * Math.PI) / 6;
+            nodes.push({ id: `v${i}`, x: cx + rx * Math.cos(a), y: cy + ry * Math.sin(a), role: 'corner' });
+          }
+          return nodes;
+        }
+        case 'diamond':
+          return [
+            { id: 'top', x: cx, y: minY, role: 'corner' },
+            { id: 'right', x: maxX, y: cy, role: 'corner' },
+            { id: 'bottom', x: cx, y: maxY, role: 'corner' },
+            { id: 'left', x: minX, y: cy, role: 'corner' },
+            { id: 'center', x: cx, y: cy, role: 'center' },
+          ];
+        case 'star': {
+          const nodes: ShapeControlNode[] = [{ id: 'center', x: cx, y: cy, role: 'center' }];
+          for (let i = 0; i < 5; i++) {
+            const a = -Math.PI / 2 + (i * 2 * Math.PI) / 5;
+            nodes.push({ id: `tip${i}`, x: cx + rx * Math.cos(a), y: cy + ry * Math.sin(a), role: 'tip' });
+          }
+          return nodes;
+        }
+        case 'callout': {
+          const tailH = Math.min(30, (maxY - minY) * 0.25);
+          return [
+            { id: 'tl', x: minX, y: minY, role: 'corner' },
+            { id: 'tr', x: maxX, y: minY, role: 'corner' },
+            { id: 'br', x: maxX, y: maxY - tailH, role: 'corner' },
+            { id: 'bl', x: minX, y: maxY - tailH, role: 'corner' },
+            { id: 'tail', x: minX + 20, y: maxY, role: 'tail' },
+          ];
+        }
+        case 'bracket':
+          return [
+            { id: 'top', x: cx, y: minY, role: 'corner' },
+            { id: 'cusp', x: cx - 18, y: cy, role: 'cusp' },
+            { id: 'bottom', x: cx, y: maxY, role: 'corner' },
+          ];
+        case 'arc':
+          return [
+            { id: 'start', x: s.x, y: s.y, role: 'endpoint' },
+            { id: 'apex', x: cx - (e.y - s.y) * 0.25, y: cy + (e.x - s.x) * 0.25, role: 'apex' },
+            { id: 'end', x: e.x, y: e.y, role: 'endpoint' },
           ];
         default:
           return [];
@@ -2368,7 +2536,16 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
                 controlNodes: newNodes,
               });
             }}
-            isClosedShape={['rectangle', 'circle', 'triangle'].includes(selectedShapeStroke.shapeType || '')}
+            isClosedShape={[
+              'rectangle',
+              'circle',
+              'triangle',
+              'pentagon',
+              'hexagon',
+              'diamond',
+              'star',
+              'callout',
+            ].includes(selectedShapeStroke.shapeType || '')}
             fillColor={selectedShapeStroke.shapeFillColor}
             fillOpacity={selectedShapeStroke.shapeFillOpacity ?? 0.25}
             onFillChange={(color, opacity) => {

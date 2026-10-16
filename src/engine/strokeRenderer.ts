@@ -209,12 +209,21 @@ export function drawStrokeOnCanvas(
 
   if (outline.length === 0) return;
 
-  // FAZ L: Render shape fill inside closed geometric shapes (rectangle, circle, triangle)
+  // FAZ L & FAZ AI: Render shape fill inside closed geometric shapes
   const strokeWithShape = stroke as Stroke;
   if (
     strokeWithShape.shapeType &&
     strokeWithShape.shapeFillColor &&
-    ['rectangle', 'circle', 'triangle'].includes(strokeWithShape.shapeType) &&
+    [
+      'rectangle',
+      'circle',
+      'triangle',
+      'pentagon',
+      'hexagon',
+      'diamond',
+      'star',
+      'callout',
+    ].includes(strokeWithShape.shapeType) &&
     stroke.points.length >= 3
   ) {
     ctx.save();
