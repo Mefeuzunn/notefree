@@ -19,6 +19,7 @@ import { OutlineDrawer } from './components/modals/OutlineDrawer';
 import { CollaborationModal } from './components/modals/CollaborationModal';
 import { FloatingScratchpad } from './components/scratchpad/FloatingScratchpad';
 import { ShortcutsModal } from './components/modals/ShortcutsModal';
+import { PresentationHUD } from './components/presentation/PresentationHUD';
 import {
   BookOpen,
   Loader2,
@@ -91,68 +92,8 @@ export const App: React.FC = () => {
       {/* 2. Top Control Bar (Hidden in Presentation Mode) */}
       {!presentationMode && <Toolbar />}
 
-      {/* Presentation Mode Floating Minimal HUD */}
-      {presentationMode && (
-        <div className="fixed top-4 right-4 z-50 bg-slate-900/90 backdrop-blur-xl border border-indigo-500/40 rounded-2xl shadow-2xl p-1.5 flex items-center gap-2 animate-in fade-in slide-in-from-top-2">
-          {/* Laser Style Switcher */}
-          <div className="flex bg-slate-800 p-0.5 rounded-xl text-xs">
-            <button
-              onClick={() => setLaserStyle('trail')}
-              className={`px-2.5 py-1 rounded-lg font-medium transition-colors flex items-center gap-1 ${
-                toolSettings.laserStyle !== 'spotlight'
-                  ? 'bg-rose-600 text-white shadow'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              <Zap size={13} />
-              <span>İz Lazer</span>
-            </button>
-            <button
-              onClick={() => setLaserStyle('spotlight')}
-              className={`px-2.5 py-1 rounded-lg font-medium transition-colors flex items-center gap-1 ${
-                toolSettings.laserStyle === 'spotlight'
-                  ? 'bg-indigo-600 text-white shadow'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              <Lightbulb size={13} />
-              <span>Spot Işığı</span>
-            </button>
-          </div>
-
-          {/* Page Stepper */}
-          <div className="flex items-center gap-1 text-xs">
-            <button
-              onClick={() => setActivePageIndex(Math.max(0, activePageIndex - 1))}
-              disabled={activePageIndex === 0}
-              className="p-1 text-slate-300 hover:text-white disabled:opacity-30 rounded-lg hover:bg-slate-800"
-            >
-              <ChevronLeft size={16} />
-            </button>
-            <span className="font-mono text-slate-300 px-1 font-semibold">
-              {activePageIndex + 1}/{totalPages}
-            </span>
-            <button
-              onClick={() => setActivePageIndex(Math.min(totalPages - 1, activePageIndex + 1))}
-              disabled={activePageIndex >= totalPages - 1}
-              className="p-1 text-slate-300 hover:text-white disabled:opacity-30 rounded-lg hover:bg-slate-800"
-            >
-              <ChevronRight size={16} />
-            </button>
-          </div>
-
-          <div className="w-px h-4 bg-slate-700" />
-
-          {/* Exit Presentation Mode */}
-          <button
-            onClick={() => setPresentationMode(false)}
-            className="flex items-center gap-1 px-3 py-1 bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 border border-rose-500/30 rounded-xl text-xs font-semibold transition-colors"
-          >
-            <X size={14} />
-            <span>Sunumu Bitir</span>
-          </button>
-        </div>
-      )}
+      {/* FAZ AL: Presentation Studio & Teleprompter HUD */}
+      <PresentationHUD />
 
       {/* 2. Main Workspace Layout */}
       <div className="flex-1 flex overflow-hidden relative">

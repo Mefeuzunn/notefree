@@ -110,6 +110,10 @@ interface NotebookStoreState {
   sidebarOpen: boolean;
   libraryViewOpen: boolean;
   presentationMode: boolean;
+  speakerNotesOpen: boolean;
+  filmstripOpen: boolean;
+  presentationTimer: number;
+  isPresentationTimerRunning: boolean;
 
   // Active Tool & Settings
   activeTool: ToolType;
@@ -489,6 +493,15 @@ interface NotebookStoreState {
   clearLaserPoints: () => void;
   setPresentationMode: (enabled: boolean) => void;
   setLaserStyle: (style: 'trail' | 'spotlight') => void;
+  setLaserColor: (color: string) => void;
+  setSpotlightRadius: (radius: number) => void;
+  setSpeakerNotesOpen: (open: boolean) => void;
+  updateCurrentPageSpeakerNotes: (notes: string) => void;
+  setFilmstripOpen: (open: boolean) => void;
+  startPresentationTimer: () => void;
+  pausePresentationTimer: () => void;
+  resetPresentationTimer: () => void;
+  tickPresentationTimer: () => void;
 
   // YouTube Actions
   toggleYouTube: () => void;
@@ -744,6 +757,8 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
     fontFamily: 'Inter',
     fontSize: 18,
     laserStyle: 'trail',
+    laserColor: '#ef4444',
+    spotlightRadius: 95,
     angleSnap: true,
     gridSnap: false,
     palmRejection: true,
@@ -754,6 +769,10 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
   },
 
   presentationMode: false,
+  speakerNotesOpen: false,
+  filmstripOpen: false,
+  presentationTimer: 0,
+  isPresentationTimerRunning: false,
   lassoSelection: null,
 
   minimapVisible: false,
@@ -4280,6 +4299,74 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
         laserStyle: style,
       },
     });
+  },
+
+  setLaserColor: (color: string) => {
+    set({
+      toolSettings: {
+        ...get().toolSettings,
+        laserColor: color,
+      },
+    });
+  },
+
+  setSpotlightRadius: (radius: number) => {
+    set({
+      toolSettings: {
+        ...get().toolSettings,
+        spotlightRadius: radius,
+      },
+    });
+  },
+
+  setSpeakerNotesOpen: (open: boolean) => {
+    set({ speakerNotesOpen: open });
+  },
+
+  updateCurrentPageSpeakerNotes: (notes: string) => {
+    const { notebooks, activeNotebookId, activePageIndex } = get();
+    if (!activeNotebookId) return;
+    const currentNb = notebooks.find((n) => n.id === activeNotebookId);
+    if (!currentNb || !currentNb.pages[activePageIndex]) return;
+
+    const updatedPages = [...currentNb.pages];
+    updatedPages[activePageIndex] = {
+      ...updatedPages[activePageIndex],
+      speakerNotes: notes,
+    };
+
+    const updatedNb = {
+      ...currentNb,
+      pages: updatedPages,
+      updatedAt: Date.now(),
+    };
+
+    set({
+      notebooks: notebooks.map((n) => (n.id === activeNotebookId ? updatedNb : n)),
+    });
+    saveNotebookToDB(updatedNb);
+  },
+
+  setFilmstripOpen: (open: boolean) => {
+    set({ filmstripOpen: open });
+  },
+
+  startPresentationTimer: () => {
+    set({ isPresentationTimerRunning: true });
+  },
+
+  pausePresentationTimer: () => {
+    set({ isPresentationTimerRunning: false });
+  },
+
+  resetPresentationTimer: () => {
+    set({ presentationTimer: 0, isPresentationTimerRunning: false });
+  },
+
+  tickPresentationTimer: () => {
+    if (get().isPresentationTimerRunning) {
+      set({ presentationTimer: get().presentationTimer + 1 });
+    }
   },
 
   // Import .notefree Notebook

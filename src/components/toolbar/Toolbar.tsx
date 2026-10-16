@@ -24,6 +24,7 @@ import {
   Menu,
   Sparkles,
   Zap,
+  Lightbulb,
   Check,
   Type,
   Compass,
@@ -153,6 +154,9 @@ export const Toolbar: React.FC = () => {
     setStudySetsModalOpen,
     presentationMode,
     setPresentationMode,
+    setLaserStyle,
+    setLaserColor,
+    setSpotlightRadius,
     togglePageBookmark,
     invertCurrentPageInks,
     setStreamline,
@@ -1117,93 +1121,176 @@ export const Toolbar: React.FC = () => {
             )}
           </div>
 
-          <div className="w-px h-5 bg-slate-750 mx-1 shrink-0" />
+          {/* FAVORITE COLOR SLOTS OR LASER QUICK CONTROLS */}
+          {activeTool === 'laser' ? (
+            <div className="flex items-center gap-2 px-1 shrink-0">
+              {/* Laser Style */}
+              <div className="flex bg-slate-800 p-0.5 rounded-xl text-xs">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setLaserStyle('trail');
+                    triggerHaptic('light');
+                  }}
+                  className={`px-2.5 py-1 rounded-lg font-medium transition-all flex items-center gap-1.5 ${
+                    toolSettings.laserStyle !== 'spotlight'
+                      ? 'bg-rose-600 text-white shadow-sm'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                  title="Kuyruklu Lazer Çizgisi"
+                >
+                  <Zap size={13} />
+                  <span>İz Lazer</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setLaserStyle('spotlight');
+                    triggerHaptic('light');
+                  }}
+                  className={`px-2.5 py-1 rounded-lg font-medium transition-all flex items-center gap-1.5 ${
+                    toolSettings.laserStyle === 'spotlight'
+                      ? 'bg-indigo-600 text-white shadow-sm'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                  title="Spot Işığı Modu"
+                >
+                  <Lightbulb size={13} />
+                  <span>Spot Işığı</span>
+                </button>
+              </div>
 
-          {/* FAVORITE COLOR SLOTS */}
-          <div className="flex items-center gap-1 px-1 relative shrink-0">
-            {toolSettings.favoriteColors.map((color, index) => {
-              const isSlotActive =
-                toolSettings.activeColorIndex === index && toolSettings.color === color;
-              return (
-                <div key={index} className="relative">
+              {/* Laser Color Palette */}
+              <div className="flex items-center gap-1.5 px-1 bg-slate-800/80 py-1 rounded-xl">
+                {[
+                  { label: 'Kırmızı', color: '#ef4444' },
+                  { label: 'Neon Yeşil', color: '#22c55e' },
+                  { label: 'Elektrik Mavisi', color: '#06b6d4' },
+                  { label: 'Mor', color: '#a855f7' },
+                ].map((c) => (
                   <button
+                    key={c.color}
                     type="button"
                     onClick={() => {
-                      selectFavoriteColor(index);
-                      setActiveColorSlot(null);
+                      setLaserColor(c.color);
+                      triggerHaptic('light');
                     }}
-                    onContextMenu={(e) => {
-                      e.preventDefault();
-                      setActiveColorSlot(activeColorSlot === index ? null : index);
-                    }}
-                    className={`w-6 h-6 rounded-full transition-transform flex items-center justify-center shadow-sm ${
-                      isSlotActive
-                        ? 'ring-2 ring-white ring-offset-2 ring-offset-slate-800 scale-110'
-                        : 'hover:scale-105 opacity-80 hover:opacity-100 ring-1 ring-white/20'
+                    style={{ backgroundColor: c.color }}
+                    className={`w-5 h-5 rounded-full border-2 transition-transform ${
+                      (toolSettings.laserColor || '#ef4444') === c.color
+                        ? 'border-white scale-110 shadow-md'
+                        : 'border-transparent opacity-60 hover:opacity-100'
                     }`}
-                    style={{ backgroundColor: color }}
-                    title={`Renk Yuvası ${index + 1} (Sağ tıkla değiştir)`}
-                  >
-                    {isSlotActive && (
-                      <Check
-                        size={11}
-                        className={
-                          color === '#facc15' || color === '#ffffff' ? 'text-black font-bold' : 'text-white font-bold'
-                        }
-                      />
-                    )}
-                  </button>
+                    title={c.label}
+                  />
+                ))}
+              </div>
 
-                  {activeColorSlot === index && (
-                    <div className="absolute top-9 left-1/2 -translate-x-1/2 bg-slate-900 border border-slate-700 p-2.5 rounded-xl shadow-2xl z-50 w-44 backdrop-blur-xl">
-                      <div className="text-[10px] font-semibold text-slate-400 mb-1.5">
-                        Rengi Değiştir
-                      </div>
-                      <div className="grid grid-cols-4 gap-1.5">
-                        {COLOR_PALETTE.map((c) => (
-                          <button
-                            key={c}
-                            type="button"
-                            onClick={() => {
-                              setFavoriteColor(index, c);
-                              setActiveColorSlot(null);
-                            }}
-                            className="w-6 h-6 rounded-full ring-1 ring-white/20 hover:scale-110 transition-transform"
-                            style={{ backgroundColor: c }}
+              {/* Start Presentation Mode */}
+              <button
+                type="button"
+                onClick={() => {
+                  setPresentationMode(true);
+                  triggerHaptic('medium');
+                }}
+                className="px-2.5 py-1 bg-gradient-to-r from-rose-600 to-indigo-600 hover:from-rose-500 hover:to-indigo-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all shadow-md shadow-indigo-600/20"
+                title="Tam Ekran Sunum Modunu Başlat"
+              >
+                <Presentation size={13} />
+                <span>Sunumu Başlat</span>
+              </button>
+            </div>
+          ) : (
+            <>
+              <div className="w-px h-5 bg-slate-750 mx-1 shrink-0" />
+
+              {/* FAVORITE COLOR SLOTS */}
+              <div className="flex items-center gap-1 px-1 relative shrink-0">
+                {toolSettings.favoriteColors.map((color, index) => {
+                  const isSlotActive =
+                    toolSettings.activeColorIndex === index && toolSettings.color === color;
+                  return (
+                    <div key={index} className="relative">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          selectFavoriteColor(index);
+                          setActiveColorSlot(null);
+                        }}
+                        onContextMenu={(e) => {
+                          e.preventDefault();
+                          setActiveColorSlot(activeColorSlot === index ? null : index);
+                        }}
+                        className={`w-6 h-6 rounded-full transition-transform flex items-center justify-center shadow-sm ${
+                          isSlotActive
+                            ? 'ring-2 ring-white ring-offset-2 ring-offset-slate-800 scale-110'
+                            : 'hover:scale-105 opacity-80 hover:opacity-100 ring-1 ring-white/20'
+                        }`}
+                        style={{ backgroundColor: color }}
+                        title={`Renk Yuvası ${index + 1} (Sağ tıkla değiştir)`}
+                      >
+                        {isSlotActive && (
+                          <Check
+                            size={11}
+                            className={
+                              color === '#facc15' || color === '#ffffff' ? 'text-black font-bold' : 'text-white font-bold'
+                            }
                           />
-                        ))}
-                      </div>
+                        )}
+                      </button>
+
+                      {activeColorSlot === index && (
+                        <div className="absolute top-9 left-1/2 -translate-x-1/2 bg-slate-900 border border-slate-700 p-2.5 rounded-xl shadow-2xl z-50 w-44 backdrop-blur-xl">
+                          <div className="text-[10px] font-semibold text-slate-400 mb-1.5">
+                            Rengi Değiştir
+                          </div>
+                          <div className="grid grid-cols-4 gap-1.5">
+                            {COLOR_PALETTE.map((c) => (
+                              <button
+                                key={c}
+                                type="button"
+                                onClick={() => {
+                                  setFavoriteColor(index, c);
+                                  setActiveColorSlot(null);
+                                }}
+                                className="w-6 h-6 rounded-full ring-1 ring-white/20 hover:scale-110 transition-transform"
+                                style={{ backgroundColor: c }}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+                  );
+                })}
+              </div>
 
-          <div className="w-px h-5 bg-slate-750 mx-1 shrink-0" />
+              <div className="w-px h-5 bg-slate-750 mx-1 shrink-0" />
 
-          {/* FAVORITE SIZES */}
-          <div className="flex items-center gap-1 px-1 shrink-0">
-            {toolSettings.favoriteSizes.map((size, index) => {
-              const isSizeActive =
-                toolSettings.activeSizeIndex === index && toolSettings.size === size;
-              return (
-                <button
-                  key={index}
-                  type="button"
-                  onClick={() => selectFavoriteSize(index)}
-                  className={`w-6 h-6 rounded-lg font-mono text-[11px] font-semibold flex items-center justify-center transition-all ${
-                    isSizeActive
-                      ? 'bg-indigo-600 text-white shadow-sm ring-1 ring-indigo-400'
-                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
-                  }`}
-                  title={`Uç: ${size}px`}
-                >
-                  {size}
-                </button>
-              );
-            })}
-          </div>
+              {/* FAVORITE SIZES */}
+              <div className="flex items-center gap-1 px-1 shrink-0">
+                {toolSettings.favoriteSizes.map((size, index) => {
+                  const isSizeActive =
+                    toolSettings.activeSizeIndex === index && toolSettings.size === size;
+                  return (
+                    <button
+                      key={index}
+                      type="button"
+                      onClick={() => selectFavoriteSize(index)}
+                      className={`w-6 h-6 rounded-lg font-mono text-[11px] font-semibold flex items-center justify-center transition-all ${
+                        isSizeActive
+                          ? 'bg-indigo-600 text-white shadow-sm ring-1 ring-indigo-400'
+                          : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
+                      }`}
+                      title={`Uç: ${size}px`}
+                    >
+                      {size}
+                    </button>
+                  );
+                })}
+              </div>
+            </>
+          )}
         </div>
 
         {/* RIGHT SECTION: Undo/Redo & Actions */}

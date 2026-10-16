@@ -1183,42 +1183,58 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
       return;
     }
 
+    const laserColor = toolSettings.laserColor || '#ef4444';
+    const spotlightRadius = toolSettings.spotlightRadius || 95;
+
     if (toolSettings.laserStyle === 'spotlight') {
       const currentPt = valid[valid.length - 1];
       // Dim entire page
-      ctx.fillStyle = 'rgba(15, 23, 42, 0.72)';
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.75)';
       ctx.fillRect(0, 0, width, height);
 
       // Cut out spotlight circular beam
       ctx.globalCompositeOperation = 'destination-out';
       ctx.beginPath();
-      ctx.arc(currentPt.x, currentPt.y, 85, 0, Math.PI * 2);
+      ctx.arc(currentPt.x, currentPt.y, spotlightRadius, 0, Math.PI * 2);
       ctx.fill();
       ctx.globalCompositeOperation = 'source-over';
 
       // Ring glow
       ctx.beginPath();
-      ctx.arc(currentPt.x, currentPt.y, 85, 0, Math.PI * 2);
-      ctx.strokeStyle = '#818cf8';
-      ctx.lineWidth = 3;
-      ctx.shadowColor = '#6366f1';
-      ctx.shadowBlur = 16;
+      ctx.arc(currentPt.x, currentPt.y, spotlightRadius, 0, Math.PI * 2);
+      ctx.strokeStyle = laserColor;
+      ctx.lineWidth = 3.5;
+      ctx.shadowColor = laserColor;
+      ctx.shadowBlur = 20;
       ctx.stroke();
 
       ctx.restore();
       return;
     }
 
+    const cleanHex = laserColor.replace('#', '');
+    const cr = parseInt(cleanHex.substring(0, 2), 16) || 239;
+    const cg = parseInt(cleanHex.substring(2, 4), 16) || 68;
+    const cb = parseInt(cleanHex.substring(4, 6), 16) || 68;
+
     for (let i = 0; i < valid.length; i++) {
       const pt = valid[i];
       const age = now - pt.time;
-      const alpha = Math.max(0, 1 - age / 1200);
+      const progress = 1 - age / 1200;
+      const alpha = Math.max(0, progress);
 
+      // Outer neon laser glow
       ctx.beginPath();
-      ctx.arc(pt.x, pt.y, (1 - age / 1200) * 8 + 3, 0, Math.PI * 2);
-      ctx.fillStyle = `rgba(239, 68, 68, ${alpha})`;
-      ctx.shadowColor = '#ef4444';
-      ctx.shadowBlur = 12;
+      ctx.arc(pt.x, pt.y, progress * 9 + 3, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(${cr}, ${cg}, ${cb}, ${alpha * 0.9})`;
+      ctx.shadowColor = laserColor;
+      ctx.shadowBlur = 14;
+      ctx.fill();
+
+      // Inner intense core
+      ctx.beginPath();
+      ctx.arc(pt.x, pt.y, Math.max(1, (progress * 9 + 3) * 0.4), 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
       ctx.fill();
     }
 

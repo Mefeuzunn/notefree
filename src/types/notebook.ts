@@ -252,6 +252,7 @@ export interface Page {
   customPitch?: number; // Custom line/grid spacing in px (e.g. 20 - 64)
   customLineColor?: string; // Optional custom line hex color
   lineOpacity?: number; // Line opacity (0.1 - 1.0)
+  speakerNotes?: string; // FAZ AL: Secret presenter teleprompter notes for this slide
 }
 
 export interface TableCell {
@@ -530,6 +531,8 @@ export interface ToolSettings {
   fontSize: number;
   // Laser Pointer & Presentation
   laserStyle?: 'trail' | 'spotlight';
+  laserColor?: string; // FAZ AL: Custom laser trail & spotlight ring glow color (default: #ef4444)
+  spotlightRadius?: number; // FAZ AL: Spotlight cutout radius in px (default: 95)
   smartInkInversion?: boolean;
   palmRejection?: boolean; // Reject single finger touches when stylus is active
   tiltShading?: boolean; // Enable broad graphite pencil shading when stylus is tilted

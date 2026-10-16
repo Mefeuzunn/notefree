@@ -87,6 +87,8 @@ export const NotebookWorkspace: React.FC = () => {
     togglePlannerTabs,
     outlineDrawerOpen,
     setOutlineDrawerOpen,
+    presentationMode,
+    setPresentationMode,
     setShortcutsModalOpen,
   } = useNotebookStore();
 
@@ -268,6 +270,15 @@ export const NotebookWorkspace: React.FC = () => {
       }
 
       // Standalone Power-User Tool Shortcuts
+      if (e.key === 'F5') {
+        e.preventDefault();
+        const next = !presentationMode;
+        setPresentationMode(next);
+        triggerHaptic('medium');
+        showShortcutHud(next ? 'Sunum Başlatıldı' : 'Sunum Bitti', 'F5');
+        return;
+      }
+
       const key = e.key.toLowerCase();
       if (e.key === '?' || (e.shiftKey && e.key === '/')) {
         e.preventDefault();
