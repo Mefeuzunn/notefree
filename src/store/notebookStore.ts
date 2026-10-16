@@ -31,6 +31,7 @@ import {
   StylusDoubleTapAction,
   RulerUnit,
   CustomTemplateItem,
+  StickyNoteColor,
 } from '../types/notebook';
 import { collaborationService } from '../services/collaborationService';
 import { db, initStorage, saveNotebookToDB, importNotebookFromNotefree } from '../services/storage';
@@ -141,6 +142,7 @@ interface NotebookStoreState {
   pageManagerModalOpen: boolean;
   studySetsModalOpen: boolean;
   searchModalOpen: boolean;
+  shortcutsModalOpen: boolean;
 
   // Faz 2: AI & Dual Multitasking
   mathModalOpen: boolean;
@@ -231,6 +233,7 @@ interface NotebookStoreState {
   toggleTiltShading: () => void;
   setStylusDoubleTapAction: (action: StylusDoubleTapAction) => void;
   addStrokeToCurrentPage: (stroke: Stroke) => void;
+  addStrokesToCurrentPage: (strokes: Stroke[]) => void;
   eraseStrokesOnCurrentPage: (strokeIds: string[]) => void;
   updateStrokeOnCurrentPage: (strokeId: string, partial: Partial<Stroke>) => void;
   undo: () => void;
@@ -267,6 +270,7 @@ interface NotebookStoreState {
   // Study Sets / Flashcards Actions
   setStudySetsModalOpen: (open: boolean) => void;
   setSearchModalOpen: (open: boolean) => void;
+  setShortcutsModalOpen: (open: boolean) => void;
   addFlashcard: (frontText: string, backText: string) => void;
   deleteFlashcard: (cardId: string) => void;
   rateFlashcard: (cardId: string, rating: 'again' | 'hard' | 'good' | 'easy') => void;
@@ -453,6 +457,19 @@ interface NotebookStoreState {
   setDocImportModalOpen: (open: boolean) => void;
   setNewNotebookModalOpen: (open: boolean) => void;
   setPageManagerModalOpen: (open: boolean) => void;
+
+  // Faz W: Floating Quick Scratchpad
+  scratchpadOpen: boolean;
+  scratchpadMinimized: boolean;
+  scratchpadMode: 'draw' | 'text';
+  scratchpadText: string;
+  scratchpadColor: StickyNoteColor;
+  toggleScratchpad: () => void;
+  setScratchpadOpen: (open: boolean) => void;
+  setScratchpadMinimized: (minimized: boolean) => void;
+  setScratchpadMode: (mode: 'draw' | 'text') => void;
+  setScratchpadText: (text: string) => void;
+  setScratchpadColor: (color: StickyNoteColor) => void;
 
   // Document & Notebook Import
   importPagesAsNotebook: (pages: Page[], title: string, pdfOutline?: PdfOutlineItem[]) => Promise<void>;
@@ -722,6 +739,14 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
   pageManagerModalOpen: false,
   studySetsModalOpen: false,
   searchModalOpen: false,
+  shortcutsModalOpen: false,
+
+  // Faz W Initial State
+  scratchpadOpen: false,
+  scratchpadMinimized: false,
+  scratchpadMode: 'draw',
+  scratchpadText: '',
+  scratchpadColor: 'yellow',
 
   // Faz 2 Initial State
   mathModalOpen: false,
@@ -1581,6 +1606,55 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
     const { collaboration } = get();
     if (collaboration.isConnected) {
       collaborationService.broadcastAddStroke(strokeWithAudio, activePageIndex);
+    }
+  },
+
+  addStrokesToCurrentPage: (strokesToAdd: Stroke[]) => {
+    if (!strokesToAdd || strokesToAdd.length === 0) return;
+    const {
+      activeNotebookId,
+      notebooks,
+      activePageIndex,
+      undoStack,
+      isRecordingAudio,
+      collaboration,
+    } = get();
+    if (!activeNotebookId) return;
+    const currentNb = notebooks.find((n) => n.id === activeNotebookId);
+    if (!currentNb) return;
+    const currentPage = currentNb.pages[activePageIndex];
+    if (!currentPage) return;
+
+    const audioMs = isRecordingAudio ? audioRecorder.getElapsedMs() : undefined;
+    const stampedStrokes = strokesToAdd.map((s) => ({
+      ...s,
+      audioTimestamp: audioMs,
+    }));
+
+    const newUndoStack = [...undoStack, [...currentPage.strokes]];
+    const updatedStrokes = [...currentPage.strokes, ...stampedStrokes];
+
+    const updatedPages = currentNb.pages.map((p, idx) =>
+      idx === activePageIndex ? { ...p, strokes: updatedStrokes } : p
+    );
+
+    const updatedNotebook = { ...currentNb, pages: updatedPages, updatedAt: Date.now() };
+    const updatedNotebooks = notebooks.map((n) =>
+      n.id === activeNotebookId ? updatedNotebook : n
+    );
+
+    set({
+      notebooks: updatedNotebooks,
+      undoStack: newUndoStack,
+      redoStack: [],
+    });
+
+    db.pages.update(currentPage.id, { strokes: updatedStrokes });
+
+    if (collaboration.isConnected) {
+      stampedStrokes.forEach((st) => {
+        collaborationService.broadcastAddStroke(st, activePageIndex);
+      });
     }
   },
 
@@ -3107,6 +3181,10 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
     set({ searchModalOpen: open });
   },
 
+  setShortcutsModalOpen: (open: boolean) => {
+    set({ shortcutsModalOpen: open });
+  },
+
   importPagesAsNotebook: async (pages: Page[], title: string, pdfOutline?: PdfOutlineItem[]) => {
     const newId = `nb_doc_${Date.now()}`;
     const newNotebook: Notebook = {
@@ -3266,6 +3344,26 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
 
     const nextY = Math.min(pageHeight - zoomBoxHeight - 20, zoomWindowPos.y + stepY);
     set({ zoomWindowPos: { x: startX, y: nextY } });
+  },
+
+  // Faz W: Floating Quick Scratchpad Actions
+  toggleScratchpad: () => {
+    set((state) => ({ scratchpadOpen: !state.scratchpadOpen, scratchpadMinimized: false }));
+  },
+  setScratchpadOpen: (open: boolean) => {
+    set({ scratchpadOpen: open });
+  },
+  setScratchpadMinimized: (minimized: boolean) => {
+    set({ scratchpadMinimized: minimized });
+  },
+  setScratchpadMode: (mode: 'draw' | 'text') => {
+    set({ scratchpadMode: mode });
+  },
+  setScratchpadText: (text: string) => {
+    set({ scratchpadText: text });
+  },
+  setScratchpadColor: (color: StickyNoteColor) => {
+    set({ scratchpadColor: color });
   },
 
   // Study Sets / Flashcards Actions

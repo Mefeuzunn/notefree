@@ -16,6 +16,8 @@ import { MathSolverModal } from './components/modals/MathSolverModal';
 import { SearchModal } from './components/modals/SearchModal';
 import { LayersDrawer } from './components/modals/LayersDrawer';
 import { CollaborationModal } from './components/modals/CollaborationModal';
+import { FloatingScratchpad } from './components/scratchpad/FloatingScratchpad';
+import { ShortcutsModal } from './components/modals/ShortcutsModal';
 import {
   BookOpen,
   Loader2,
@@ -43,6 +45,8 @@ export const App: React.FC = () => {
     setActivePageIndex,
     notebooks,
     activeNotebookId,
+    shortcutsModalOpen,
+    setShortcutsModalOpen,
   } = useNotebookStore();
 
   const activeNotebook = notebooks.find((n) => n.id === activeNotebookId);
@@ -158,7 +162,10 @@ export const App: React.FC = () => {
       {/* 3. Handwriting Zoom Window (GoodNotes Magnifying Box) */}
       <ZoomWindow />
 
-      {/* 4. Global Modals & Drawers */}
+      {/* 4. Faz W: Floating Quick Scratchpad (GoodNotes / Apple Quick Note) */}
+      <FloatingScratchpad />
+
+      {/* 5. Global Modals & Drawers */}
       <TemplateSelectorModal />
       <DocImportModal />
       <NewNotebookModal />
@@ -172,6 +179,10 @@ export const App: React.FC = () => {
       <PageManagerModal
         isOpen={pageManagerModalOpen}
         onClose={() => setPageManagerModalOpen(false)}
+      />
+      <ShortcutsModal
+        isOpen={shortcutsModalOpen}
+        onClose={() => setShortcutsModalOpen(false)}
       />
     </div>
   );

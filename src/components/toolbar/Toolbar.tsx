@@ -55,6 +55,8 @@ import {
   CircleDot,
   FlipHorizontal,
   Ban,
+  SquarePen,
+  Keyboard,
 } from 'lucide-react';
 import { PenType, ShapeType, ToolType, StylusDoubleTapAction } from '../../types/notebook';
 import { AudioPlayerBar } from '../audio/AudioPlayerBar';
@@ -114,6 +116,10 @@ export const Toolbar: React.FC = () => {
     viewMode,
     zoomWindowOpen,
     toggleZoomWindow,
+    scratchpadOpen,
+    toggleScratchpad,
+    shortcutsModalOpen,
+    setShortcutsModalOpen,
     setStudySetsModalOpen,
     presentationMode,
     setPresentationMode,
@@ -211,6 +217,16 @@ export const Toolbar: React.FC = () => {
         >
           <Search size={18} />
           <span className="text-xs font-semibold hidden xl:inline">Ara</span>
+        </button>
+
+        {/* Faz W: Keyboard Shortcuts Guide Button */}
+        <button
+          onClick={() => setShortcutsModalOpen(true)}
+          className="p-2 rounded-xl text-slate-400 hover:text-amber-400 hover:bg-slate-800 transition-colors flex items-center gap-1.5"
+          title="Klavye Kısayolları Kılavuzu (?)"
+        >
+          <Keyboard size={18} />
+          <span className="text-xs font-semibold hidden xl:inline">Kısayollar</span>
         </button>
 
         <div className="hidden lg:flex items-center gap-2">
@@ -766,9 +782,22 @@ export const Toolbar: React.FC = () => {
               ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30 scale-105 ring-1 ring-indigo-400'
               : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
           }`}
-          title="Büyüteç Yazım Penceresi (GoodNotes Zoom Window)"
+          title="Büyüteç Yazım Penceresi (GoodNotes Zoom Window - Z)"
         >
           <ZoomIn size={16} />
+        </button>
+
+        {/* 📝 Faz W: Floating Quick Scratchpad (Hızlı Karalama Panosu) */}
+        <button
+          onClick={toggleScratchpad}
+          className={`p-2 rounded-xl transition-all flex items-center justify-center ${
+            scratchpadOpen
+              ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/30 scale-105 ring-1 ring-amber-300 font-bold'
+              : 'text-slate-400 hover:text-amber-300 hover:bg-slate-700/50'
+          }`}
+          title="Hızlı Karalama Panosu / Quick Notes (Q)"
+        >
+          <SquarePen size={16} />
         </button>
 
         {/* 🎨 Faz 1: Renk Damlalığı (Eyedropper) */}

@@ -28,6 +28,8 @@ import {
   BookOpen,
   Bookmark,
   Brain,
+  SquarePen,
+  Keyboard,
 } from 'lucide-react';
 import { ExportModal } from './modals/ExportModal';
 import { MarginStudyWorkspace } from './margin/MarginStudyWorkspace';
@@ -66,6 +68,13 @@ export const NotebookWorkspace: React.FC = () => {
     toggleMarginWorkspace,
     tapeQuizMode,
     setTapeQuizMode,
+    setActiveTool,
+    undo,
+    redo,
+    toggleRuler,
+    toggleZoomWindow,
+    toggleScratchpad,
+    setShortcutsModalOpen,
   } = useNotebookStore();
 
   const [lockModalOpen, setLockModalOpen] = useState(false);
@@ -129,7 +138,19 @@ export const NotebookWorkspace: React.FC = () => {
     [activePageIndex, pages.length, twoPageSpread, setActivePageIndex]
   );
 
-  // Navigation & Gestures: Trackpad horizontal swipe, touch swipe, zoom & keyboard
+  // Power-User Keyboard Shortcut HUD Toast
+  const [shortcutHud, setShortcutHud] = useState<{ title: string; key: string } | null>(null);
+  const hudTimerRef = useRef<any>(null);
+
+  const showShortcutHud = useCallback((title: string, key: string) => {
+    if (hudTimerRef.current) clearTimeout(hudTimerRef.current);
+    setShortcutHud({ title, key });
+    hudTimerRef.current = setTimeout(() => {
+      setShortcutHud(null);
+    }, 1200);
+  }, []);
+
+  // Navigation & Gestures: Trackpad horizontal swipe, touch swipe, zoom & power user keyboard shortcuts
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
@@ -208,6 +229,108 @@ export const NotebookWorkspace: React.FC = () => {
         return;
       }
 
+      // Check for Undo / Redo with Cmd/Ctrl
+      if (e.metaKey || e.ctrlKey) {
+        if (e.key === 'z' || e.key === 'Z') {
+          e.preventDefault();
+          if (e.shiftKey) {
+            redo();
+            triggerHaptic('light');
+            showShortcutHud('İleri Al', '⌘⇧Z');
+          } else {
+            undo();
+            triggerHaptic('light');
+            showShortcutHud('Geri Al', '⌘Z');
+          }
+          return;
+        } else if (e.key === 'y' || e.key === 'Y') {
+          e.preventDefault();
+          redo();
+          triggerHaptic('light');
+          showShortcutHud('İleri Al', '⌘Y');
+          return;
+        }
+        return; // Don't intercept other modifier combos (like Cmd+K, etc.)
+      }
+
+      // Standalone Power-User Tool Shortcuts
+      const key = e.key.toLowerCase();
+      if (e.key === '?' || (e.shiftKey && e.key === '/')) {
+        e.preventDefault();
+        setShortcutsModalOpen(true);
+        triggerHaptic('light');
+        return;
+      }
+
+      if (key === 'b') {
+        e.preventDefault();
+        setActiveTool('ballpoint');
+        triggerHaptic('light');
+        showShortcutHud('Tükenmez Kalem', 'B');
+        return;
+      } else if (key === 'p') {
+        e.preventDefault();
+        setActiveTool('fountain');
+        triggerHaptic('light');
+        showShortcutHud('Dolma Kalem', 'P');
+        return;
+      } else if (key === 'e') {
+        e.preventDefault();
+        setActiveTool('eraser');
+        triggerHaptic('light');
+        showShortcutHud('Silgi', 'E');
+        return;
+      } else if (key === 'l') {
+        e.preventDefault();
+        setActiveTool('lasso');
+        triggerHaptic('light');
+        showShortcutHud('Kement Aracı', 'L');
+        return;
+      } else if (key === 'h') {
+        e.preventDefault();
+        setActiveTool('highlighter');
+        triggerHaptic('light');
+        showShortcutHud('Fosforlu Kalem', 'H');
+        return;
+      } else if (key === 't') {
+        e.preventDefault();
+        setActiveTool('text');
+        triggerHaptic('light');
+        showShortcutHud('Metin Kutusu', 'T');
+        return;
+      } else if (key === 's') {
+        e.preventDefault();
+        setActiveTool('sticky-note');
+        triggerHaptic('light');
+        showShortcutHud('Yapışkan Not', 'S');
+        return;
+      } else if (key === 'r') {
+        e.preventDefault();
+        toggleRuler();
+        triggerHaptic('light');
+        showShortcutHud('Cetvel', 'R');
+        return;
+      } else if (key === 'z') {
+        e.preventDefault();
+        toggleZoomWindow();
+        triggerHaptic('light');
+        showShortcutHud('Büyüteç Penceresi', 'Z');
+        return;
+      } else if (key === 'q') {
+        e.preventDefault();
+        toggleScratchpad();
+        triggerHaptic('light');
+        showShortcutHud('Hızlı Karalama', 'Q');
+        return;
+      } else if (key === 'm') {
+        e.preventDefault();
+        toggleMarginWorkspace();
+        triggerHaptic('light');
+        showShortcutHud('Kenarlık', 'M');
+        return;
+      }
+
+      // Page Navigation Arrows (when in paged mode)
       if (canvasMode !== 'paged' || (viewMode !== 'single' && !twoPageSpread)) return;
 
       if (e.key === 'ArrowRight' || e.key === 'PageDown') {
@@ -230,7 +353,23 @@ export const NotebookWorkspace: React.FC = () => {
       el.removeEventListener('touchend', handleTouchEnd);
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [zoom, setZoom, canvasMode, viewMode, twoPageSpread, flipPage]);
+  }, [
+    zoom,
+    setZoom,
+    canvasMode,
+    viewMode,
+    twoPageSpread,
+    flipPage,
+    setActiveTool,
+    undo,
+    redo,
+    toggleRuler,
+    toggleZoomWindow,
+    toggleScratchpad,
+    toggleMarginWorkspace,
+    setShortcutsModalOpen,
+    showShortcutHud,
+  ]);
 
   return (
     <div className="flex-1 flex overflow-hidden relative bg-slate-950">
@@ -666,6 +805,30 @@ export const NotebookWorkspace: React.FC = () => {
         <Sparkles size={16} />
         <span>Çıkartmalar</span>
       </button>
+
+      {/* 📝 Faz W: Floating Quick Scratchpad Launcher (Bottom Right) */}
+      <button
+        onClick={() => {
+          triggerHaptic('light');
+          toggleScratchpad();
+        }}
+        className="fixed bottom-5 right-36 z-30 flex items-center gap-1.5 bg-slate-900/90 hover:bg-slate-800 text-amber-400 font-bold text-xs px-3 py-2 rounded-2xl shadow-xl border border-amber-500/30 hover:border-amber-400 hover:scale-105 transition-all backdrop-blur-md"
+        title="Hızlı Karalama Panosu / Quick Notes (Q)"
+      >
+        <SquarePen size={15} />
+        <span className="hidden sm:inline">Hızlı Not</span>
+        <span className="text-[10px] bg-slate-800 text-amber-300 px-1.5 py-0.5 rounded font-mono font-semibold">Q</span>
+      </button>
+
+      {/* ⌨️ Faz W: Power-User Keyboard Shortcut HUD Toast */}
+      {shortcutHud && (
+        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 pointer-events-none select-none flex items-center gap-2.5 bg-slate-900/95 backdrop-blur-md text-slate-100 border border-slate-700/80 px-4 py-2 rounded-2xl shadow-2xl animate-in fade-in zoom-in-95 duration-100">
+          <span className="text-xs font-semibold text-slate-200 tracking-wide">{shortcutHud.title}</span>
+          <kbd className="px-2 py-0.5 bg-slate-950 text-amber-400 font-mono text-xs font-bold rounded-lg border border-slate-700 shadow-sm">
+            {shortcutHud.key}
+          </kbd>
+        </div>
+      )}
 
       {/* 🌟 Interactive GoodNotes Floating Ruler */}
       <Ruler scale={zoom} />
