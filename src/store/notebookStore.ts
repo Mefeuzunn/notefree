@@ -211,6 +211,9 @@ interface NotebookStoreState {
   movePageLeft: (index: number) => Promise<void>;
   movePageRight: (index: number) => Promise<void>;
   insertPageAt: (index: number, template?: PageTemplate, paperColor?: PaperColor) => Promise<void>;
+  removePagesBatch: (indices: number[]) => Promise<void>;
+  duplicatePagesBatch: (indices: number[]) => Promise<void>;
+  toggleBookmarksBatch: (indices: number[], forceState?: boolean) => Promise<void>;
 
   // Drawing & Strokes Actions
   setActiveTool: (tool: ToolType) => void;
@@ -1228,6 +1231,155 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
       redoStack: [],
     });
 
+    await saveNotebookToDB(updatedNotebook);
+  },
+
+  removePagesBatch: async (indices: number[]) => {
+    const { activeNotebookId, notebooks, activePageIndex } = get();
+    if (!activeNotebookId || indices.length === 0) return;
+    const currentNb = notebooks.find((n) => n.id === activeNotebookId);
+    if (!currentNb) return;
+
+    const indexSet = new Set(indices);
+    let remainingPages = currentNb.pages.filter((_, idx) => !indexSet.has(idx));
+
+    // If all pages were removed, leave at least 1 blank page
+    if (remainingPages.length === 0) {
+      remainingPages = [
+        {
+          id: `pg_${Date.now()}_1`,
+          pageNumber: 1,
+          template: 'lined',
+          paperColor: 'white',
+          strokes: [],
+          width: 800,
+          height: 1130,
+          title: 'Sayfa 1',
+        },
+      ];
+    }
+
+    const reindexedPages = remainingPages.map((p, idx) => ({
+      ...p,
+      pageNumber: idx + 1,
+    }));
+
+    const nextPageIndex = Math.min(reindexedPages.length - 1, Math.max(0, activePageIndex));
+    const updatedNotebook: Notebook = {
+      ...currentNb,
+      pages: reindexedPages,
+      activePageIndex: nextPageIndex,
+      updatedAt: Date.now(),
+    };
+
+    const updatedNotebooks = notebooks.map((n) =>
+      n.id === activeNotebookId ? updatedNotebook : n
+    );
+
+    set({
+      notebooks: updatedNotebooks,
+      activePageIndex: nextPageIndex,
+      undoStack: [],
+      redoStack: [],
+    });
+
+    await saveNotebookToDB(updatedNotebook);
+  },
+
+  duplicatePagesBatch: async (indices: number[]) => {
+    const { activeNotebookId, notebooks } = get();
+    if (!activeNotebookId || indices.length === 0) return;
+    const currentNb = notebooks.find((n) => n.id === activeNotebookId);
+    if (!currentNb) return;
+
+    const indexSet = new Set(indices);
+    const newPages: Page[] = [];
+
+    currentNb.pages.forEach((p, idx) => {
+      newPages.push(p);
+      if (indexSet.has(idx)) {
+        const clonedPage: Page = {
+          ...p,
+          id: `pg_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+          title: `${p.title || `Sayfa ${idx + 1}`} (Kopya)`,
+          strokes: (p.strokes || []).map((s) => ({
+            ...s,
+            id: `str_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+          })),
+          texts: (p.texts || []).map((t) => ({
+            ...t,
+            id: `txt_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+          })),
+          images: (p.images || []).map((img) => ({
+            ...img,
+            id: `img_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+          })),
+          fills: (p.fills || []).map((f) => ({
+            ...f,
+            id: `fill_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+          })),
+          stickyNotes: (p.stickyNotes || []).map((sn) => ({
+            ...sn,
+            id: `sn_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+          })),
+          tapes: (p.tapes || []).map((tp) => ({
+            ...tp,
+            id: `tp_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+          })),
+          stickers: (p.stickers || []).map((stk) => ({
+            ...stk,
+            id: `stk_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+          })),
+        };
+        newPages.push(clonedPage);
+      }
+    });
+
+    const reindexedPages = newPages.map((p, idx) => ({
+      ...p,
+      pageNumber: idx + 1,
+    }));
+
+    const updatedNotebook: Notebook = {
+      ...currentNb,
+      pages: reindexedPages,
+      updatedAt: Date.now(),
+    };
+
+    const updatedNotebooks = notebooks.map((n) =>
+      n.id === activeNotebookId ? updatedNotebook : n
+    );
+
+    set({ notebooks: updatedNotebooks });
+    await saveNotebookToDB(updatedNotebook);
+  },
+
+  toggleBookmarksBatch: async (indices: number[], forceState?: boolean) => {
+    const { activeNotebookId, notebooks } = get();
+    if (!activeNotebookId || indices.length === 0) return;
+    const currentNb = notebooks.find((n) => n.id === activeNotebookId);
+    if (!currentNb) return;
+
+    const indexSet = new Set(indices);
+    const updatedPages = currentNb.pages.map((p, idx) => {
+      if (!indexSet.has(idx)) return p;
+      return {
+        ...p,
+        isBookmarked: typeof forceState === 'boolean' ? forceState : !p.isBookmarked,
+      };
+    });
+
+    const updatedNotebook: Notebook = {
+      ...currentNb,
+      pages: updatedPages,
+      updatedAt: Date.now(),
+    };
+
+    const updatedNotebooks = notebooks.map((n) =>
+      n.id === activeNotebookId ? updatedNotebook : n
+    );
+
+    set({ notebooks: updatedNotebooks });
     await saveNotebookToDB(updatedNotebook);
   },
 

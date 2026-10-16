@@ -11,7 +11,15 @@ import {
   Check,
   GripHorizontal,
   PlusCircle,
+  CheckSquare,
+  Square,
+  Star,
+  Download,
+  Layers,
+  Sparkles,
 } from 'lucide-react';
+import { triggerHaptic } from '../../engine/hapticFeedback';
+import { MiniPagePreview } from '../navigation/PageScrubberBar';
 
 interface PageManagerModalProps {
   isOpen: boolean;
@@ -30,29 +38,45 @@ export const PageManagerModal: React.FC<PageManagerModalProps> = ({ isOpen, onCl
     movePageLeft,
     movePageRight,
     insertPageAt,
+    removePagesBatch,
+    duplicatePagesBatch,
+    toggleBookmarksBatch,
+    setExportModalOpen,
   } = useNotebookStore();
 
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+  const [isSelectionMode, setIsSelectionMode] = useState<boolean>(false);
+  const [selectedIndices, setSelectedIndices] = useState<Set<number>>(new Set());
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
 
   const activeNotebook = notebooks.find((n) => n.id === activeNotebookId);
   const pages = activeNotebook?.pages || [];
 
   if (!isOpen) return null;
 
+  const showToast = (msg: string) => {
+    setToastMsg(msg);
+    setTimeout(() => setToastMsg(null), 2000);
+  };
+
   const handleDuplicatePage = async (index: number) => {
     const pageToClone = pages[index];
     if (!pageToClone) return;
+    triggerHaptic('light');
     await insertPageAt(index + 1, pageToClone.template, pageToClone.paperColor);
+    showToast(`Sayfa ${index + 1} çoğaltıldı`);
   };
 
   const handleDragStart = (e: React.DragEvent, index: number) => {
+    if (isSelectionMode) return;
     e.dataTransfer.setData('text/plain', String(index));
     e.dataTransfer.effectAllowed = 'move';
     setDraggedIndex(index);
   };
 
   const handleDragOver = (e: React.DragEvent, index: number) => {
+    if (isSelectionMode) return;
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
     if (dragOverIndex !== index) {
@@ -66,21 +90,86 @@ export const PageManagerModal: React.FC<PageManagerModalProps> = ({ isOpen, onCl
   };
 
   const handleDrop = async (e: React.DragEvent, targetIndex: number) => {
+    if (isSelectionMode) return;
     e.preventDefault();
     const sourceIndexStr = e.dataTransfer.getData('text/plain');
     const sourceIndex = sourceIndexStr ? parseInt(sourceIndexStr, 10) : draggedIndex;
 
     if (sourceIndex !== null && !isNaN(sourceIndex) && sourceIndex !== targetIndex) {
+      triggerHaptic('medium');
       await reorderPages(sourceIndex, targetIndex);
     }
     setDraggedIndex(null);
     setDragOverIndex(null);
   };
 
+  // Selection Mode Helpers
+  const toggleSelect = (index: number) => {
+    triggerHaptic('light');
+    setSelectedIndices((prev) => {
+      const next = new Set(prev);
+      if (next.has(index)) next.delete(index);
+      else next.add(index);
+      return next;
+    });
+  };
+
+  const handleSelectAll = () => {
+    triggerHaptic('light');
+    if (selectedIndices.size === pages.length) {
+      setSelectedIndices(new Set());
+    } else {
+      setSelectedIndices(new Set(pages.map((_, i) => i)));
+    }
+  };
+
+  // Batch Action Handlers
+  const handleBatchDelete = async () => {
+    if (selectedIndices.size === 0) return;
+    const count = selectedIndices.size;
+    if (!confirm(`Seçilen ${count} sayfayı kalıcı olarak silmek istediğinize emin misiniz?`)) {
+      return;
+    }
+    triggerHaptic('heavy');
+    await removePagesBatch(Array.from(selectedIndices));
+    setSelectedIndices(new Set());
+    showToast(`${count} sayfa silindi`);
+  };
+
+  const handleBatchDuplicate = async () => {
+    if (selectedIndices.size === 0) return;
+    const count = selectedIndices.size;
+    triggerHaptic('medium');
+    await duplicatePagesBatch(Array.from(selectedIndices));
+    setSelectedIndices(new Set());
+    showToast(`${count} sayfa çoğaltıldı`);
+  };
+
+  const handleBatchBookmark = async () => {
+    if (selectedIndices.size === 0) return;
+    triggerHaptic('light');
+    await toggleBookmarksBatch(Array.from(selectedIndices));
+    showToast(`${selectedIndices.size} sayfanın yer imi güncellendi`);
+  };
+
+  const handleBatchExport = () => {
+    triggerHaptic('light');
+    onClose();
+    setExportModalOpen(true);
+  };
+
   return (
     <div className="fixed inset-0 bg-black/75 backdrop-blur-md z-50 flex flex-col select-none animate-in fade-in duration-200">
+      {/* Toast notification */}
+      {toastMsg && (
+        <div className="absolute top-18 left-1/2 -translate-x-1/2 z-60 bg-indigo-600/95 text-white text-xs font-semibold px-4 py-2 rounded-2xl shadow-2xl border border-indigo-400/50 flex items-center gap-2 animate-in fade-in zoom-in-95">
+          <Sparkles size={14} className="text-amber-300" />
+          <span>{toastMsg}</span>
+        </div>
+      )}
+
       {/* Header */}
-      <div className="h-14 bg-slate-900 border-b border-slate-800 px-6 flex items-center justify-between shadow-sm">
+      <div className="h-14 bg-slate-900 border-b border-slate-800 px-6 flex items-center justify-between shadow-sm shrink-0">
         <div className="flex items-center gap-2.5">
           <div className="p-1.5 rounded-lg bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
             <Grid size={18} />
@@ -93,14 +182,45 @@ export const PageManagerModal: React.FC<PageManagerModalProps> = ({ isOpen, onCl
               </span>
             </h2>
             <p className="text-[11px] text-slate-400">
-              Sürükle-bırak yaparak veya oklarla sayfaların sırasını kolayca değiştirin
+              {isSelectionMode
+                ? 'Sayfaları işaretleyerek toplu çoğaltın, silin veya yer imi ekleyin'
+                : 'Sürükle-bırak yaparak veya oklarla sayfaların sırasını kolayca değiştirin'}
             </p>
           </div>
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Multi-Selection Mode Toggle */}
           <button
-            onClick={() => addPage()}
+            onClick={() => {
+              triggerHaptic('light');
+              setIsSelectionMode(!isSelectionMode);
+              if (isSelectionMode) setSelectedIndices(new Set());
+            }}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all shadow-sm ${
+              isSelectionMode
+                ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700'
+            }`}
+          >
+            <CheckSquare size={14} />
+            <span>{isSelectionMode ? 'Seçimi Bitir' : 'Çoklu Seç'}</span>
+          </button>
+
+          {isSelectionMode && (
+            <button
+              onClick={handleSelectAll}
+              className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-medium transition-colors"
+            >
+              {selectedIndices.size === pages.length ? 'Tümünü Bırak' : 'Tümünü Seç'}
+            </button>
+          )}
+
+          <button
+            onClick={() => {
+              triggerHaptic('light');
+              addPage();
+            }}
             className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold shadow-md transition-all active:scale-95"
           >
             <Plus size={14} />
@@ -117,169 +237,246 @@ export const PageManagerModal: React.FC<PageManagerModalProps> = ({ isOpen, onCl
       </div>
 
       {/* Pages Grid */}
-      <div className="flex-1 overflow-y-auto p-6 sm:p-10">
+      <div className="flex-1 overflow-y-auto p-6 sm:p-10 pb-28">
         <div className="max-w-6xl mx-auto grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
           {pages.map((pg, idx) => {
-            const isSelected = idx === activePageIndex;
+            const isSelectedPage = idx === activePageIndex;
+            const isChecked = selectedIndices.has(idx);
             const isDragging = draggedIndex === idx;
             const isDragTarget = dragOverIndex === idx && draggedIndex !== idx;
 
             return (
               <div
                 key={pg.id}
-                draggable
+                draggable={!isSelectionMode}
                 onDragStart={(e) => handleDragStart(e, idx)}
                 onDragOver={(e) => handleDragOver(e, idx)}
                 onDragEnd={handleDragEnd}
                 onDrop={(e) => handleDrop(e, idx)}
                 onClick={() => {
-                  setActivePageIndex(idx);
-                  onClose();
+                  if (isSelectionMode) {
+                    toggleSelect(idx);
+                  } else {
+                    triggerHaptic('light');
+                    setActivePageIndex(idx);
+                    onClose();
+                  }
                 }}
                 className={`group relative flex flex-col items-center p-3 rounded-2xl border transition-all cursor-pointer ${
                   isDragging
                     ? 'opacity-40 scale-95 border-dashed border-indigo-400'
                     : isDragTarget
                     ? 'border-indigo-400 bg-indigo-500/20 scale-105 shadow-2xl ring-2 ring-indigo-400'
-                    : isSelected
-                    ? 'border-indigo-500 bg-indigo-500/10 ring-2 ring-indigo-500/40 shadow-xl scale-[1.02]'
+                    : isChecked
+                    ? 'border-indigo-400 bg-indigo-600/20 ring-2 ring-indigo-400 shadow-xl scale-[1.02]'
+                    : isSelectedPage
+                    ? 'border-indigo-500 bg-indigo-500/10 ring-2 ring-indigo-500/40 shadow-xl'
                     : 'border-slate-800 bg-slate-850/60 hover:border-slate-700 hover:bg-slate-800'
                 }`}
               >
-                {/* Drag Handle Icon on hover */}
-                <div
-                  className="absolute top-2 left-2 text-slate-500 group-hover:text-slate-300 opacity-60 group-hover:opacity-100 transition-opacity cursor-grab active:cursor-grabbing p-1"
-                  title="Sürükleyip sırasını değiştirin"
-                >
-                  <GripHorizontal size={14} />
-                </div>
-
-                {/* Active Selection Badge */}
-                {isSelected && (
-                  <span className="absolute top-2 right-2 w-5 h-5 rounded-full bg-indigo-600 text-white flex items-center justify-center text-[10px] font-bold shadow-md z-10">
-                    <Check size={11} />
-                  </span>
+                {/* Selection Checkbox or Drag Handle */}
+                {isSelectionMode ? (
+                  <div
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleSelect(idx);
+                    }}
+                    className={`absolute top-2 left-2 z-20 w-5 h-5 rounded-md flex items-center justify-center transition-all ${
+                      isChecked
+                        ? 'bg-indigo-600 text-white shadow-md'
+                        : 'bg-slate-800/80 border border-slate-600 text-transparent hover:border-slate-400'
+                    }`}
+                  >
+                    <Check size={12} className={isChecked ? 'stroke-[3]' : 'opacity-0'} />
+                  </div>
+                ) : (
+                  <div
+                    className="absolute top-2 left-2 text-slate-500 group-hover:text-slate-300 opacity-60 group-hover:opacity-100 transition-opacity cursor-grab active:cursor-grabbing p-1 z-10"
+                    title="Sürükleyip sırasını değiştirin"
+                  >
+                    <GripHorizontal size={14} />
+                  </div>
                 )}
 
-                {/* Simulated Thumbnail Paper */}
-                <div
-                  className="w-full aspect-[1/1.38] rounded-xl border border-slate-700/60 shadow-md mb-2 flex flex-col items-center justify-center p-2 text-center text-[10px] overflow-hidden transition-transform group-hover:shadow-lg"
-                  style={{
-                    backgroundColor:
-                      pg.paperColor === 'dark'
-                        ? '#181b26'
-                        : pg.paperColor === 'cream'
-                        ? '#fcfaf2'
-                        : pg.paperColor === 'yellow-pad'
-                        ? '#fefce8'
-                        : pg.paperColor === 'kraft'
-                        ? '#e7d8be'
-                        : '#ffffff',
-                  }}
-                >
-                  {pg.backgroundImageUrl ? (
-                    <span className="text-[10px] font-bold text-slate-700 bg-white/80 px-2 py-0.5 rounded shadow-sm">
-                      📄 Doküman
-                    </span>
-                  ) : pg.strokes.length > 0 ? (
-                    <div className="flex flex-col items-center gap-1">
-                      <span className="text-[10px] font-bold text-indigo-600 bg-white/90 px-2 py-0.5 rounded shadow-sm">
-                        ✍️ {pg.strokes.length} çizgi
-                      </span>
-                      {pg.stickyNotes && pg.stickyNotes.length > 0 && (
-                        <span className="text-[9px] font-semibold text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded shadow-2xs">
-                          📌 {pg.stickyNotes.length} not
-                        </span>
-                      )}
-                    </div>
-                  ) : (
-                    <span className="text-slate-400 font-mono capitalize">{pg.template}</span>
-                  )}
+                {/* Bookmark Star Icon */}
+                {pg.isBookmarked && (
+                  <div
+                    className="absolute top-2 right-2 text-amber-400 z-10 p-0.5"
+                    title="Yer İmi Eklenmiş Sayfa"
+                  >
+                    <Star size={13} className="fill-amber-400" />
+                  </div>
+                )}
+
+                {/* Live Real Page Canvas Preview */}
+                <div className="w-full aspect-[1/1.38] rounded-xl overflow-hidden border border-slate-700/60 shadow-md mb-2 flex items-center justify-center bg-slate-900 relative group-hover:shadow-lg transition-transform">
+                  <MiniPagePreview
+                    page={pg}
+                    width={130}
+                    height={180}
+                    className="w-full h-full border-none shadow-none"
+                  />
                 </div>
 
                 {/* Page Number & Reorder Arrow Controls */}
                 <div className="w-full flex items-center justify-between text-xs px-1 mb-1">
-                  <div className="flex items-center gap-1">
-                    <span className="font-semibold text-slate-200">Sayfa {idx + 1}</span>
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <span className="font-semibold text-slate-200 truncate">
+                      {pg.title || `Sayfa ${idx + 1}`}
+                    </span>
                   </div>
 
-                  <div className="flex items-center gap-0.5">
-                    {/* Move Left Button */}
-                    <button
-                      disabled={idx === 0}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        movePageLeft(idx);
-                      }}
-                      className="p-1 rounded text-slate-400 hover:text-indigo-300 hover:bg-slate-700 disabled:opacity-20 disabled:hover:bg-transparent"
-                      title="Sola / Öne Taşı"
-                    >
-                      <ChevronLeft size={13} />
-                    </button>
+                  {!isSelectionMode && (
+                    <div className="flex items-center gap-0.5 shrink-0">
+                      {/* Move Left Button */}
+                      <button
+                        disabled={idx === 0}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          triggerHaptic('light');
+                          movePageLeft(idx);
+                        }}
+                        className="p-1 rounded text-slate-400 hover:text-indigo-300 hover:bg-slate-700 disabled:opacity-20 disabled:hover:bg-transparent"
+                        title="Sola / Öne Taşı"
+                      >
+                        <ChevronLeft size={13} />
+                      </button>
 
-                    {/* Move Right Button */}
-                    <button
-                      disabled={idx === pages.length - 1}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        movePageRight(idx);
-                      }}
-                      className="p-1 rounded text-slate-400 hover:text-indigo-300 hover:bg-slate-700 disabled:opacity-20 disabled:hover:bg-transparent"
-                      title="Sağa / Arkaya Taşı"
-                    >
-                      <ChevronRight size={13} />
-                    </button>
-                  </div>
+                      {/* Move Right Button */}
+                      <button
+                        disabled={idx === pages.length - 1}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          triggerHaptic('light');
+                          movePageRight(idx);
+                        }}
+                        className="p-1 rounded text-slate-400 hover:text-indigo-300 hover:bg-slate-700 disabled:opacity-20 disabled:hover:bg-transparent"
+                        title="Sağa / Arkaya Taşı"
+                      >
+                        <ChevronRight size={13} />
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 {/* Bottom Actions Row: Duplicate, Insert After, Delete */}
-                <div className="w-full flex items-center justify-between pt-1 border-t border-slate-800/80 text-xs">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      insertPageAt(idx + 1);
-                    }}
-                    className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] text-slate-400 hover:text-indigo-300 hover:bg-slate-750 transition-colors"
-                    title="Bu sayfanın hemen arkasına yeni sayfa ekle"
-                  >
-                    <PlusCircle size={11} />
-                    <span>Araya Ekle</span>
-                  </button>
-
-                  <div className="flex items-center gap-1">
+                {!isSelectionMode && (
+                  <div className="w-full flex items-center justify-between pt-1 border-t border-slate-800/80 text-xs">
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        handleDuplicatePage(idx);
+                        triggerHaptic('light');
+                        insertPageAt(idx + 1);
+                        showToast(`Sayfa ${idx + 2} araya eklendi`);
                       }}
-                      className="p-1 text-slate-400 hover:text-indigo-400 rounded hover:bg-slate-700"
-                      title="Sayfayı Çoğalt"
+                      className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] text-slate-400 hover:text-indigo-300 hover:bg-slate-750 transition-colors"
+                      title="Bu sayfanın hemen arkasına yeni sayfa ekle"
                     >
-                      <Copy size={12} />
+                      <PlusCircle size={11} />
+                      <span>Araya Ekle</span>
                     </button>
 
-                    {pages.length > 1 && (
+                    <div className="flex items-center gap-1">
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          if (confirm(`Sayfa ${idx + 1}'i silmek istediğinize emin misiniz?`)) {
-                            setActivePageIndex(idx);
-                            removeCurrentPage();
-                          }
+                          handleDuplicatePage(idx);
                         }}
-                        className="p-1 text-slate-400 hover:text-rose-400 rounded hover:bg-slate-700"
-                        title="Sayfayı Sil"
+                        className="p-1 text-slate-400 hover:text-indigo-400 rounded hover:bg-slate-700"
+                        title="Sayfayı Çoğalt"
                       >
-                        <Trash2 size={12} />
+                        <Copy size={12} />
                       </button>
-                    )}
+
+                      {pages.length > 1 && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (confirm(`Sayfa ${idx + 1}'i silmek istediğinize emin misiniz?`)) {
+                              triggerHaptic('heavy');
+                              setActivePageIndex(idx);
+                              removeCurrentPage();
+                              showToast(`Sayfa ${idx + 1} silindi`);
+                            }
+                          }}
+                          className="p-1 text-slate-400 hover:text-rose-400 rounded hover:bg-slate-700"
+                          title="Sayfayı Sil"
+                        >
+                          <Trash2 size={12} />
+                        </button>
+                      )}
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
             );
           })}
         </div>
       </div>
+
+      {/* ⚡ FAZ U: Floating Bottom Batch Actions Pill Bar */}
+      {selectedIndices.size > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-slate-900/95 backdrop-blur-xl border border-indigo-500/50 rounded-2xl p-2 shadow-2xl shadow-indigo-950/60 flex items-center gap-2 ring-1 ring-black/40 animate-in fade-in slide-in-from-bottom-4 duration-200">
+          <div className="px-3 py-1 bg-indigo-600/25 rounded-xl border border-indigo-500/40 text-indigo-300 font-mono font-bold text-xs flex items-center gap-1.5">
+            <Layers size={13} />
+            <span>{selectedIndices.size} Sayfa Seçildi</span>
+          </div>
+
+          {/* Batch Duplicate */}
+          <button
+            onClick={handleBatchDuplicate}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold transition-all hover:scale-105"
+            title="Seçili sayfaları sıralarıyla çoğalt"
+          >
+            <Copy size={13} className="text-indigo-400" />
+            <span>Çoğalt</span>
+          </button>
+
+          {/* Batch Bookmark Toggle */}
+          <button
+            onClick={handleBatchBookmark}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 text-xs font-semibold transition-all hover:scale-105"
+            title="Seçili sayfalara toplu yer imi yıldızı ekle / kaldır"
+          >
+            <Star size={13} className="fill-amber-400 text-amber-400" />
+            <span>Yer İmi</span>
+          </button>
+
+          {/* Batch Export */}
+          <button
+            onClick={handleBatchExport}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-sky-300 text-xs font-semibold transition-all hover:scale-105"
+            title="Dışa Aktarma Stüdyosunu Aç"
+          >
+            <Download size={13} className="text-sky-400" />
+            <span>Dışa Aktar</span>
+          </button>
+
+          {/* Batch Delete */}
+          <button
+            onClick={handleBatchDelete}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 border border-rose-500/30 text-xs font-semibold transition-all hover:scale-105"
+            title="Seçili sayfaları sil"
+          >
+            <Trash2 size={13} className="text-rose-400" />
+            <span>Sil</span>
+          </button>
+
+          <div className="w-px h-5 bg-slate-700 mx-1" />
+
+          {/* Clear Selection */}
+          <button
+            onClick={() => {
+              triggerHaptic('light');
+              setSelectedIndices(new Set());
+            }}
+            className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800"
+            title="Seçimi Temizle"
+          >
+            <X size={15} />
+          </button>
+        </div>
+      )}
     </div>
   );
 };

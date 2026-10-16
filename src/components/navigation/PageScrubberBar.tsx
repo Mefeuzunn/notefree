@@ -15,13 +15,14 @@ import {
 } from 'lucide-react';
 import { triggerHaptic } from '../../engine/hapticFeedback';
 
-interface MiniPagePreviewProps {
+export interface MiniPagePreviewProps {
   page: Page;
   width?: number;
   height?: number;
+  className?: string;
 }
 
-const MiniPagePreview: React.FC<MiniPagePreviewProps> = ({ page, width = 84, height = 112 }) => {
+export const MiniPagePreview: React.FC<MiniPagePreviewProps> = ({ page, width = 84, height = 112, className = '' }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   useEffect(() => {
@@ -73,7 +74,7 @@ const MiniPagePreview: React.FC<MiniPagePreviewProps> = ({ page, width = 84, hei
 
   return (
     <div
-      className="rounded-lg bg-white overflow-hidden shadow-lg border border-slate-700/80 relative"
+      className={`rounded-lg bg-white overflow-hidden shadow-lg border border-slate-700/80 relative ${className}`}
       style={{ width: `${width}px`, height: `${height}px` }}
     >
       <canvas
