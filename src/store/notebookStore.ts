@@ -34,6 +34,8 @@ import {
   StickyNoteColor,
   PageLinkItem,
   PlannerTabItem,
+  PageTableItem,
+  TableCell,
 } from '../types/notebook';
 import { collaborationService } from '../services/collaborationService';
 import { db, initStorage, saveNotebookToDB, importNotebookFromNotefree } from '../services/storage';
@@ -348,6 +350,16 @@ interface NotebookStoreState {
   addStickyNoteToCurrentPage: (note: StickyNoteItem) => void;
   updateStickyNoteOnCurrentPage: (noteId: string, partial: Partial<StickyNoteItem>) => void;
   removeStickyNoteFromCurrentPage: (noteId: string) => void;
+
+  // Faz AF: Interactive Tables & Data Matrices
+  addTableToCurrentPage: (rows?: number, cols?: number, x?: number, y?: number) => string;
+  updateTableOnCurrentPage: (tableId: string, updates: Partial<PageTableItem>) => void;
+  updateTableCell: (tableId: string, row: number, col: number, updates: Partial<TableCell>) => void;
+  addRowToTable: (tableId: string, atIndex?: number) => void;
+  deleteRowFromTable: (tableId: string, rowIndex: number) => void;
+  addColToTable: (tableId: string, atIndex?: number) => void;
+  deleteColFromTable: (tableId: string, colIndex: number) => void;
+  deleteTableFromCurrentPage: (tableId: string) => void;
 
   // Faz C: Live Speech-to-Text Transcription & Dictation
   liveTranscript: string;
@@ -848,6 +860,7 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
     stickers: true,
     tapes: true,
     fills: true,
+    tables: true,
   },
   layerLocks: {
     background: false,
@@ -857,6 +870,7 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
     stickers: false,
     tapes: false,
     fills: false,
+    tables: false,
   },
 
   // Faz 4 Initial State: Infinite Canvas & Realtime Collaboration
@@ -1438,6 +1452,16 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
           stickers: (p.stickers || []).map((stk) => ({
             ...stk,
             id: `stk_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+          })),
+          tables: (p.tables || []).map((tbl) => ({
+            ...tbl,
+            id: `tbl_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+            cells: tbl.cells.map((row) =>
+              row.map((cell) => ({
+                ...cell,
+                id: `c_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+              }))
+            ),
           })),
         };
         newPages.push(clonedPage);
@@ -2242,10 +2266,20 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
       stk.y >= startY ? { ...stk, y: stk.y + amount } : stk
     );
 
+    // 6. Shift tables below startY
+    const updatedTables = currentPage.tables?.map((tbl) =>
+      tbl.y >= startY ? { ...tbl, y: tbl.y + amount } : tbl
+    );
+
     // Calculate maximum Y to expand page height if needed
     let maxY = currentPage.height;
     for (const s of updatedStrokes) {
       if (s.bounds.maxY > maxY) maxY = s.bounds.maxY;
+    }
+    if (updatedTables) {
+      for (const tbl of updatedTables) {
+        if (tbl.y + tbl.height > maxY) maxY = tbl.y + tbl.height;
+      }
     }
     const newHeight = Math.max(currentPage.height, Math.ceil(maxY + 100));
 
@@ -2256,6 +2290,7 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
       stickyNotes: updatedStickyNotes,
       tapes: updatedTapes,
       stickers: updatedStickers,
+      tables: updatedTables,
       height: newHeight,
     };
 
@@ -3096,6 +3131,317 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
     const updatedStickyNotes = (targetPage.stickyNotes || []).filter((sn) => sn.id !== noteId);
     const updatedPages = currentNb.pages.map((p, idx) =>
       idx === activePageIndex ? { ...p, stickyNotes: updatedStickyNotes } : p
+    );
+
+    const updatedNotebook = { ...currentNb, pages: updatedPages, updatedAt: Date.now() };
+    set({
+      notebooks: notebooks.map((n) =>
+        n.id === activeNotebookId ? updatedNotebook : n
+      ),
+    });
+    saveNotebookToDB(updatedNotebook);
+  },
+
+  // Faz AF: Interactive Tables & Data Matrices Actions
+  addTableToCurrentPage: (rows = 3, cols = 3, x = 140, y = 180) => {
+    const { activeNotebookId, notebooks, activePageIndex } = get();
+    if (!activeNotebookId) return '';
+    const currentNb = notebooks.find((n) => n.id === activeNotebookId);
+    if (!currentNb) return '';
+    const targetPage = currentNb.pages[activePageIndex];
+    if (!targetPage) return '';
+
+    const rowCount = Math.max(1, Math.min(20, rows));
+    const colCount = Math.max(1, Math.min(12, cols));
+    const cellW = 150;
+    const cellH = 38;
+    const tableW = colCount * cellW;
+    const tableH = rowCount * cellH;
+
+    const initialCells: TableCell[][] = [];
+    for (let r = 0; r < rowCount; r++) {
+      const row: TableCell[] = [];
+      for (let c = 0; c < colCount; c++) {
+        row.push({
+          id: `c_${Date.now()}_${r}_${c}_${Math.random().toString(36).slice(2, 5)}`,
+          text: '',
+          align: 'left',
+          bold: r === 0,
+        });
+      }
+      initialCells.push(row);
+    }
+
+    const newTable: PageTableItem = {
+      id: `tbl_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      x,
+      y,
+      width: tableW,
+      height: tableH,
+      rows: rowCount,
+      cols: colCount,
+      cells: initialCells,
+      hasHeaderRow: true,
+      headerBgColor: 'rgba(99, 102, 241, 0.12)',
+      borderColor: '#94a3b8',
+      borderWidth: 1,
+      createdAt: Date.now(),
+    };
+
+    const updatedTables = [...(targetPage.tables || []), newTable];
+    const updatedPages = currentNb.pages.map((p, idx) =>
+      idx === activePageIndex ? { ...p, tables: updatedTables } : p
+    );
+
+    const updatedNotebook = { ...currentNb, pages: updatedPages, updatedAt: Date.now() };
+    set({
+      notebooks: notebooks.map((n) =>
+        n.id === activeNotebookId ? updatedNotebook : n
+      ),
+    });
+    saveNotebookToDB(updatedNotebook);
+    return newTable.id;
+  },
+
+  updateTableOnCurrentPage: (tableId: string, updates: Partial<PageTableItem>) => {
+    const { activeNotebookId, notebooks, activePageIndex } = get();
+    if (!activeNotebookId) return;
+    const currentNb = notebooks.find((n) => n.id === activeNotebookId);
+    if (!currentNb) return;
+    const targetPage = currentNb.pages[activePageIndex];
+    if (!targetPage) return;
+
+    const updatedTables = (targetPage.tables || []).map((t) =>
+      t.id === tableId ? { ...t, ...updates } : t
+    );
+    const updatedPages = currentNb.pages.map((p, idx) =>
+      idx === activePageIndex ? { ...p, tables: updatedTables } : p
+    );
+
+    const updatedNotebook = { ...currentNb, pages: updatedPages, updatedAt: Date.now() };
+    set({
+      notebooks: notebooks.map((n) =>
+        n.id === activeNotebookId ? updatedNotebook : n
+      ),
+    });
+    saveNotebookToDB(updatedNotebook);
+  },
+
+  updateTableCell: (tableId: string, row: number, col: number, cellUpdates: Partial<TableCell>) => {
+    const { activeNotebookId, notebooks, activePageIndex } = get();
+    if (!activeNotebookId) return;
+    const currentNb = notebooks.find((n) => n.id === activeNotebookId);
+    if (!currentNb) return;
+    const targetPage = currentNb.pages[activePageIndex];
+    if (!targetPage) return;
+
+    const targetTable = (targetPage.tables || []).find((t) => t.id === tableId);
+    if (!targetTable) return;
+
+    const newCells = targetTable.cells.map((rCells, rIdx) => {
+      if (rIdx !== row) return rCells;
+      return rCells.map((cCell, cIdx) => {
+        if (cIdx !== col) return cCell;
+        return { ...cCell, ...cellUpdates };
+      });
+    });
+
+    const updatedTables = (targetPage.tables || []).map((t) =>
+      t.id === tableId ? { ...t, cells: newCells } : t
+    );
+    const updatedPages = currentNb.pages.map((p, idx) =>
+      idx === activePageIndex ? { ...p, tables: updatedTables } : p
+    );
+
+    const updatedNotebook = { ...currentNb, pages: updatedPages, updatedAt: Date.now() };
+    set({
+      notebooks: notebooks.map((n) =>
+        n.id === activeNotebookId ? updatedNotebook : n
+      ),
+    });
+    saveNotebookToDB(updatedNotebook);
+  },
+
+  addRowToTable: (tableId: string, atIndex?: number) => {
+    const { activeNotebookId, notebooks, activePageIndex } = get();
+    if (!activeNotebookId) return;
+    const currentNb = notebooks.find((n) => n.id === activeNotebookId);
+    if (!currentNb) return;
+    const targetPage = currentNb.pages[activePageIndex];
+    if (!targetPage) return;
+
+    const targetTable = (targetPage.tables || []).find((t) => t.id === tableId);
+    if (!targetTable) return;
+
+    const newRowCells: TableCell[] = [];
+    for (let c = 0; c < targetTable.cols; c++) {
+      newRowCells.push({
+        id: `c_${Date.now()}_${targetTable.rows}_${c}_${Math.random().toString(36).slice(2, 5)}`,
+        text: '',
+        align: 'left',
+      });
+    }
+
+    const insertIdx = atIndex !== undefined ? atIndex : targetTable.rows;
+    const newCells = [...targetTable.cells];
+    newCells.splice(insertIdx, 0, newRowCells);
+
+    const rowH = targetTable.height / targetTable.rows;
+    const updatedTable: PageTableItem = {
+      ...targetTable,
+      rows: targetTable.rows + 1,
+      height: targetTable.height + rowH,
+      cells: newCells,
+    };
+
+    const updatedTables = (targetPage.tables || []).map((t) =>
+      t.id === tableId ? updatedTable : t
+    );
+    const updatedPages = currentNb.pages.map((p, idx) =>
+      idx === activePageIndex ? { ...p, tables: updatedTables } : p
+    );
+
+    const updatedNotebook = { ...currentNb, pages: updatedPages, updatedAt: Date.now() };
+    set({
+      notebooks: notebooks.map((n) =>
+        n.id === activeNotebookId ? updatedNotebook : n
+      ),
+    });
+    saveNotebookToDB(updatedNotebook);
+  },
+
+  deleteRowFromTable: (tableId: string, rowIndex: number) => {
+    const { activeNotebookId, notebooks, activePageIndex } = get();
+    if (!activeNotebookId) return;
+    const currentNb = notebooks.find((n) => n.id === activeNotebookId);
+    if (!currentNb) return;
+    const targetPage = currentNb.pages[activePageIndex];
+    if (!targetPage) return;
+
+    const targetTable = (targetPage.tables || []).find((t) => t.id === tableId);
+    if (!targetTable || targetTable.rows <= 1) return; // Keep at least 1 row
+
+    const newCells = targetTable.cells.filter((_, idx) => idx !== rowIndex);
+    const rowH = targetTable.height / targetTable.rows;
+    const updatedTable: PageTableItem = {
+      ...targetTable,
+      rows: targetTable.rows - 1,
+      height: Math.max(38, targetTable.height - rowH),
+      cells: newCells,
+    };
+
+    const updatedTables = (targetPage.tables || []).map((t) =>
+      t.id === tableId ? updatedTable : t
+    );
+    const updatedPages = currentNb.pages.map((p, idx) =>
+      idx === activePageIndex ? { ...p, tables: updatedTables } : p
+    );
+
+    const updatedNotebook = { ...currentNb, pages: updatedPages, updatedAt: Date.now() };
+    set({
+      notebooks: notebooks.map((n) =>
+        n.id === activeNotebookId ? updatedNotebook : n
+      ),
+    });
+    saveNotebookToDB(updatedNotebook);
+  },
+
+  addColToTable: (tableId: string, atIndex?: number) => {
+    const { activeNotebookId, notebooks, activePageIndex } = get();
+    if (!activeNotebookId) return;
+    const currentNb = notebooks.find((n) => n.id === activeNotebookId);
+    if (!currentNb) return;
+    const targetPage = currentNb.pages[activePageIndex];
+    if (!targetPage) return;
+
+    const targetTable = (targetPage.tables || []).find((t) => t.id === tableId);
+    if (!targetTable) return;
+
+    const insertIdx = atIndex !== undefined ? atIndex : targetTable.cols;
+    const newCells = targetTable.cells.map((rCells, rIdx) => {
+      const copy = [...rCells];
+      copy.splice(insertIdx, 0, {
+        id: `c_${Date.now()}_${rIdx}_${targetTable.cols}_${Math.random().toString(36).slice(2, 5)}`,
+        text: '',
+        align: 'left',
+        bold: rIdx === 0 && targetTable.hasHeaderRow,
+      });
+      return copy;
+    });
+
+    const colW = targetTable.width / targetTable.cols;
+    const updatedTable: PageTableItem = {
+      ...targetTable,
+      cols: targetTable.cols + 1,
+      width: targetTable.width + colW,
+      cells: newCells,
+    };
+
+    const updatedTables = (targetPage.tables || []).map((t) =>
+      t.id === tableId ? updatedTable : t
+    );
+    const updatedPages = currentNb.pages.map((p, idx) =>
+      idx === activePageIndex ? { ...p, tables: updatedTables } : p
+    );
+
+    const updatedNotebook = { ...currentNb, pages: updatedPages, updatedAt: Date.now() };
+    set({
+      notebooks: notebooks.map((n) =>
+        n.id === activeNotebookId ? updatedNotebook : n
+      ),
+    });
+    saveNotebookToDB(updatedNotebook);
+  },
+
+  deleteColFromTable: (tableId: string, colIndex: number) => {
+    const { activeNotebookId, notebooks, activePageIndex } = get();
+    if (!activeNotebookId) return;
+    const currentNb = notebooks.find((n) => n.id === activeNotebookId);
+    if (!currentNb) return;
+    const targetPage = currentNb.pages[activePageIndex];
+    if (!targetPage) return;
+
+    const targetTable = (targetPage.tables || []).find((t) => t.id === tableId);
+    if (!targetTable || targetTable.cols <= 1) return; // Keep at least 1 column
+
+    const newCells = targetTable.cells.map((rCells) =>
+      rCells.filter((_, idx) => idx !== colIndex)
+    );
+    const colW = targetTable.width / targetTable.cols;
+    const updatedTable: PageTableItem = {
+      ...targetTable,
+      cols: targetTable.cols - 1,
+      width: Math.max(80, targetTable.width - colW),
+      cells: newCells,
+    };
+
+    const updatedTables = (targetPage.tables || []).map((t) =>
+      t.id === tableId ? updatedTable : t
+    );
+    const updatedPages = currentNb.pages.map((p, idx) =>
+      idx === activePageIndex ? { ...p, tables: updatedTables } : p
+    );
+
+    const updatedNotebook = { ...currentNb, pages: updatedPages, updatedAt: Date.now() };
+    set({
+      notebooks: notebooks.map((n) =>
+        n.id === activeNotebookId ? updatedNotebook : n
+      ),
+    });
+    saveNotebookToDB(updatedNotebook);
+  },
+
+  deleteTableFromCurrentPage: (tableId: string) => {
+    const { activeNotebookId, notebooks, activePageIndex } = get();
+    if (!activeNotebookId) return;
+    const currentNb = notebooks.find((n) => n.id === activeNotebookId);
+    if (!currentNb) return;
+    const targetPage = currentNb.pages[activePageIndex];
+    if (!targetPage) return;
+
+    const updatedTables = (targetPage.tables || []).filter((t) => t.id !== tableId);
+    const updatedPages = currentNb.pages.map((p, idx) =>
+      idx === activePageIndex ? { ...p, tables: updatedTables } : p
     );
 
     const updatedNotebook = { ...currentNb, pages: updatedPages, updatedAt: Date.now() };

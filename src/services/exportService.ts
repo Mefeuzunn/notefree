@@ -4,6 +4,7 @@ import {
   ExportOptions,
   Notebook,
   PageSticker,
+  PageTableItem,
   WatermarkOptions,
   HeaderFooterOptions,
 } from '../types/notebook';
@@ -486,6 +487,13 @@ export async function renderPageToCanvas(
     }
   }
 
+  // 10.5 Faz AF: Interactive Tables & Data Matrices
+  if (page.tables && page.tables.length > 0) {
+    for (const tbl of page.tables) {
+      drawTableToCanvas(ctx, tbl);
+    }
+  }
+
   // 11. Watermark Security Overlay
   if (options.watermark && options.watermark.enabled) {
     drawWatermarkToCanvas(ctx, page.width, page.height, options.watermark);
@@ -607,4 +615,82 @@ export function downloadBlob(blob: Blob, filename: string) {
   a.click();
   document.body.removeChild(a);
   setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
+
+/**
+ * FAZ AF: Renders interactive table and cell matrix vectorially to canvas
+ */
+export function drawTableToCanvas(ctx: CanvasRenderingContext2D, tbl: PageTableItem) {
+  ctx.save();
+  const colW = tbl.width / tbl.cols;
+  const rowH = Math.max(34, tbl.height / tbl.rows);
+
+  // Outer background
+  ctx.fillStyle = '#ffffff';
+  ctx.beginPath();
+  ctx.roundRect(tbl.x, tbl.y, tbl.width, tbl.height, 6);
+  ctx.fill();
+
+  // Draw cells
+  for (let r = 0; r < tbl.rows; r++) {
+    const isHeader = r === 0 && tbl.hasHeaderRow;
+    const y = tbl.y + r * rowH;
+
+    for (let c = 0; c < tbl.cols; c++) {
+      const x = tbl.x + c * colW;
+      const cell = tbl.cells[r]?.[c];
+      const cellBg =
+        cell?.bgColor ||
+        (isHeader ? tbl.headerBgColor || '#f1f5f9' : r % 2 === 1 ? '#fafafa' : '#ffffff');
+
+      // Cell background fill
+      if (cellBg) {
+        ctx.fillStyle = cellBg;
+        ctx.fillRect(x, y, colW, rowH);
+      }
+
+      // Cell border
+      ctx.strokeStyle = tbl.borderColor || '#cbd5e1';
+      ctx.lineWidth = tbl.borderWidth || 1;
+      ctx.strokeRect(x, y, colW, rowH);
+
+      // Cell text
+      if (cell?.text) {
+        ctx.fillStyle = isHeader ? '#0f172a' : '#1e293b';
+        const fontSize = 12;
+        ctx.font = `${cell.bold || isHeader ? 'bold ' : ''}${fontSize}px Inter, sans-serif`;
+        ctx.textBaseline = 'middle';
+
+        const align = cell.align || (isHeader ? 'center' : 'left');
+        let textX = x + 8;
+        if (align === 'center') {
+          textX = x + colW / 2;
+          ctx.textAlign = 'center';
+        } else if (align === 'right') {
+          textX = x + colW - 8;
+          ctx.textAlign = 'right';
+        } else {
+          ctx.textAlign = 'left';
+        }
+
+        const textY = y + rowH / 2;
+        // Clip text within cell bounds
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(x + 2, y + 2, colW - 4, rowH - 4);
+        ctx.clip();
+        ctx.fillText(cell.text, textX, textY);
+        ctx.restore();
+      }
+    }
+  }
+
+  // Outer border with rounded corners
+  ctx.strokeStyle = tbl.borderColor || '#94a3b8';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.roundRect(tbl.x, tbl.y, tbl.width, tbl.height, 6);
+  ctx.stroke();
+
+  ctx.restore();
 }

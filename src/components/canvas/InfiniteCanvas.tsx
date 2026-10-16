@@ -23,6 +23,7 @@ import {
 } from '../../engine/shapeDetector';
 import { collaborationService } from '../../services/collaborationService';
 import { StickyNoteOverlay } from './StickyNoteOverlay';
+import { TableItemOverlay } from './TableItemOverlay';
 import { Compass, Move, Users, Maximize2, Sparkles } from 'lucide-react';
 import { triggerHaptic } from '../../engine/hapticFeedback';
 
@@ -612,6 +613,10 @@ export const InfiniteCanvas: React.FC = () => {
           {currentPage?.stickyNotes &&
             currentPage.stickyNotes.map((note) => (
               <StickyNoteOverlay key={note.id} note={note} scale={zoom} />
+            ))}
+          {currentPage?.tables &&
+            currentPage.tables.map((tbl) => (
+              <TableItemOverlay key={tbl.id} table={tbl} scale={1.0} />
             ))}
         </div>
       </div>

@@ -16,6 +16,7 @@ import {
   PaintBucket,
   FileText,
   RotateCcw,
+  Table2,
 } from 'lucide-react';
 
 export const LayersDrawer: React.FC = () => {
@@ -42,6 +43,7 @@ export const LayersDrawer: React.FC = () => {
   const stickerCount = currentPage?.stickers?.length || 0;
   const tapeCount = currentPage?.tapes?.length || 0;
   const fillCount = currentPage?.fills?.length || 0;
+  const tableCount = currentPage?.tables?.length || 0;
 
   const layerItems: {
     key: keyof LayerVisibilitySettings;
@@ -51,6 +53,14 @@ export const LayersDrawer: React.FC = () => {
     icon: React.ReactNode;
     color: string;
   }[] = [
+    {
+      key: 'tables',
+      name: 'İnteraktif Tablolar',
+      description: 'Tablo ve çizelge matrisleri',
+      count: `${tableCount} tablo`,
+      icon: <Table2 size={16} />,
+      color: 'text-indigo-400 bg-indigo-500/10 border-indigo-500/20',
+    },
     {
       key: 'stickers',
       name: 'Öğeler & Çıkartmalar',

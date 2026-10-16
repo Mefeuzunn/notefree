@@ -57,6 +57,7 @@ import {
   Link2,
   TrendingUp,
   Stamp,
+  Table2,
   MoreHorizontal,
   X,
   ChevronDown,
@@ -160,6 +161,7 @@ export const Toolbar: React.FC = () => {
     openLinkModal,
     addPageLinkToCurrentPage,
     setStampCreatorModalOpen,
+    addTableToCurrentPage,
   } = useNotebookStore();
 
   // Active Dropdown state
@@ -932,6 +934,21 @@ export const Toolbar: React.FC = () => {
                   >
                     <StickyNote size={16} className="text-amber-400" />
                     <span>Not Ekle</span>
+                  </button>
+
+                  {/* FAZ AF: İnteraktif Tablo */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      triggerHaptic('medium');
+                      addTableToCurrentPage(3, 3, 160, 200);
+                      closeDropdown();
+                    }}
+                    className="p-2 rounded-xl border bg-slate-800/60 border-slate-750 text-slate-400 hover:text-indigo-300 flex flex-col items-center gap-1 text-[10px] font-medium transition-all"
+                    title="İnteraktif Çizelge & Tablo Ekle (3x3)"
+                  >
+                    <Table2 size={16} className="text-indigo-400" />
+                    <span>Tablo</span>
                   </button>
 
                   {/* Kaşe & Damga */}
@@ -2133,6 +2150,19 @@ export const Toolbar: React.FC = () => {
               >
                 <StickyNote size={16} className="text-amber-400" />
                 <span>Not Ekle</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  triggerHaptic('medium');
+                  addTableToCurrentPage(3, 3, 140, 180);
+                  closeDropdown();
+                }}
+                className="p-2 rounded-xl border bg-slate-800/60 border-slate-750 text-slate-400 hover:text-indigo-300 flex flex-col items-center gap-1 text-[10px] font-medium transition-all"
+                title="İnteraktif Çizelge & Tablo Ekle (3x3)"
+              >
+                <Table2 size={16} className="text-indigo-400" />
+                <span>Tablo</span>
               </button>
               <button
                 type="button"

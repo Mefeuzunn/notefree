@@ -139,6 +139,7 @@ export interface LayerVisibilitySettings {
   stickers: boolean;
   tapes: boolean;
   fills: boolean;
+  tables?: boolean;
 }
 
 export interface LayerLockSettings {
@@ -149,6 +150,7 @@ export interface LayerLockSettings {
   stickers: boolean;
   tapes: boolean;
   fills: boolean;
+  tables?: boolean;
 }
 
 export interface StickerItem {
@@ -220,6 +222,7 @@ export interface Page {
   fills?: FillItem[];
   stickyNotes?: StickyNoteItem[];
   links?: PageLinkItem[]; // Interactive page hyperlinks & hotspots
+  tables?: PageTableItem[]; // FAZ AF: Interactive Tables & Data Matrix
   backgroundImageUrl?: string; // Rendered PDF or Word page
   width: number;
   height: number;
@@ -228,6 +231,32 @@ export interface Page {
   customPitch?: number; // Custom line/grid spacing in px (e.g. 20 - 64)
   customLineColor?: string; // Optional custom line hex color
   lineOpacity?: number; // Line opacity (0.1 - 1.0)
+}
+
+export interface TableCell {
+  id: string;
+  text: string;
+  bgColor?: string; // Optional cell background tint (e.g. #fef08a, #dcfce7, #e0f2fe, #fce7f3, #f3e8ff, #f1f5f9)
+  align?: 'left' | 'center' | 'right';
+  bold?: boolean;
+}
+
+export interface PageTableItem {
+  id: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  rows: number;
+  cols: number;
+  cells: TableCell[][]; // [row][col] 2D matrix
+  colWidths?: number[]; // Custom pixel width per column or auto-calculated
+  rowHeights?: number[]; // Custom pixel height per row or auto-calculated
+  hasHeaderRow?: boolean; // When true, first row is styled with distinct header styling
+  headerBgColor?: string; // Background color for header row
+  borderColor?: string;
+  borderWidth?: number;
+  createdAt?: number;
 }
 
 export interface PageLinkItem {

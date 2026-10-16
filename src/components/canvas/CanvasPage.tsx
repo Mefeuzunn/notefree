@@ -34,6 +34,7 @@ import { TextBoxOverlay } from './TextBoxOverlay';
 import { StickyNoteOverlay } from './StickyNoteOverlay';
 import { PageLinkOverlay } from './PageLinkOverlay';
 import { StickerItemOverlay } from './StickerItemOverlay';
+import { TableItemOverlay } from './TableItemOverlay';
 import { SymmetryGuide } from './SymmetryGuide';
 import { ShapeNodeEditor } from './ShapeNodeEditor';
 import { getSnapToRulerPoint, formatRulerMeasurement } from '../../engine/rulerHelper';
@@ -1746,6 +1747,17 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
           <StickyNoteOverlay
             key={note.id}
             note={note}
+            scale={scale}
+          />
+        ))}
+
+      {/* 📊 Layer 0.75: Faz AF Interactive Tables (İnteraktif Tablolar) */}
+      {layers.tables !== false &&
+        page.tables &&
+        page.tables.map((tbl) => (
+          <TableItemOverlay
+            key={tbl.id}
+            table={tbl}
             scale={scale}
           />
         ))}
