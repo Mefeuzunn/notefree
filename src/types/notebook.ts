@@ -23,7 +23,8 @@ export type ToolType =
   | 'audio-scrub'
   | 'sticky-note'
   | 'protractor'
-  | 'compass';
+  | 'compass'
+  | 'connector';
 
 export type EraserMode = 'stroke' | 'pixel';
 
@@ -140,6 +141,7 @@ export interface LayerVisibilitySettings {
   tapes: boolean;
   fills: boolean;
   tables?: boolean;
+  connectors?: boolean;
 }
 
 export interface LayerLockSettings {
@@ -151,6 +153,7 @@ export interface LayerLockSettings {
   tapes: boolean;
   fills: boolean;
   tables?: boolean;
+  connectors?: boolean;
 }
 
 export interface StickerItem {
@@ -223,6 +226,7 @@ export interface Page {
   stickyNotes?: StickyNoteItem[];
   links?: PageLinkItem[]; // Interactive page hyperlinks & hotspots
   tables?: PageTableItem[]; // FAZ AF: Interactive Tables & Data Matrix
+  connectors?: PageConnectorItem[]; // FAZ AH: Smart Magnetic Connectors & Flowchart Lines
   backgroundImageUrl?: string; // Rendered PDF or Word page
   width: number;
   height: number;
@@ -256,6 +260,30 @@ export interface PageTableItem {
   headerBgColor?: string; // Background color for header row
   borderColor?: string;
   borderWidth?: number;
+  createdAt?: number;
+}
+
+export type ConnectorStyle = 'straight' | 'curved' | 'orthogonal';
+export type ConnectorArrowType = 'end' | 'both' | 'none';
+
+export interface ConnectorAnchor {
+  elementId?: string; // ID of target sticky note, table, or text box
+  elementType?: 'sticky' | 'table' | 'text' | 'free';
+  side?: 'top' | 'bottom' | 'left' | 'right';
+  x: number; // Page absolute coordinate
+  y: number;
+}
+
+export interface PageConnectorItem {
+  id: string;
+  from: ConnectorAnchor;
+  to: ConnectorAnchor;
+  style: ConnectorStyle;
+  arrowType: ConnectorArrowType;
+  color: string;
+  width: number;
+  dashed?: boolean;
+  label?: string;
   createdAt?: number;
 }
 

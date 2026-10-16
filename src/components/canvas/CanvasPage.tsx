@@ -35,6 +35,7 @@ import { StickyNoteOverlay } from './StickyNoteOverlay';
 import { PageLinkOverlay } from './PageLinkOverlay';
 import { StickerItemOverlay } from './StickerItemOverlay';
 import { TableItemOverlay } from './TableItemOverlay';
+import { ConnectorOverlay } from './ConnectorOverlay';
 import { SymmetryGuide } from './SymmetryGuide';
 import { ShapeNodeEditor } from './ShapeNodeEditor';
 import { getSnapToRulerPoint, formatRulerMeasurement } from '../../engine/rulerHelper';
@@ -1698,6 +1699,7 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
 
   return (
     <div
+      id={`canvas-page-container-${page.id || 'default'}`}
       className={`relative mx-auto my-6 shadow-2xl rounded-sm transition-all duration-100 ease-out select-none bg-white overflow-hidden ring-1 ring-slate-800/10 ${
         isCurrent ? 'ring-2 ring-indigo-500/40' : ''
       }`}
@@ -1763,6 +1765,14 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
             scale={scale}
           />
         ))}
+
+      {/* 🧭 Layer 0.78: Faz AH Smart Magnetic Connectors (Manyetik Akış & Zihin Haritası Okları) */}
+      {layers.connectors !== false && (
+        <ConnectorOverlay
+          page={page}
+          scale={scale}
+        />
+      )}
 
       {/* 🔗 Layer 0.8: Interactive Page Links & Hotspots */}
       {page.links &&

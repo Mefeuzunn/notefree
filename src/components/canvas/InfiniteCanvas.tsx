@@ -24,6 +24,7 @@ import {
 import { collaborationService } from '../../services/collaborationService';
 import { StickyNoteOverlay } from './StickyNoteOverlay';
 import { TableItemOverlay } from './TableItemOverlay';
+import { ConnectorOverlay } from './ConnectorOverlay';
 import { Compass, Move, Users, Maximize2, Sparkles } from 'lucide-react';
 import { triggerHaptic } from '../../engine/hapticFeedback';
 
@@ -609,7 +610,10 @@ export const InfiniteCanvas: React.FC = () => {
           transformOrigin: '0 0',
         }}
       >
-        <div className="relative w-full h-full pointer-events-auto">
+        <div
+          id={`canvas-page-container-${currentPage?.id || 'default'}`}
+          className="relative w-full h-full pointer-events-auto"
+        >
           {currentPage?.stickyNotes &&
             currentPage.stickyNotes.map((note) => (
               <StickyNoteOverlay key={note.id} note={note} scale={zoom} />
@@ -618,6 +622,9 @@ export const InfiniteCanvas: React.FC = () => {
             currentPage.tables.map((tbl) => (
               <TableItemOverlay key={tbl.id} table={tbl} scale={1.0} />
             ))}
+          {currentPage && (
+            <ConnectorOverlay page={currentPage} scale={1.0} />
+          )}
         </div>
       </div>
 

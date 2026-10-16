@@ -316,6 +316,12 @@ export const NotebookWorkspace: React.FC = () => {
         triggerHaptic('light');
         showShortcutHud('Yapışkan Not', 'S');
         return;
+      } else if (key === 'c') {
+        e.preventDefault();
+        setActiveTool('connector');
+        triggerHaptic('light');
+        showShortcutHud('Bağlayıcı Ok & Akış Çizgisi', 'C');
+        return;
       } else if (key === 'r') {
         e.preventDefault();
         toggleRuler();

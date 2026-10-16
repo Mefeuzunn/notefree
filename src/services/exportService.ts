@@ -5,6 +5,8 @@ import {
   Notebook,
   PageSticker,
   PageTableItem,
+  PageConnectorItem,
+  ConnectorAnchor,
   WatermarkOptions,
   HeaderFooterOptions,
 } from '../types/notebook';
@@ -494,6 +496,11 @@ export async function renderPageToCanvas(
     }
   }
 
+  // 10.6 Faz AH: Smart Magnetic Connectors & Flowchart Lines
+  if (page.connectors && page.connectors.length > 0) {
+    drawConnectorsToCanvas(ctx, page);
+  }
+
   // 11. Watermark Security Overlay
   if (options.watermark && options.watermark.enabled) {
     drawWatermarkToCanvas(ctx, page.width, page.height, options.watermark);
@@ -693,4 +700,195 @@ export function drawTableToCanvas(ctx: CanvasRenderingContext2D, tbl: PageTableI
   ctx.stroke();
 
   ctx.restore();
+}
+
+/**
+ * Draws smart magnetic connectors and flowchart lines to export canvas
+ */
+export function drawConnectorsToCanvas(ctx: CanvasRenderingContext2D, page: Page) {
+  if (!page.connectors || page.connectors.length === 0) return;
+
+  const resolveAnchor = (anchor: ConnectorAnchor): { x: number; y: number } => {
+    if (anchor.elementId) {
+      if (!anchor.elementType || anchor.elementType === 'sticky') {
+        const note = page.stickyNotes?.find((s) => s.id === anchor.elementId);
+        if (note) {
+          const w = note.width || 200;
+          const h = note.height || 200;
+          switch (anchor.side) {
+            case 'top': return { x: note.x + w / 2, y: note.y };
+            case 'bottom': return { x: note.x + w / 2, y: note.y + h };
+            case 'left': return { x: note.x, y: note.y + h / 2 };
+            case 'right': return { x: note.x + w, y: note.y + h / 2 };
+            default: return { x: note.x + w / 2, y: note.y + h / 2 };
+          }
+        }
+      }
+      if (!anchor.elementType || anchor.elementType === 'table') {
+        const table = page.tables?.find((t) => t.id === anchor.elementId);
+        if (table) {
+          const w = table.colWidths?.reduce((a, b) => a + b, 0) || table.cols * 100;
+          const h = (table.rowHeights?.reduce((a, b) => a + b, 0) || table.rows * 40) + 36;
+          switch (anchor.side) {
+            case 'top': return { x: table.x + w / 2, y: table.y };
+            case 'bottom': return { x: table.x + w / 2, y: table.y + h };
+            case 'left': return { x: table.x, y: table.y + h / 2 };
+            case 'right': return { x: table.x + w, y: table.y + h / 2 };
+            default: return { x: table.x + w / 2, y: table.y + h / 2 };
+          }
+        }
+      }
+      if (!anchor.elementType || anchor.elementType === 'text') {
+        const txt = page.texts?.find((tx) => tx.id === anchor.elementId);
+        if (txt) {
+          const w = txt.width || 180;
+          const h = txt.height || 40;
+          switch (anchor.side) {
+            case 'top': return { x: txt.x + w / 2, y: txt.y };
+            case 'bottom': return { x: txt.x + w / 2, y: txt.y + h };
+            case 'left': return { x: txt.x, y: txt.y + h / 2 };
+            case 'right': return { x: txt.x + w, y: txt.y + h / 2 };
+            default: return { x: txt.x + w / 2, y: txt.y + h / 2 };
+          }
+        }
+      }
+    }
+    return { x: anchor.x, y: anchor.y };
+  };
+
+  const drawArrowHead = (tipX: number, tipY: number, angle: number, color: string) => {
+    const headLength = 10;
+    ctx.save();
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(tipX, tipY);
+    ctx.lineTo(
+      tipX - headLength * Math.cos(angle - Math.PI / 6),
+      tipY - headLength * Math.sin(angle - Math.PI / 6)
+    );
+    ctx.lineTo(
+      tipX - headLength * Math.cos(angle + Math.PI / 6),
+      tipY - headLength * Math.sin(angle + Math.PI / 6)
+    );
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  };
+
+  for (const conn of page.connectors) {
+    const p1 = resolveAnchor(conn.from);
+    const p2 = resolveAnchor(conn.to);
+    const dx = p2.x - p1.x;
+    const dy = p2.y - p1.y;
+    const dist = Math.hypot(dx, dy);
+
+    ctx.save();
+    ctx.strokeStyle = conn.color || '#3b82f6';
+    ctx.lineWidth = conn.width || 2;
+    ctx.lineCap = 'round';
+    if (conn.dashed) {
+      ctx.setLineDash([6, 4]);
+    } else {
+      ctx.setLineDash([]);
+    }
+
+    let midX = (p1.x + p2.x) / 2;
+    let midY = (p1.y + p2.y) / 2;
+    let startAngle = Math.atan2(p1.y - p2.y, p1.x - p2.x);
+    let endAngle = Math.atan2(p2.y - p1.y, p2.x - p1.x);
+
+    ctx.beginPath();
+    if (conn.style === 'curved') {
+      const curvature = Math.max(30, dist * 0.4);
+      let cp1x = p1.x;
+      let cp1y = p1.y;
+      let cp2x = p2.x;
+      let cp2y = p2.y;
+
+      if (conn.from.side === 'top') cp1y -= curvature;
+      else if (conn.from.side === 'bottom') cp1y += curvature;
+      else if (conn.from.side === 'left') cp1x -= curvature;
+      else if (conn.from.side === 'right') cp1x += curvature;
+      else cp1x += dx * 0.4;
+
+      if (conn.to.side === 'top') cp2y -= curvature;
+      else if (conn.to.side === 'bottom') cp2y += curvature;
+      else if (conn.to.side === 'left') cp2x -= curvature;
+      else if (conn.to.side === 'right') cp2x += curvature;
+      else cp2x -= dx * 0.4;
+
+      midX = 0.125 * p1.x + 0.375 * cp1x + 0.375 * cp2x + 0.125 * p2.x;
+      midY = 0.125 * p1.y + 0.375 * cp1y + 0.375 * cp2y + 0.125 * p2.y;
+      startAngle = Math.atan2(p1.y - cp1y, p1.x - cp1x);
+      endAngle = Math.atan2(p2.y - cp2y, p2.x - cp2x);
+
+      ctx.moveTo(p1.x, p1.y);
+      ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, p2.x, p2.y);
+    } else if (conn.style === 'orthogonal') {
+      const isHorizontal =
+        conn.from.side === 'left' ||
+        conn.from.side === 'right' ||
+        (!conn.from.side && Math.abs(dx) > Math.abs(dy));
+
+      ctx.moveTo(p1.x, p1.y);
+      if (isHorizontal) {
+        const stepX = p1.x + dx / 2;
+        ctx.lineTo(stepX, p1.y);
+        ctx.lineTo(stepX, p2.y);
+        ctx.lineTo(p2.x, p2.y);
+        midX = stepX;
+        midY = (p1.y + p2.y) / 2;
+        startAngle = Math.atan2(0, p1.x - stepX);
+        endAngle = Math.atan2(0, p2.x - stepX);
+      } else {
+        const stepY = p1.y + dy / 2;
+        ctx.lineTo(p1.x, stepY);
+        ctx.lineTo(p2.x, stepY);
+        ctx.lineTo(p2.x, p2.y);
+        midX = (p1.x + p2.x) / 2;
+        midY = stepY;
+        startAngle = Math.atan2(p1.y - stepY, 0);
+        endAngle = Math.atan2(p2.y - stepY, 0);
+      }
+    } else {
+      // straight
+      ctx.moveTo(p1.x, p1.y);
+      ctx.lineTo(p2.x, p2.y);
+    }
+    ctx.stroke();
+
+    // Arrow heads
+    if (conn.arrowType === 'end' || conn.arrowType === 'both') {
+      drawArrowHead(p2.x, p2.y, endAngle, conn.color || '#3b82f6');
+    }
+    if (conn.arrowType === 'both') {
+      drawArrowHead(p1.x, p1.y, startAngle, conn.color || '#3b82f6');
+    }
+
+    // Label pill
+    if (conn.label && conn.label.trim()) {
+      ctx.font = 'bold 11px Inter, sans-serif';
+      const textMetrics = ctx.measureText(conn.label);
+      const pillW = textMetrics.width + 16;
+      const pillH = 20;
+      const pillX = midX - pillW / 2;
+      const pillY = midY - pillH / 2;
+
+      ctx.setLineDash([]);
+      ctx.fillStyle = '#ffffff';
+      ctx.strokeStyle = '#cbd5e1';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.roundRect(pillX, pillY, pillW, pillH, 10);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = '#1e293b';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(conn.label, midX, midY);
+    }
+
+    ctx.restore();
+  }
 }

@@ -36,6 +36,10 @@ import {
   PlannerTabItem,
   PageTableItem,
   TableCell,
+  PageConnectorItem,
+  ConnectorAnchor,
+  ConnectorStyle,
+  ConnectorArrowType,
 } from '../types/notebook';
 import { collaborationService } from '../services/collaborationService';
 import { db, initStorage, saveNotebookToDB, importNotebookFromNotefree } from '../services/storage';
@@ -362,6 +366,13 @@ interface NotebookStoreState {
   addColToTable: (tableId: string, atIndex?: number) => void;
   deleteColFromTable: (tableId: string, colIndex: number) => void;
   deleteTableFromCurrentPage: (tableId: string) => void;
+
+  // FAZ AH: Smart Magnetic Connectors & Flowchart Mind Map Lines
+  addConnectorToCurrentPage: (connector: PageConnectorItem) => void;
+  updateConnectorOnCurrentPage: (connectorId: string, updates: Partial<PageConnectorItem>) => void;
+  removeConnectorFromCurrentPage: (connectorId: string) => void;
+  activeConnectorDraft: { from: ConnectorAnchor; to: { x: number; y: number } } | null;
+  setActiveConnectorDraft: (draft: { from: ConnectorAnchor; to: { x: number; y: number } } | null) => void;
 
   // Faz C: Live Speech-to-Text Transcription & Dictation
   liveTranscript: string;
@@ -863,6 +874,7 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
     tapes: true,
     fills: true,
     tables: true,
+    connectors: true,
   },
   layerLocks: {
     background: false,
@@ -873,7 +885,9 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
     tapes: false,
     fills: false,
     tables: false,
+    connectors: false,
   },
+  activeConnectorDraft: null,
 
   // Faz 4 Initial State: Infinite Canvas & Realtime Collaboration
   canvasMode: 'paged',
@@ -1464,6 +1478,10 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
                 id: `c_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
               }))
             ),
+          })),
+          connectors: (p.connectors || []).map((conn) => ({
+            ...conn,
+            id: `conn_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
           })),
         };
         newPages.push(clonedPage);
@@ -2323,6 +2341,19 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
       tbl.y >= startY ? { ...tbl, y: tbl.y + amount } : tbl
     );
 
+    // 7. Shift free connectors below startY
+    const updatedConnectors = currentPage.connectors?.map((conn) => {
+      const fromShifted =
+        !conn.from.elementId && conn.from.y >= startY ? { ...conn.from, y: conn.from.y + amount } : conn.from;
+      const toShifted =
+        !conn.to.elementId && conn.to.y >= startY ? { ...conn.to, y: conn.to.y + amount } : conn.to;
+      return {
+        ...conn,
+        from: fromShifted,
+        to: toShifted,
+      };
+    });
+
     // Calculate maximum Y to expand page height if needed
     let maxY = currentPage.height;
     for (const s of updatedStrokes) {
@@ -2343,6 +2374,7 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
       tapes: updatedTapes,
       stickers: updatedStickers,
       tables: updatedTables,
+      connectors: updatedConnectors,
       height: newHeight,
     };
 
@@ -3503,6 +3535,79 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
       ),
     });
     saveNotebookToDB(updatedNotebook);
+  },
+
+  // FAZ AH: Smart Magnetic Connectors & Flowchart Mind Map Lines
+  addConnectorToCurrentPage: (connector: PageConnectorItem) => {
+    const { notebooks, activeNotebookId, activePageIndex } = get();
+    if (!activeNotebookId) return;
+    const currentNb = notebooks.find((n) => n.id === activeNotebookId);
+    if (!currentNb) return;
+    const targetPage = currentNb.pages[activePageIndex];
+    if (!targetPage) return;
+
+    const updatedConnectors = [...(targetPage.connectors || []), connector];
+    const updatedPages = currentNb.pages.map((p, idx) =>
+      idx === activePageIndex ? { ...p, connectors: updatedConnectors } : p
+    );
+
+    const updatedNotebook = { ...currentNb, pages: updatedPages, updatedAt: Date.now() };
+    set({
+      notebooks: notebooks.map((n) =>
+        n.id === activeNotebookId ? updatedNotebook : n
+      ),
+    });
+    saveNotebookToDB(updatedNotebook);
+  },
+
+  updateConnectorOnCurrentPage: (connectorId: string, updates: Partial<PageConnectorItem>) => {
+    const { notebooks, activeNotebookId, activePageIndex } = get();
+    if (!activeNotebookId) return;
+    const currentNb = notebooks.find((n) => n.id === activeNotebookId);
+    if (!currentNb) return;
+    const targetPage = currentNb.pages[activePageIndex];
+    if (!targetPage) return;
+
+    const updatedConnectors = (targetPage.connectors || []).map((c) =>
+      c.id === connectorId ? { ...c, ...updates } : c
+    );
+    const updatedPages = currentNb.pages.map((p, idx) =>
+      idx === activePageIndex ? { ...p, connectors: updatedConnectors } : p
+    );
+
+    const updatedNotebook = { ...currentNb, pages: updatedPages, updatedAt: Date.now() };
+    set({
+      notebooks: notebooks.map((n) =>
+        n.id === activeNotebookId ? updatedNotebook : n
+      ),
+    });
+    saveNotebookToDB(updatedNotebook);
+  },
+
+  removeConnectorFromCurrentPage: (connectorId: string) => {
+    const { notebooks, activeNotebookId, activePageIndex } = get();
+    if (!activeNotebookId) return;
+    const currentNb = notebooks.find((n) => n.id === activeNotebookId);
+    if (!currentNb) return;
+    const targetPage = currentNb.pages[activePageIndex];
+    if (!targetPage) return;
+
+    const updatedConnectors = (targetPage.connectors || []).filter((c) => c.id !== connectorId);
+    const updatedPages = currentNb.pages.map((p, idx) =>
+      idx === activePageIndex ? { ...p, connectors: updatedConnectors } : p
+    );
+
+    const updatedNotebook = { ...currentNb, pages: updatedPages, updatedAt: Date.now() };
+    set({
+      notebooks: notebooks.map((n) =>
+        n.id === activeNotebookId ? updatedNotebook : n
+      ),
+    });
+    saveNotebookToDB(updatedNotebook);
+  },
+
+  setActiveConnectorDraft: (draft: { from: ConnectorAnchor; to: { x: number; y: number } } | null) => {
+    set({ activeConnectorDraft: draft });
   },
 
   addLaserPoint: (x: number, y: number) => {

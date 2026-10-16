@@ -17,6 +17,7 @@ import {
   FileText,
   RotateCcw,
   Table2,
+  Workflow,
 } from 'lucide-react';
 
 export const LayersDrawer: React.FC = () => {
@@ -44,6 +45,7 @@ export const LayersDrawer: React.FC = () => {
   const tapeCount = currentPage?.tapes?.length || 0;
   const fillCount = currentPage?.fills?.length || 0;
   const tableCount = currentPage?.tables?.length || 0;
+  const connectorCount = currentPage?.connectors?.length || 0;
 
   const layerItems: {
     key: keyof LayerVisibilitySettings;
@@ -53,6 +55,14 @@ export const LayersDrawer: React.FC = () => {
     icon: React.ReactNode;
     color: string;
   }[] = [
+    {
+      key: 'connectors',
+      name: 'Bağlayıcı Oklar & Zihin Haritası',
+      description: 'Manyetik akış şeması ve bağlantı çizgileri',
+      count: `${connectorCount} bağlantı`,
+      icon: <Workflow size={16} />,
+      color: 'text-blue-400 bg-blue-500/10 border-blue-500/20',
+    },
     {
       key: 'tables',
       name: 'İnteraktif Tablolar',

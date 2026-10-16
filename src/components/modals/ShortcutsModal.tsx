@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, Keyboard, Sparkles, PenTool, Eraser, Scissors, Highlighter, Type, StickyNote, Ruler, ZoomIn, Bookmark, Search, RotateCcw, ArrowLeftRight, Map as MapIcon, Link2, TrendingUp, Stamp, FileDown, Table2 } from 'lucide-react';
+import { X, Keyboard, Sparkles, PenTool, Eraser, Scissors, Highlighter, Type, StickyNote, Ruler, ZoomIn, Bookmark, Search, RotateCcw, ArrowLeftRight, Map as MapIcon, Link2, TrendingUp, Stamp, FileDown, Table2, Workflow } from 'lucide-react';
 import { triggerHaptic } from '../../engine/hapticFeedback';
 
 interface ShortcutsModalProps {
@@ -22,6 +22,7 @@ const DRAWING_SHORTCUTS: ShortcutItem[] = [
   { key: 'H', label: 'Fosforlu Kalem', desc: 'Ders notlarının üzerini yarı saydam çiz', icon: <Highlighter size={15} /> },
   { key: 'T', label: 'Metin Kutusu', desc: 'Klavyeyle yazı yazmak için metin alanı aç', icon: <Type size={15} /> },
   { key: 'S', label: 'Yapışkan Not', desc: 'Tuvale renkli post-it not yapıştır', icon: <StickyNote size={15} /> },
+  { key: 'C', label: 'Bağlayıcı Ok (Connector)', desc: 'Yapışkan notlar ve tablolar arasında manyetik akış okları ve zihin haritası çizgileri çek', icon: <Workflow size={15} /> },
   { key: 'Tablo', label: 'İnteraktif Çizelge / Tablo', desc: 'Hücre içi metin, Tab ile gezinti ve satır/sütun ekleme özellikli tablo', icon: <Table2 size={15} /> },
 ];
 

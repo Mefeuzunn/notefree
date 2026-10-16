@@ -58,6 +58,7 @@ import {
   TrendingUp,
   Stamp,
   Table2,
+  Workflow,
   MoreHorizontal,
   X,
   ChevronDown,
@@ -949,6 +950,25 @@ export const Toolbar: React.FC = () => {
                   >
                     <Table2 size={16} className="text-indigo-400" />
                     <span>Tablo</span>
+                  </button>
+
+                  {/* Akıllı Bağlantı Oku (Flowchart / Zihin Haritası) */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      triggerHaptic('medium');
+                      setActiveTool('connector');
+                      closeDropdown();
+                    }}
+                    className={`p-2 rounded-xl border flex flex-col items-center gap-1 text-[10px] font-medium transition-all ${
+                      activeTool === 'connector'
+                        ? 'bg-blue-600/30 border-blue-500 text-blue-300'
+                        : 'bg-slate-800/60 border-slate-750 text-slate-400 hover:text-blue-300'
+                    }`}
+                    title="Manyetik Bağlantı Oku & Akış Şeması"
+                  >
+                    <Workflow size={16} className="text-blue-400" />
+                    <span>Bağlayıcı</span>
                   </button>
 
                   {/* Kaşe & Damga */}
@@ -2163,6 +2183,23 @@ export const Toolbar: React.FC = () => {
               >
                 <Table2 size={16} className="text-indigo-400" />
                 <span>Tablo</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  triggerHaptic('medium');
+                  setActiveTool('connector');
+                  closeDropdown();
+                }}
+                className={`p-2 rounded-xl border flex flex-col items-center gap-1 text-[10px] font-medium transition-all ${
+                  activeTool === 'connector'
+                    ? 'bg-blue-600/30 border-blue-500 text-blue-300'
+                    : 'bg-slate-800/60 border-slate-750 text-slate-400 hover:text-blue-300'
+                }`}
+                title="Manyetik Bağlantı Oku & Akış Şeması"
+              >
+                <Workflow size={16} className="text-blue-400" />
+                <span>Bağlayıcı</span>
               </button>
               <button
                 type="button"
