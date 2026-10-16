@@ -60,6 +60,7 @@ import {
   Map as MapIcon,
   Bookmark,
   Link2,
+  TrendingUp,
 } from 'lucide-react';
 import { PenType, ShapeType, ToolType, StylusDoubleTapAction } from '../../types/notebook';
 import { AudioPlayerBar } from '../audio/AudioPlayerBar';
@@ -137,6 +138,8 @@ export const Toolbar: React.FC = () => {
     setSearchModalOpen,
     mathModalOpen,
     openMathModal,
+    functionPlotterModalOpen,
+    openFunctionPlotterModal,
     splitNotebook,
     openDualNotebook,
     closeDualNotebook,
@@ -1294,6 +1297,19 @@ export const Toolbar: React.FC = () => {
           title="Yapay Zeka Matematik & Denklem Çözücü (GoodNotes 6 Math AI)"
         >
           <Calculator size={17} />
+        </button>
+
+        {/* 📈 Faz AB: STEM 2D Matematik Fonksiyon & Grafik Çizici */}
+        <button
+          onClick={() => openFunctionPlotterModal()}
+          className={`p-2 rounded-xl transition-all ${
+            functionPlotterModalOpen
+              ? 'bg-cyan-600 text-white shadow-md shadow-cyan-600/30 ring-1 ring-cyan-400'
+              : 'text-slate-400 hover:text-cyan-400 hover:bg-slate-800'
+          }`}
+          title="STEM 2D Fonksiyon & Grafik Çizici (Cartesian Function Grapher)"
+        >
+          <TrendingUp size={17} />
         </button>
 
         {/* 📖 Dual Notebook Split-Screen Mode */}

@@ -444,3 +444,26 @@ export interface LassoSelection {
   scaleY: number;
   rotation: number;
 }
+
+// FAZ AB: STEM 2D Function Plotter & Coordinate Stamping
+export interface PlotFunctionItem {
+  id: string;
+  expression: string;
+  color: string;
+  lineWidth: number;
+  visible: boolean;
+  label?: string;
+}
+
+export interface PlotGraphSettings {
+  xMin: number;
+  xMax: number;
+  yMin: number;
+  yMax: number;
+  gridStep: number;
+  showGrid: boolean;
+  showAxes: boolean;
+  showLabels: boolean;
+  showRoots: boolean;
+  theme: 'dark' | 'light' | 'blueprint' | 'chalkboard';
+}

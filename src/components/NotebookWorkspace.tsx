@@ -39,6 +39,7 @@ import { TapeQuizToolbar } from './canvas/TapeQuizToolbar';
 import { PageScrubberBar } from './navigation/PageScrubberBar';
 import { PlannerTabsBar } from './planner/PlannerTabsBar';
 import { LinkEditorModal } from './modals/LinkEditorModal';
+import { FunctionPlotterModal } from './modals/FunctionPlotterModal';
 import { triggerHaptic } from '../engine/hapticFeedback';
 
 export const NotebookWorkspace: React.FC = () => {
@@ -930,6 +931,9 @@ export const NotebookWorkspace: React.FC = () => {
 
       {/* 🔗 Faz AA: Interactive Hyperlink & Jump Editor Modal */}
       <LinkEditorModal />
+
+      {/* 📈 Faz AB: STEM 2D Function Plotter & Coordinate Stamping Modal */}
+      <FunctionPlotterModal />
     </div>
   );
 };

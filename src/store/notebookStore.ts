@@ -509,6 +509,13 @@ interface NotebookStoreState {
   }) => void;
   closeLinkModal: () => void;
 
+  // Faz AB: STEM 2D Function Plotter & Coordinate Stamping
+  functionPlotterModalOpen: boolean;
+  functionPlotterInitialExpr: string;
+  openFunctionPlotterModal: (initialExpr?: string) => void;
+  closeFunctionPlotterModal: () => void;
+  stampPlotGraphToCurrentPage: (params: { strokes: Stroke[]; texts: TextAnnotation[] }) => void;
+
   // Faz W: Floating Quick Scratchpad
   scratchpadOpen: boolean;
   scratchpadMinimized: boolean;
@@ -809,6 +816,8 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
   // Faz 2 Initial State
   mathModalOpen: false,
   mathInputEquation: '',
+  functionPlotterModalOpen: false,
+  functionPlotterInitialExpr: 'x^2 - 4',
   splitNotebook: {
     isOpen: false,
     secondaryNotebookId: null,
@@ -3849,6 +3858,48 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
   addMathSolutionToCanvas: (equation: string, result: string) => {
     const { activePageIndex, addTextAnnotation } = get();
     addTextAnnotation(activePageIndex, 120, 220, `∑ Math AI:\n${equation}\n➔ ${result}`);
+  },
+
+  // Faz AB: STEM 2D Function Plotter & Coordinate Stamping Actions
+  openFunctionPlotterModal: (initialExpr?: string) => {
+    set({
+      functionPlotterModalOpen: true,
+      functionPlotterInitialExpr: initialExpr || 'x^2 - 4',
+    });
+  },
+
+  closeFunctionPlotterModal: () => {
+    set({ functionPlotterModalOpen: false });
+  },
+
+  stampPlotGraphToCurrentPage: ({ strokes, texts }: { strokes: Stroke[]; texts: TextAnnotation[] }) => {
+    const { notebooks, activeNotebookId, activePageIndex, undoStack } = get();
+    if (!activeNotebookId) return;
+    const currentNb = notebooks.find((n) => n.id === activeNotebookId);
+    if (!currentNb || !currentNb.pages[activePageIndex]) return;
+
+    const currentPage = currentNb.pages[activePageIndex];
+    const newUndoStack = [...undoStack, [...currentPage.strokes]];
+
+    const updatedStrokes = [...currentPage.strokes, ...strokes];
+    const updatedTexts = [...(currentPage.texts || []), ...texts];
+
+    const updatedPages = currentNb.pages.map((p, idx) =>
+      idx === activePageIndex
+        ? { ...p, strokes: updatedStrokes, texts: updatedTexts }
+        : p
+    );
+
+    const updatedNotebook = { ...currentNb, pages: updatedPages, updatedAt: Date.now() };
+
+    set({
+      notebooks: notebooks.map((n) => (n.id === activeNotebookId ? updatedNotebook : n)),
+      undoStack: newUndoStack,
+      redoStack: [],
+      functionPlotterModalOpen: false,
+    });
+
+    saveNotebookToDB(updatedNotebook).catch(console.error);
   },
 
   // Faz 2: Dual Notebook Split Screen Actions
