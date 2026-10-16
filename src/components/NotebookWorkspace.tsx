@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { useNotebookStore } from '../store/notebookStore';
 import { CanvasPage } from './canvas/CanvasPage';
 import { YouTubePanel } from './youtube/YouTubePanel';
@@ -32,6 +32,7 @@ import {
 import { ExportModal } from './modals/ExportModal';
 import { MarginStudyWorkspace } from './margin/MarginStudyWorkspace';
 import { TapeQuizToolbar } from './canvas/TapeQuizToolbar';
+import { PageScrubberBar } from './navigation/PageScrubberBar';
 
 export const NotebookWorkspace: React.FC = () => {
   const {
@@ -99,7 +100,34 @@ export const NotebookWorkspace: React.FC = () => {
     }));
   };
 
-  // Wheel zoom handler (Ctrl / Cmd + Wheel or trackpad pinch)
+  const [pageFlipDirection, setPageFlipDirection] = useState<'next' | 'prev' | null>(null);
+  const lastSwipeTimeRef = useRef<number>(0);
+
+  const flipPage = useCallback(
+    (direction: 'next' | 'prev') => {
+      const total = pages.length;
+      if (total <= 1) return;
+      const step = twoPageSpread ? 2 : 1;
+      let nextIdx = activePageIndex;
+      if (direction === 'next') {
+        if (activePageIndex + step < total) {
+          nextIdx = Math.min(total - 1, activePageIndex + step);
+        }
+      } else {
+        if (activePageIndex - step >= 0) {
+          nextIdx = Math.max(0, activePageIndex - step);
+        }
+      }
+      if (nextIdx !== activePageIndex) {
+        setPageFlipDirection(direction);
+        setActivePageIndex(nextIdx);
+        setTimeout(() => setPageFlipDirection(null), 300);
+      }
+    },
+    [activePageIndex, pages.length, twoPageSpread, setActivePageIndex]
+  );
+
+  // Navigation & Gestures: Trackpad horizontal swipe, touch swipe, zoom & keyboard
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
@@ -109,12 +137,98 @@ export const NotebookWorkspace: React.FC = () => {
         e.preventDefault();
         const delta = e.deltaY > 0 ? -0.08 : 0.08;
         setZoom(zoom + delta);
+        return;
+      }
+
+      // Horizontal trackpad swipe for page flip in single/spread view
+      if (canvasMode === 'paged' && (viewMode === 'single' || twoPageSpread)) {
+        const now = Date.now();
+        if (now - lastSwipeTimeRef.current > 350) {
+          if (Math.abs(e.deltaX) > 45 && Math.abs(e.deltaX) > Math.abs(e.deltaY) * 1.5) {
+            if (e.deltaX > 45) {
+              flipPage('next');
+              lastSwipeTimeRef.current = now;
+            } else if (e.deltaX < -45) {
+              flipPage('prev');
+              lastSwipeTimeRef.current = now;
+            }
+          }
+        }
+      }
+    };
+
+    let touchStartX = 0;
+    let touchStartY = 0;
+
+    const handleTouchStart = (e: TouchEvent) => {
+      if (e.touches.length === 2) {
+        // Two-finger touch swipe gesture across canvas
+        touchStartX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+        touchStartY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+      } else if (e.touches.length === 1 && (e.target === el || !(e.target as HTMLElement).closest('canvas'))) {
+        // One-finger swipe on workspace background/margin
+        touchStartX = e.touches[0].clientX;
+        touchStartY = e.touches[0].clientY;
+      }
+    };
+
+    const handleTouchEnd = (e: TouchEvent) => {
+      if (canvasMode !== 'paged' || (viewMode !== 'single' && !twoPageSpread)) return;
+      const now = Date.now();
+      if (now - lastSwipeTimeRef.current < 350) return;
+
+      const changedTouch = e.changedTouches[0];
+      if (!changedTouch) return;
+
+      const diffX = changedTouch.clientX - touchStartX;
+      const diffY = changedTouch.clientY - touchStartY;
+
+      if (Math.abs(diffX) > 50 && Math.abs(diffX) > Math.abs(diffY) * 1.3) {
+        if (diffX < -50) {
+          flipPage('next');
+          lastSwipeTimeRef.current = now;
+        } else if (diffX > 50) {
+          flipPage('prev');
+          lastSwipeTimeRef.current = now;
+        }
+      }
+    };
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = document.activeElement as HTMLElement | null;
+      if (
+        target &&
+        (target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.isContentEditable ||
+          target.tagName === 'SELECT')
+      ) {
+        return;
+      }
+
+      if (canvasMode !== 'paged' || (viewMode !== 'single' && !twoPageSpread)) return;
+
+      if (e.key === 'ArrowRight' || e.key === 'PageDown') {
+        e.preventDefault();
+        flipPage('next');
+      } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
+        e.preventDefault();
+        flipPage('prev');
       }
     };
 
     el.addEventListener('wheel', handleWheel, { passive: false });
-    return () => el.removeEventListener('wheel', handleWheel);
-  }, [zoom, setZoom]);
+    el.addEventListener('touchstart', handleTouchStart, { passive: true });
+    el.addEventListener('touchend', handleTouchEnd, { passive: true });
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      el.removeEventListener('wheel', handleWheel);
+      el.removeEventListener('touchstart', handleTouchStart);
+      el.removeEventListener('touchend', handleTouchEnd);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [zoom, setZoom, canvasMode, viewMode, twoPageSpread, flipPage]);
 
   return (
     <div className="flex-1 flex overflow-hidden relative bg-slate-950">
@@ -216,7 +330,16 @@ export const NotebookWorkspace: React.FC = () => {
           ) : twoPageSpread && pages.length > 1 ? (
             /* 📖 Faz E: Two-Page Book Spread View (İkili Kitap Modu) */
             <div className="flex flex-col items-center pb-24">
-              <div className="flex items-center justify-center gap-1 p-3 bg-slate-900/60 rounded-3xl shadow-2xl border border-slate-800 relative max-w-full overflow-x-auto">
+              <div
+                key={`spread_${activePageIndex}`}
+                className={`flex items-center justify-center gap-1 p-3 bg-slate-900/60 rounded-3xl shadow-2xl border border-slate-800 relative max-w-full overflow-x-auto transition-all duration-200 ${
+                  pageFlipDirection === 'next'
+                    ? 'animate-in fade-in slide-in-from-right-4'
+                    : pageFlipDirection === 'prev'
+                    ? 'animate-in fade-in slide-in-from-left-4'
+                    : ''
+                }`}
+              >
                 {/* Left Page (Even Index) */}
                 {pages[activePageIndex % 2 === 0 ? activePageIndex : activePageIndex - 1] && (
                   <div className="relative shadow-xl">
@@ -261,12 +384,23 @@ export const NotebookWorkspace: React.FC = () => {
             /* Single Page View */
             <div className="flex flex-col items-center pb-24">
               {pages[activePageIndex] && (
-                <CanvasPage
-                  page={pages[activePageIndex]}
-                  pageIndex={activePageIndex}
-                  scale={isSplit ? zoom * 0.9 : zoom}
-                  isCurrent={true}
-                />
+                <div
+                  key={pages[activePageIndex].id}
+                  className={`transition-all duration-200 ${
+                    pageFlipDirection === 'next'
+                      ? 'animate-in fade-in slide-in-from-right-4'
+                      : pageFlipDirection === 'prev'
+                      ? 'animate-in fade-in slide-in-from-left-4'
+                      : ''
+                  }`}
+                >
+                  <CanvasPage
+                    page={pages[activePageIndex]}
+                    pageIndex={activePageIndex}
+                    scale={isSplit ? zoom * 0.9 : zoom}
+                    isCurrent={true}
+                  />
+                </div>
               )}
             </div>
           )}
@@ -539,6 +673,11 @@ export const NotebookWorkspace: React.FC = () => {
 
       {/* 🌟 Interactive Geometry Compass (Hassas Pergel) */}
       <Compass scale={zoom} />
+
+      {/* ⚡ Faz S: Interactive GoodNotes-Style Bottom Page Scrubber & Quick Jumper */}
+      {!isLocked && canvasMode === 'paged' && (viewMode === 'single' || twoPageSpread) && (
+        <PageScrubberBar />
+      )}
 
       {/* 3. Floating Picture-in-Picture YouTube Panel */}
       {youtube.isOpen && youtube.mode === 'floating' && <YouTubePanel />}
