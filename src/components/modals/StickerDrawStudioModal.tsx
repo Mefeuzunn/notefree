@@ -71,7 +71,7 @@ export const StickerDrawStudioModal: React.FC = () => {
 
   if (!stickerCreatorModalOpen) return null;
 
-  const getCanvasCoords = (e: React.MouseEvent<HTMLCanvasElement>) => {
+  const getCanvasCoords = (e: React.PointerEvent<HTMLCanvasElement> | React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
     if (!canvas) return { x: 0, y: 0 };
     const rect = canvas.getBoundingClientRect();
@@ -83,7 +83,10 @@ export const StickerDrawStudioModal: React.FC = () => {
     };
   };
 
-  const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
+  const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    try {
+      (e.currentTarget as HTMLCanvasElement).setPointerCapture(e.pointerId);
+    } catch (_) {}
     isDrawingRef.current = true;
     const pt = getCanvasCoords(e);
     lastPointRef.current = pt;
@@ -104,7 +107,7 @@ export const StickerDrawStudioModal: React.FC = () => {
     }
   };
 
-  const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+  const handlePointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
     if (!isDrawingRef.current || !lastPointRef.current) return;
     const canvas = canvasRef.current;
     const ctx = canvas?.getContext('2d');
@@ -131,7 +134,10 @@ export const StickerDrawStudioModal: React.FC = () => {
     lastPointRef.current = pt;
   };
 
-  const handleMouseUp = () => {
+  const handlePointerUp = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    try {
+      (e.currentTarget as HTMLCanvasElement).releasePointerCapture(e.pointerId);
+    } catch (_) {}
     isDrawingRef.current = false;
     lastPointRef.current = null;
   };
@@ -205,19 +211,19 @@ export const StickerDrawStudioModal: React.FC = () => {
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-slate-950/80 backdrop-blur-md select-none animate-in fade-in duration-150">
       <div className="relative w-full max-w-2xl bg-slate-900 border border-slate-700/80 rounded-3xl shadow-2xl flex flex-col overflow-hidden max-h-[90vh]">
         {/* Header */}
-        <div className="px-6 py-4 bg-slate-850 border-b border-slate-750 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-amber-500 to-orange-500 flex items-center justify-center text-slate-950 shadow-lg shadow-amber-500/20">
-              <Paintbrush size={20} />
+        <div className="px-4 sm:px-6 py-3.5 bg-slate-850 border-b border-slate-750 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 shrink-0 rounded-2xl bg-gradient-to-tr from-amber-500 to-orange-500 flex items-center justify-center text-slate-950 shadow-lg shadow-amber-500/20">
+              <Paintbrush size={18} />
             </div>
-            <div>
-              <h2 className="text-base font-bold text-white flex items-center gap-2">
-                <span>Özel Çıkartma & İkon Çizim Stüdyosu</span>
-                <span className="text-[10px] bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded-full font-mono font-semibold">
+            <div className="min-w-0">
+              <h2 className="text-sm sm:text-base font-bold text-white flex items-center gap-2 truncate">
+                <span className="truncate">Özel Çıkartma Çizim Stüdyosu</span>
+                <span className="hidden sm:inline text-[10px] bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded-full font-mono font-semibold">
                   Faz AC
                 </span>
               </h2>
-              <p className="text-xs text-slate-400">
+              <p className="hidden sm:block text-xs text-slate-400 truncate">
                 Şeffaf arka planlı kişisel çıkartmalar, rozetler ve çizimler üretip kaydedin
               </p>
             </div>
@@ -228,24 +234,24 @@ export const StickerDrawStudioModal: React.FC = () => {
               triggerHaptic('light');
               setStickerCreatorModalOpen(false);
             }}
-            className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition-colors"
+            className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition-colors shrink-0"
           >
             <X size={18} />
           </button>
         </div>
 
         {/* Content Body: Split Left (Canvas) and Right (Tools) */}
-        <div className="flex-1 flex flex-col sm:flex-row p-6 gap-6 overflow-y-auto">
+        <div className="flex-1 flex flex-col sm:flex-row p-4 sm:p-6 gap-4 sm:gap-6 overflow-y-auto">
           {/* Left Canvas (Transparent Checkerboard Grid) */}
           <div className="flex flex-col items-center gap-3">
             <div className="relative w-[280px] h-[280px] rounded-2xl border-2 border-dashed border-slate-700 shadow-xl overflow-hidden bg-[radial-gradient(#334155_1.2px,transparent_1.2px)] [background-size:14px_14px] bg-slate-950">
               <canvas
                 ref={canvasRef}
-                onMouseDown={handleMouseDown}
-                onMouseMove={handleMouseMove}
-                onMouseUp={handleMouseUp}
-                onMouseLeave={handleMouseUp}
-                className="w-full h-full cursor-crosshair touch-none"
+                onPointerDown={handlePointerDown}
+                onPointerMove={handlePointerMove}
+                onPointerUp={handlePointerUp}
+                onPointerCancel={handlePointerUp}
+                className="w-full h-full cursor-crosshair touch-none select-none"
               />
             </div>
 
@@ -391,23 +397,23 @@ export const StickerDrawStudioModal: React.FC = () => {
         </div>
 
         {/* Footer Actions */}
-        <div className="px-6 py-4 bg-slate-850 border-t border-slate-750 flex items-center justify-between">
+        <div className="px-4 sm:px-6 py-3.5 bg-slate-850 border-t border-slate-750 flex items-center justify-between gap-2">
           <button
             type="button"
             onClick={handleSaveToCollection}
-            className="flex items-center gap-1.5 px-4 py-2 bg-slate-800 hover:bg-slate-750 text-slate-200 hover:text-white rounded-xl text-xs font-semibold border border-slate-700 transition-colors"
+            className="flex items-center gap-1.5 px-3 sm:px-4 py-2 bg-slate-800 hover:bg-slate-750 text-slate-200 hover:text-white rounded-xl text-xs font-semibold border border-slate-700 transition-colors"
           >
             <BookmarkPlus size={15} />
-            <span>Koleksiyonuma Ekle</span>
+            <span className="hidden xs:inline">Koleksiyonuma </span><span>Kaydet</span>
           </button>
 
           <button
             type="button"
             onClick={handleStampToPage}
-            className="flex items-center gap-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-bold text-xs px-5 py-2 rounded-xl shadow-lg shadow-amber-500/20 hover:scale-105 transition-all"
+            className="flex items-center gap-1.5 sm:gap-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-bold text-xs px-3.5 sm:px-5 py-2 rounded-xl shadow-lg shadow-amber-500/20 hover:scale-105 transition-all"
           >
             <Sparkles size={16} />
-            <span>Doğrudan Tuvale Damgala</span>
+            <span className="hidden xs:inline">Tuvale </span><span>Damgala</span>
           </button>
         </div>
       </div>

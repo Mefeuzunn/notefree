@@ -82,19 +82,19 @@ export const MathSolverModal: React.FC = () => {
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-md animate-in fade-in duration-150 select-none">
       <div className="relative w-full max-w-lg bg-slate-900 border border-slate-750 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
         {/* Header Bar */}
-        <div className="flex items-center justify-between px-5 py-3.5 bg-slate-850/80 border-b border-slate-750">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-indigo-600 to-purple-600 flex items-center justify-center text-white shadow-md shadow-indigo-600/30">
+        <div className="flex items-center justify-between px-4 sm:px-5 py-3.5 bg-slate-850/80 border-b border-slate-750 gap-2">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-indigo-600 to-purple-600 flex items-center justify-center text-white shadow-md shadow-indigo-600/30 shrink-0">
               <Calculator size={16} />
             </div>
-            <div>
-              <h3 className="text-sm font-bold text-slate-100 flex items-center gap-1.5">
-                <span>Math AI Denklem Çözücü</span>
-                <span className="text-[10px] bg-indigo-500/20 text-indigo-300 px-1.5 py-0.2 rounded font-semibold border border-indigo-500/30">
-                  GoodNotes Math AI
+            <div className="min-w-0">
+              <h3 className="text-xs sm:text-sm font-bold text-slate-100 flex items-center gap-1.5 truncate">
+                <span className="truncate">Math AI Denklem Çözücü</span>
+                <span className="hidden sm:inline text-[10px] bg-indigo-500/20 text-indigo-300 px-1.5 py-0.2 rounded font-semibold border border-indigo-500/30">
+                  Math AI
                 </span>
               </h3>
-              <p className="text-[11px] text-slate-400">
+              <p className="hidden sm:block text-[11px] text-slate-400 truncate">
                 El yazısı ve cebirsel denklemleri otomatik çöz ve tuvale aktar
               </p>
             </div>
@@ -102,7 +102,7 @@ export const MathSolverModal: React.FC = () => {
 
           <button
             onClick={closeMathModal}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors shrink-0"
           >
             <X size={16} />
           </button>
@@ -220,10 +220,10 @@ export const MathSolverModal: React.FC = () => {
         </div>
 
         {/* Footer Actions */}
-        <div className="px-5 py-3 bg-slate-850/90 border-t border-slate-750 flex items-center justify-between gap-2">
+        <div className="px-4 sm:px-5 py-3 bg-slate-850/90 border-t border-slate-750 flex items-center justify-between gap-2">
           <button
             onClick={closeMathModal}
-            className="px-3.5 py-1.5 text-xs text-slate-400 hover:text-slate-200 transition-colors"
+            className="px-3 py-1.5 text-xs text-slate-400 hover:text-slate-200 transition-colors"
           >
             Kapat
           </button>
@@ -231,14 +231,14 @@ export const MathSolverModal: React.FC = () => {
           <button
             onClick={handleInsertToCanvas}
             disabled={!solution || !solution.isSolvable}
-            className={`px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all shadow-md ${
+            className={`px-3.5 sm:px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all shadow-md ${
               solution && solution.isSolvable
                 ? 'bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white shadow-indigo-600/30 hover:scale-[1.02]'
                 : 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-750'
             }`}
           >
             <PlusCircle size={14} />
-            <span>Tuvale Çözüm Olarak Ekle</span>
+            <span className="hidden xs:inline">Tuvale Çözüm Olarak </span><span>Ekle</span>
           </button>
         </div>
       </div>

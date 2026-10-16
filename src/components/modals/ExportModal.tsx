@@ -347,27 +347,27 @@ export const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose }) => 
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-150">
       <div className="bg-slate-900 border border-slate-750 rounded-3xl shadow-2xl w-full max-w-4xl overflow-hidden animate-in zoom-in-95 duration-150 text-white flex flex-col max-h-[92vh]">
         {/* Header */}
-        <div className="px-5 py-4 border-b border-slate-800 flex items-center justify-between bg-slate-925/40">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400">
-              <FileDown size={20} />
+        <div className="px-4 sm:px-5 py-3.5 sm:py-4 border-b border-slate-800 flex items-center justify-between bg-slate-925/40 gap-2">
+          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400 shrink-0">
+              <FileDown size={19} />
             </div>
-            <div>
-              <h3 className="text-base font-bold text-white flex items-center gap-2">
-                Dışa Aktarma Stüdyosu
-                <span className="text-[10px] bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 px-2 py-0.5 rounded-full font-medium">
+            <div className="min-w-0">
+              <h3 className="text-sm sm:text-base font-bold text-white flex items-center gap-2 truncate">
+                <span className="truncate">Dışa Aktarma Stüdyosu</span>
+                <span className="hidden sm:inline text-[10px] bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 px-2 py-0.5 rounded-full font-medium">
                   Studio Export
                 </span>
               </h3>
-              <p className="text-xs text-slate-400">
-                {activeNotebook.title} • Toplam {totalPages} sayfa
+              <p className="text-[11px] sm:text-xs text-slate-400 truncate">
+                {activeNotebook.title} • {totalPages} sayfa
               </p>
             </div>
           </div>
 
           <button
             onClick={onClose}
-            className="p-1.5 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800 transition-colors"
+            className="p-1.5 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800 transition-colors shrink-0"
           >
             <X size={18} />
           </button>
@@ -431,9 +431,9 @@ export const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose }) => 
         </div>
 
         {/* Modal Main Content: Left Controls & Right Live Preview */}
-        <div className="grid grid-cols-1 md:grid-cols-12 flex-1 overflow-hidden divide-y md:divide-y-0 md:divide-x divide-slate-800">
+        <div className="grid grid-cols-1 md:grid-cols-12 flex-1 overflow-y-auto md:overflow-hidden divide-y md:divide-y-0 md:divide-x divide-slate-800">
           {/* Left Column: Settings Panel */}
-          <div className="md:col-span-7 p-5 space-y-4 overflow-y-auto max-h-[60vh] md:max-h-[64vh]">
+          <div className="md:col-span-7 p-4 sm:p-5 space-y-4 overflow-y-visible md:overflow-y-auto max-h-none md:max-h-[64vh]">
             {/* TAB 1: FORMAT & SCOPE */}
             {activeTab === 'format' && (
               <div className="space-y-4 animate-in fade-in duration-150">

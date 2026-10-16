@@ -300,8 +300,8 @@ export const InfiniteCanvas: React.FC = () => {
       hasStylusUsedRef.current = true;
     }
 
-    // Smart Palm Rejection: If stylus has been used or palm rejection is enabled, reject touch events
-    if (e.pointerType === 'touch' && (hasStylusUsedRef.current || toolSettings.palmRejection)) {
+    // Smart Palm Rejection: If palm rejection is explicitly enabled, reject touch events
+    if (e.pointerType === 'touch' && toolSettings.palmRejection) {
       return;
     }
 
@@ -331,7 +331,7 @@ export const InfiniteCanvas: React.FC = () => {
         text: '',
         createdAt: Date.now(),
       });
-      setActiveTool(previousTool || 'pen');
+      setActiveTool(previousTool || 'ballpoint');
       return;
     }
 

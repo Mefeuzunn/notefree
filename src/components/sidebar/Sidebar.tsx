@@ -76,7 +76,14 @@ export const Sidebar: React.FC = () => {
     });
 
   return (
-    <aside className="fixed inset-y-0 left-0 w-84 sm:w-96 bg-slate-900/95 backdrop-blur-xl border-r border-slate-800 z-40 flex flex-col shadow-2xl animate-in slide-in-from-left duration-200">
+    <>
+      {/* Mobile & iPad Backdrop Overlay */}
+      <div
+        className="fixed inset-0 bg-black/60 backdrop-blur-xs z-35 transition-opacity"
+        onClick={() => setSidebarOpen(false)}
+      />
+
+      <aside className="fixed inset-y-0 left-0 w-84 sm:w-96 bg-slate-900/95 backdrop-blur-xl border-r border-slate-800 z-40 flex flex-col shadow-2xl animate-in slide-in-from-left duration-200">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3.5 border-b border-slate-800">
         <div className="flex items-center gap-2">
@@ -570,5 +577,6 @@ export const Sidebar: React.FC = () => {
         }}
       />
     </aside>
+    </>
   );
 };

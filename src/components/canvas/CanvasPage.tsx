@@ -514,8 +514,8 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
       hasStylusUsedRef.current = true;
     }
 
-    // Smart Palm Rejection: If stylus has been used or palm rejection is enabled, reject single-finger touches
-    if (e.pointerType === 'touch' && (hasStylusUsedRef.current || toolSettings.palmRejection)) {
+    // Smart Palm Rejection: If palm rejection is explicitly enabled, reject single-finger touches
+    if (e.pointerType === 'touch' && toolSettings.palmRejection) {
       return;
     }
 
@@ -653,7 +653,7 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
         text: '',
         createdAt: Date.now(),
       });
-      setActiveTool(previousTool || 'pen');
+      setActiveTool(previousTool || 'ballpoint');
       return;
     }
 
@@ -813,7 +813,7 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
     });
 
     // 🎯 FAZ T & FAZ Z: GoodNotes-Style Hold-to-Lasso Gesture Detection
-    const penTools = ['pen', 'ballpoint', 'fountain', 'brush', 'highlighter', 'pencil', 'fineliner'];
+    const penTools = ['ballpoint', 'fountain', 'brush', 'highlighter', 'pencil', 'fineliner', 'neon', 'dashed'];
     if (
       toolSettings.circleToLasso !== false &&
       penTools.includes(activeTool) &&

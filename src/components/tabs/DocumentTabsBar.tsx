@@ -44,7 +44,7 @@ export const DocumentTabsBar: React.FC = () => {
             <div
               key={nb.id}
               onClick={() => openNotebookTab(nb.id)}
-              className={`group relative flex items-center gap-2 h-7 px-3 rounded-t-lg text-xs cursor-pointer transition-all max-w-[200px] min-w-[110px] shrink-0 border-t-2 ${
+              className={`group relative flex items-center gap-2 h-7 px-2.5 sm:px-3 rounded-t-lg text-xs cursor-pointer transition-all max-w-[200px] min-w-[85px] sm:min-w-[110px] shrink-0 border-t-2 ${
                 isActive
                   ? 'bg-slate-900 text-slate-100 border-t-indigo-500 border-x border-slate-800 shadow-sm font-medium'
                   : 'bg-slate-950/60 text-slate-400 hover:text-slate-200 hover:bg-slate-900/40 border-t-transparent'
@@ -74,7 +74,7 @@ export const DocumentTabsBar: React.FC = () => {
                   closeNotebookTab(nb.id);
                 }}
                 className={`p-0.5 rounded-full text-slate-400 hover:text-rose-400 hover:bg-slate-800 transition-colors shrink-0 ${
-                  isActive ? 'opacity-80 hover:opacity-100' : 'opacity-0 group-hover:opacity-100'
+                  isActive ? 'opacity-90 hover:opacity-100' : 'opacity-50 sm:opacity-0 sm:group-hover:opacity-100 hover:opacity-100'
                 }`}
                 title="Sekmeyi Kapat"
               >

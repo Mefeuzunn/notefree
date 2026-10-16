@@ -132,7 +132,14 @@ export const StickersDrawer: React.FC = () => {
   };
 
   return (
-    <div className="fixed inset-y-0 right-0 w-84 sm:w-96 bg-slate-900/95 backdrop-blur-xl border-l border-slate-800 z-50 flex flex-col shadow-2xl animate-in slide-in-from-right duration-200 select-none">
+    <>
+      {/* Mobile Backdrop */}
+      <div
+        className="fixed inset-0 bg-black/60 backdrop-blur-xs z-40 md:hidden"
+        onClick={() => setStickersDrawerOpen(false)}
+      />
+
+      <div className="fixed inset-y-0 right-0 w-84 max-w-[88vw] sm:w-96 bg-slate-900/95 backdrop-blur-xl border-l border-slate-800 z-50 flex flex-col shadow-2xl animate-in slide-in-from-right duration-200 select-none">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800">
         <div className="flex items-center gap-2">
@@ -343,5 +350,6 @@ export const StickersDrawer: React.FC = () => {
         onApplyCrop={handleApplyCroppedImage}
       />
     </div>
-  );
+  </>
+);
 };

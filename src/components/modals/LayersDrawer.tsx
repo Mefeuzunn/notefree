@@ -110,7 +110,14 @@ export const LayersDrawer: React.FC = () => {
   ];
 
   return (
-    <div className="fixed inset-y-0 right-0 w-80 sm:w-92 bg-slate-900/95 backdrop-blur-xl border-l border-slate-800 z-50 flex flex-col shadow-2xl animate-in slide-in-from-right duration-200 select-none">
+    <>
+      {/* Mobile Backdrop */}
+      <div
+        className="fixed inset-0 bg-black/60 backdrop-blur-xs z-40 md:hidden"
+        onClick={() => setLayersDrawerOpen(false)}
+      />
+
+      <div className="fixed inset-y-0 right-0 w-80 max-w-[85vw] sm:w-92 bg-slate-900/95 backdrop-blur-xl border-l border-slate-800 z-50 flex flex-col shadow-2xl animate-in slide-in-from-right duration-200 select-none">
       {/* Header */}
       <div className="flex items-center justify-between px-5 py-4 border-b border-slate-800">
         <div className="flex items-center gap-2.5">
@@ -215,5 +222,6 @@ export const LayersDrawer: React.FC = () => {
         <span className="text-indigo-400 font-medium">Concepts & Procreate Motoru</span>
       </div>
     </div>
-  );
+  </>
+);
 };

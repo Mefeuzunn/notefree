@@ -128,7 +128,7 @@ export const PlannerTabsBar: React.FC = () => {
                       triggerHaptic('light');
                       setEditingTab(tab);
                     }}
-                    className="opacity-0 group-hover/tab:opacity-100 mr-1 p-1 bg-slate-800/90 text-slate-300 hover:text-white rounded-md shadow-md border border-slate-700 transition-opacity"
+                    className="opacity-70 sm:opacity-0 sm:group-hover/tab:opacity-100 mr-1 p-1 bg-slate-800/90 text-slate-300 hover:text-white rounded-md shadow-md border border-slate-700 transition-opacity"
                     title="Sekmeyi Düzenle"
                   >
                     <Edit2 size={11} />

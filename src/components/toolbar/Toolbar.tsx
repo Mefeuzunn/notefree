@@ -1,6 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useNotebookStore } from '../../store/notebookStore';
-import { exportNotebookToPdf } from '../../services/pdfService';
 import { exportNotebookAsNotefree } from '../../services/storage';
 import {
   PenTool,
@@ -12,21 +11,18 @@ import {
   Shapes,
   Undo2,
   Redo2,
-  Plus,
   ChevronLeft,
   ChevronRight,
   FileDown,
   UploadCloud,
   Youtube,
   Trash2,
-  Palette,
   Layers,
   LayoutTemplate,
   Users,
   Menu,
   Sparkles,
   Zap,
-  MousePointer,
   Check,
   Type,
   Compass,
@@ -46,7 +42,6 @@ import {
   Pipette,
   PaintBucket,
   SlidersHorizontal,
-  Volume2,
   Calculator,
   Split,
   Search,
@@ -62,10 +57,14 @@ import {
   Link2,
   TrendingUp,
   Stamp,
+  MoreHorizontal,
+  X,
+  ChevronDown,
 } from 'lucide-react';
-import { PenType, ShapeType, ToolType, StylusDoubleTapAction } from '../../types/notebook';
+import { ShapeType, StylusDoubleTapAction } from '../../types/notebook';
 import { AudioPlayerBar } from '../audio/AudioPlayerBar';
 import { PomodoroBarWidget } from '../pomodoro/PomodoroBarWidget';
+import { triggerHaptic } from '../../engine/hapticFeedback';
 
 const COLOR_PALETTE = [
   '#0f172a', // Slate black
@@ -78,6 +77,8 @@ const COLOR_PALETTE = [
   '#facc15', // Highlighter yellow
   '#f472b6', // Highlighter pink
   '#4ade80', // Highlighter mint
+  '#ffffff', // Pure white
+  '#64748b', // Slate gray
 ];
 
 export const Toolbar: React.FC = () => {
@@ -85,15 +86,12 @@ export const Toolbar: React.FC = () => {
     activeTool,
     setActiveTool,
     toolSettings,
-    setToolColor,
-    setToolSize,
     setEraserMode,
     toggleEraseHighlighterOnly,
     toggleAutoDeselectEraser,
     selectFavoriteColor,
     selectFavoriteSize,
     setFavoriteColor,
-    setFavoriteSize,
     setSelectedShape,
     setShapeFillColor,
     setShapeFillOpacity,
@@ -101,7 +99,6 @@ export const Toolbar: React.FC = () => {
     notebooks,
     activePageIndex,
     setActivePageIndex,
-    addPage,
     undo,
     redo,
     undoStack,
@@ -118,28 +115,22 @@ export const Toolbar: React.FC = () => {
     setPageManagerModalOpen,
     rulerVisible,
     toggleRuler,
-    viewMode,
     zoomWindowOpen,
     toggleZoomWindow,
     scratchpadOpen,
     toggleScratchpad,
     minimapVisible,
     toggleMinimap,
-    shortcutsModalOpen,
     setShortcutsModalOpen,
     setStudySetsModalOpen,
     presentationMode,
     setPresentationMode,
-    setLaserStyle,
     togglePageBookmark,
     invertCurrentPageInks,
     setStreamline,
     setFillTolerance,
-    searchModalOpen,
     setSearchModalOpen,
-    mathModalOpen,
     openMathModal,
-    functionPlotterModalOpen,
     openFunctionPlotterModal,
     splitNotebook,
     openDualNotebook,
@@ -168,1003 +159,1687 @@ export const Toolbar: React.FC = () => {
     togglePlannerTabs,
     openLinkModal,
     addPageLinkToCurrentPage,
-    stampCreatorModalOpen,
     setStampCreatorModalOpen,
   } = useNotebookStore();
 
+  // Active Dropdown state
+  const [openDropdown, setOpenDropdown] = useState<
+    'eraser' | 'shape' | 'artist' | 'moreTools' | 'overflowActions' | null
+  >(null);
   const [activeColorSlot, setActiveColorSlot] = useState<number | null>(null);
-  const [activeSizeSlot, setActiveSizeSlot] = useState<number | null>(null);
-  const [eraserMenuOpen, setEraserMenuOpen] = useState(false);
-  const [shapeMenuOpen, setShapeMenuOpen] = useState(false);
-  const [artistMenuOpen, setArtistMenuOpen] = useState(false);
-  const [isExporting, setIsExporting] = useState(false);
+
+  const toolbarRef = useRef<HTMLDivElement | null>(null);
+
+  // Close all popovers when tapping/clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent | TouchEvent) => {
+      if (toolbarRef.current && !toolbarRef.current.contains(e.target as Node)) {
+        setOpenDropdown(null);
+        setActiveColorSlot(null);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('touchstart', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
+    };
+  }, []);
 
   const activeNotebook = notebooks.find((n) => n.id === activeNotebookId);
   const totalPages = activeNotebook ? activeNotebook.pages.length : 1;
 
-  const handleExportPdf = async () => {
-    if (!activeNotebook || activeNotebook.pages.length === 0) return;
-    try {
-      setIsExporting(true);
-      const blob = await exportNotebookToPdf(activeNotebook.pages, activeNotebook.title);
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${activeNotebook.title.replace(/[^a-zA-Z0-9çğıöşüÇĞİÖŞÜ_-]/g, '_')}_notlar.pdf`;
-      a.click();
-      URL.revokeObjectURL(url);
-    } catch (err) {
-      console.error('PDF export error:', err);
-      alert('PDF dışa aktarılırken bir hata oluştu.');
-    } finally {
-      setIsExporting(false);
-    }
+  const toggleDropdown = (
+    name: 'eraser' | 'shape' | 'artist' | 'moreTools' | 'overflowActions'
+  ) => {
+    triggerHaptic('light');
+    setOpenDropdown(openDropdown === name ? null : name);
+    setActiveColorSlot(null);
   };
 
+  const closeDropdown = () => {
+    setOpenDropdown(null);
+    setActiveColorSlot(null);
+  };
+
+  // Check if any secondary inking or geometry tool is currently active
+  const isSecondaryToolActive =
+    ['neon', 'dashed', 'tape', 'laser', 'eyedropper', 'fill'].includes(activeTool) ||
+    rulerVisible ||
+    protractorVisible ||
+    compassVisible ||
+    symmetryEnabled ||
+    zoomWindowOpen ||
+    scratchpadOpen ||
+    minimapVisible ||
+    plannerTabsVisible;
+
+  // Check if any background service or session is active
+  const isActivityActive = collaboration.isConnected || youtube.isOpen;
+
   return (
-    <header className="h-14 bg-slate-900 border-b border-slate-800 flex items-center justify-between px-3 z-30 select-none shadow-lg">
-      {/* 1. Left Section: Sidebar & Notebook Title */}
-      <div className="flex items-center gap-2.5">
-        <button
-          onClick={() => setSidebarOpen(!sidebarOpen)}
-          className={`p-2 rounded-xl transition-colors ${
-            sidebarOpen
-              ? 'bg-indigo-600/30 text-indigo-400 border border-indigo-500/30'
-              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
-          }`}
-          title="Defterler ve Sayfalar Menüsü"
-        >
-          <Menu size={18} />
-        </button>
-
-        {/* GoodNotes Library View Button */}
-        <button
-          onClick={() => setLibraryViewOpen(true)}
-          className="p-2 rounded-xl text-slate-400 hover:text-indigo-400 hover:bg-slate-800 transition-colors flex items-center gap-1.5"
-          title="Tüm Defterleri Gör (Kütüphane)"
-        >
-          <Library size={18} />
-          <span className="text-xs font-semibold hidden md:inline">Kütüphane</span>
-        </button>
-
-        {/* Global Search Button */}
-        <button
-          onClick={() => setSearchModalOpen(true)}
-          className="p-2 rounded-xl text-slate-400 hover:text-indigo-400 hover:bg-slate-800 transition-colors flex items-center gap-1.5"
-          title="Küresel Arama & İndeks (Cmd+K / Ctrl+K)"
-        >
-          <Search size={18} />
-          <span className="text-xs font-semibold hidden xl:inline">Ara</span>
-        </button>
-
-        {/* Faz W: Keyboard Shortcuts Guide Button */}
-        <button
-          onClick={() => setShortcutsModalOpen(true)}
-          className="p-2 rounded-xl text-slate-400 hover:text-amber-400 hover:bg-slate-800 transition-colors flex items-center gap-1.5"
-          title="Klavye Kısayolları Kılavuzu (?)"
-        >
-          <Keyboard size={18} />
-          <span className="text-xs font-semibold hidden xl:inline">Kısayollar</span>
-        </button>
-
-        <div className="hidden lg:flex items-center gap-2">
-          <span
-            className="w-3 h-3 rounded-full shrink-0 shadow-sm"
-            style={{ backgroundColor: activeNotebook?.coverColor || '#3b82f6' }}
-          />
-          <span className="font-semibold text-xs text-slate-200 max-w-[150px] truncate">
-            {activeNotebook?.title || 'Defter Seçilmedi'}
-          </span>
-        </div>
-
-        {/* Page Stepper & Star Bookmark */}
-        <div className="hidden sm:flex items-center gap-1.5 pl-1 border-l border-slate-800">
+    <div ref={toolbarRef} className="flex flex-col z-30 select-none shadow-lg">
+      {/* 1. MAIN TOP BAR */}
+      <header className="h-14 bg-slate-900 border-b border-slate-800 flex items-center justify-between px-2 sm:px-3 gap-1 sm:gap-2">
+        {/* LEFT SECTION: Sidebar, Notebook Title & Page Stepper */}
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+          {/* Sidebar Menu Toggle */}
           <button
-            onClick={() => togglePageBookmark(activePageIndex)}
-            className={`p-1.5 rounded-lg transition-all ${
-              activeNotebook?.pages[activePageIndex]?.isBookmarked
-                ? 'text-amber-400 fill-amber-400 bg-amber-400/10'
-                : 'text-slate-500 hover:text-amber-300 hover:bg-slate-800'
+            type="button"
+            onClick={() => {
+              triggerHaptic('light');
+              setSidebarOpen(!sidebarOpen);
+            }}
+            className={`p-2 rounded-xl transition-colors ${
+              sidebarOpen
+                ? 'bg-indigo-600/30 text-indigo-400 border border-indigo-500/30'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
             }`}
-            title={
-              activeNotebook?.pages[activePageIndex]?.isBookmarked
-                ? 'Sayfayı Yer İmlerinden Çıkar'
-                : 'Bu Sayfayı Yer İmlerine Ekle'
-            }
+            title="Defterler ve Sayfalar Menüsü"
           >
-            <Star
-              size={15}
-              className={
-                activeNotebook?.pages[activePageIndex]?.isBookmarked
-                  ? 'fill-amber-400'
-                  : ''
-              }
-            />
+            <Menu size={18} />
           </button>
 
-          <div className="flex items-center bg-slate-800/80 rounded-lg p-0.5 border border-slate-750">
-            <button
-              onClick={() => setActivePageIndex(Math.max(0, activePageIndex - 1))}
-              disabled={activePageIndex === 0}
-              className={`p-1 rounded transition-colors ${
-                activePageIndex > 0
-                  ? 'text-slate-300 hover:text-white hover:bg-slate-700'
-                  : 'text-slate-600 cursor-not-allowed'
-              }`}
-              title="Önceki Sayfa"
-            >
-              <ChevronLeft size={13} />
-            </button>
-            <span className="text-[11px] font-mono font-semibold px-1.5 text-slate-300">
-              {activePageIndex + 1}/{totalPages}
+          {/* Notebook Title Badge with Cover Color Dot */}
+          <div className="flex items-center gap-1.5 px-1.5 py-1 rounded-xl bg-slate-800/40 border border-slate-750/60 max-w-[110px] xs:max-w-[150px] sm:max-w-[200px] md:max-w-[220px]">
+            <span
+              className="w-2.5 h-2.5 rounded-full shrink-0 shadow-sm"
+              style={{ backgroundColor: activeNotebook?.coverColor || '#3b82f6' }}
+            />
+            <span className="font-semibold text-xs text-slate-200 truncate">
+              {activeNotebook?.title || 'Notefree'}
             </span>
+          </div>
+
+          {/* Page Stepper & Bookmark Star */}
+          <div className="flex items-center gap-1 pl-1 border-l border-slate-800/80">
             <button
-              onClick={() => setActivePageIndex(Math.min(totalPages - 1, activePageIndex + 1))}
-              disabled={activePageIndex >= totalPages - 1}
-              className={`p-1 rounded transition-colors ${
-                activePageIndex < totalPages - 1
-                  ? 'text-slate-300 hover:text-white hover:bg-slate-700'
-                  : 'text-slate-600 cursor-not-allowed'
+              type="button"
+              onClick={() => {
+                triggerHaptic('light');
+                togglePageBookmark(activePageIndex);
+              }}
+              className={`p-1.5 rounded-lg transition-all ${
+                activeNotebook?.pages[activePageIndex]?.isBookmarked
+                  ? 'text-amber-400 fill-amber-400 bg-amber-400/10'
+                  : 'text-slate-500 hover:text-amber-300 hover:bg-slate-800'
               }`}
-              title="Sonraki Sayfa"
+              title="Bu Sayfayı Yer İmlerine Ekle/Kaldır"
             >
-              <ChevronRight size={13} />
+              <Star
+                size={14}
+                className={
+                  activeNotebook?.pages[activePageIndex]?.isBookmarked
+                    ? 'fill-amber-400'
+                    : ''
+                }
+              />
+            </button>
+
+            <div className="flex items-center bg-slate-800/80 rounded-lg p-0.5 border border-slate-750">
+              <button
+                type="button"
+                onClick={() => {
+                  triggerHaptic('light');
+                  setActivePageIndex(Math.max(0, activePageIndex - 1));
+                }}
+                disabled={activePageIndex === 0}
+                className={`p-1 rounded transition-colors ${
+                  activePageIndex > 0
+                    ? 'text-slate-300 hover:text-white hover:bg-slate-700'
+                    : 'text-slate-600 cursor-not-allowed'
+                }`}
+                title="Önceki Sayfa"
+              >
+                <ChevronLeft size={13} />
+              </button>
+              <span className="text-[11px] font-mono font-semibold px-1 text-slate-300">
+                {activePageIndex + 1}/{totalPages}
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  triggerHaptic('light');
+                  setActivePageIndex(Math.min(totalPages - 1, activePageIndex + 1));
+                }}
+                disabled={activePageIndex >= totalPages - 1}
+                className={`p-1 rounded transition-colors ${
+                  activePageIndex < totalPages - 1
+                    ? 'text-slate-300 hover:text-white hover:bg-slate-700'
+                    : 'text-slate-600 cursor-not-allowed'
+                }`}
+                title="Sonraki Sayfa"
+              >
+                <ChevronRight size={13} />
+              </button>
+            </div>
+          </div>
+
+          {/* Quick Library & Search (Tablets & Desktop) */}
+          <div className="hidden md:flex items-center gap-0.5">
+            <button
+              type="button"
+              onClick={() => {
+                triggerHaptic('light');
+                setLibraryViewOpen(true);
+              }}
+              className="p-1.5 rounded-xl text-slate-400 hover:text-indigo-400 hover:bg-slate-800 transition-colors"
+              title="Kütüphane"
+            >
+              <Library size={16} />
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                triggerHaptic('light');
+                setSearchModalOpen(true);
+              }}
+              className="p-1.5 rounded-xl text-slate-400 hover:text-indigo-400 hover:bg-slate-800 transition-colors"
+              title="Arama (Cmd+K)"
+            >
+              <Search size={16} />
             </button>
           </div>
         </div>
-      </div>
 
-      {/* 2. Middle Section: GoodNotes Professional Tool Dock */}
-      <div className="flex items-center bg-slate-800/90 p-1 rounded-2xl border border-slate-750 shadow-inner gap-0.5">
-        {/* Fountain Pen */}
-        <button
-          onClick={() => setActiveTool('fountain')}
-          className={`p-2 rounded-xl transition-all flex items-center justify-center ${
-            activeTool === 'fountain'
-              ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30 scale-105'
-              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
-          }`}
-          title="Dolma Kalem (Basınca ve hıza duyarlı doğal hatlar)"
-        >
-          <Feather size={16} />
-        </button>
+        {/* CENTER SECTION: GoodNotes Professional Tool Dock (Visible on Tablets & Desktop >= 768px) */}
+        <div className="hidden md:flex items-center bg-slate-800/90 p-1 rounded-2xl border border-slate-750 shadow-inner gap-0.5 overflow-x-auto scrollbar-none max-w-[52vw] lg:max-w-none shrink">
+          {/* 1. Fountain Pen */}
+          <button
+            type="button"
+            onClick={() => {
+              triggerHaptic('light');
+              setActiveTool('fountain');
+            }}
+            className={`p-2 rounded-xl transition-all flex items-center justify-center shrink-0 ${
+              activeTool === 'fountain'
+                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30 scale-105'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
+            }`}
+            title="Dolma Kalem"
+          >
+            <Feather size={16} />
+          </button>
 
-        {/* Ballpoint Pen */}
+          {/* 2. Ballpoint Pen */}
+          <button
+            type="button"
+            onClick={() => {
+              triggerHaptic('light');
+              setActiveTool('ballpoint');
+            }}
+            className={`p-2 rounded-xl transition-all flex items-center justify-center shrink-0 ${
+              activeTool === 'ballpoint'
+                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30 scale-105'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
+            }`}
+            title="Tükenmez Kalem"
+          >
+            <PenTool size={16} />
+          </button>
+
+          {/* 3. Pencil */}
+          <button
+            type="button"
+            onClick={() => {
+              triggerHaptic('light');
+              setActiveTool('pencil');
+            }}
+            className={`p-2 rounded-xl transition-all flex items-center justify-center shrink-0 ${
+              activeTool === 'pencil'
+                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30 scale-105'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
+            }`}
+            title="Kurşun Kalem"
+          >
+            <Pencil size={16} />
+          </button>
+
+          {/* 4. Fineliner */}
+          <button
+            type="button"
+            onClick={() => {
+              triggerHaptic('light');
+              setActiveTool('fineliner');
+            }}
+            className={`p-2 rounded-xl transition-all flex items-center justify-center shrink-0 ${
+              activeTool === 'fineliner'
+                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30 scale-105'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
+            }`}
+            title="Teknik Fineliner Kalemi"
+          >
+            <PenLine size={16} />
+          </button>
+
+          {/* 5. Brush */}
+          <button
+            type="button"
+            onClick={() => {
+              triggerHaptic('light');
+              setActiveTool('brush');
+            }}
+            className={`p-2 rounded-xl transition-all flex items-center justify-center shrink-0 ${
+              activeTool === 'brush'
+                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30 scale-105'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
+            }`}
+            title="Fırça / Kaligrafi"
+          >
+            <Paintbrush size={16} />
+          </button>
+
+          {/* 6. Highlighter */}
+          <button
+            type="button"
+            onClick={() => {
+              triggerHaptic('light');
+              setActiveTool('highlighter');
+            }}
+            className={`p-2 rounded-xl transition-all flex items-center justify-center shrink-0 ${
+              activeTool === 'highlighter'
+                ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/30 scale-105 font-bold'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
+            }`}
+            title="Fosforlu Kalem"
+          >
+            <Highlighter size={16} />
+          </button>
+
+          {/* 7. Eraser with Dropdown Settings */}
+          <div className="relative shrink-0">
+            <button
+              type="button"
+              onClick={() => {
+                if (activeTool === 'eraser') {
+                  toggleDropdown('eraser');
+                } else {
+                  triggerHaptic('light');
+                  setActiveTool('eraser');
+                }
+              }}
+              className={`p-2 rounded-xl transition-all flex items-center justify-center ${
+                activeTool === 'eraser'
+                  ? 'bg-rose-600 text-white shadow-md shadow-rose-600/30 scale-105'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
+              }`}
+              title="Silgi (Tekrar tıklayarak ayarları açın)"
+            >
+              <Eraser size={16} />
+            </button>
+
+            {openDropdown === 'eraser' && (
+              <div className="absolute top-12 left-0 bg-slate-800 border border-slate-700 shadow-2xl rounded-2xl p-3 w-56 z-50 animate-in fade-in zoom-in-95 backdrop-blur-xl">
+                <div className="text-[11px] font-semibold text-slate-400 mb-2 uppercase tracking-wider">
+                  Silgi Ayarları
+                </div>
+
+                <div className="flex bg-slate-900 rounded-lg p-0.5 mb-2.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEraserMode('stroke');
+                      closeDropdown();
+                    }}
+                    className={`flex-1 py-1 text-xs rounded-md transition-colors ${
+                      toolSettings.eraserMode === 'stroke'
+                        ? 'bg-rose-600 text-white font-medium'
+                        : 'text-slate-400'
+                    }`}
+                  >
+                    Tüm Çizgi
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEraserMode('pixel');
+                      closeDropdown();
+                    }}
+                    className={`flex-1 py-1 text-xs rounded-md transition-colors ${
+                      toolSettings.eraserMode === 'pixel'
+                        ? 'bg-rose-600 text-white font-medium'
+                        : 'text-slate-400'
+                    }`}
+                  >
+                    Piksel
+                  </button>
+                </div>
+
+                <label className="flex items-center justify-between text-xs text-slate-200 py-1.5 cursor-pointer hover:text-white">
+                  <span>Yalnızca Fosforluyu Sil</span>
+                  <input
+                    type="checkbox"
+                    checked={toolSettings.eraseHighlighterOnly}
+                    onChange={toggleEraseHighlighterOnly}
+                    className="rounded accent-rose-500 cursor-pointer"
+                  />
+                </label>
+
+                <label className="flex items-center justify-between text-xs text-slate-200 py-1.5 cursor-pointer hover:text-white">
+                  <span>Otomatik Kaleme Dön</span>
+                  <input
+                    type="checkbox"
+                    checked={toolSettings.autoDeselectEraser}
+                    onChange={toggleAutoDeselectEraser}
+                    className="rounded accent-rose-500 cursor-pointer"
+                  />
+                </label>
+              </div>
+            )}
+          </div>
+
+          {/* 8. Lasso Tool */}
+          <button
+            type="button"
+            onClick={() => {
+              triggerHaptic('light');
+              setActiveTool('lasso');
+            }}
+            className={`p-2 rounded-xl transition-all flex items-center justify-center shrink-0 ${
+              activeTool === 'lasso'
+                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30 scale-105'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
+            }`}
+            title="Kement Seçim Aracı (Lasso)"
+          >
+            <Scissors size={16} />
+          </button>
+
+          {/* 9. Shapes Menu */}
+          <div className="relative shrink-0">
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTool('shape');
+                toggleDropdown('shape');
+              }}
+              className={`p-2 rounded-xl transition-all flex items-center justify-center ${
+                activeTool === 'shape'
+                  ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
+              }`}
+              title="Geometrik Şekiller"
+            >
+              <Shapes size={16} />
+            </button>
+
+            {openDropdown === 'shape' && (
+              <div className="absolute top-12 left-0 bg-slate-850 border border-slate-750 shadow-2xl rounded-2xl p-3 flex flex-col gap-2.5 z-50 animate-in fade-in zoom-in-95 min-w-[280px] backdrop-blur-xl">
+                <div className="text-[11px] font-semibold text-slate-400 px-1 uppercase tracking-wider">
+                  Şekil Türü
+                </div>
+                <div className="flex gap-1">
+                  {(['line', 'arrow', 'rectangle', 'circle', 'triangle'] as ShapeType[]).map(
+                    (shp) => (
+                      <button
+                        key={shp}
+                        type="button"
+                        onClick={() => {
+                          setSelectedShape(shp);
+                          closeDropdown();
+                        }}
+                        className={`flex-1 py-1.5 text-xs rounded-lg capitalize transition-colors font-medium text-center ${
+                          toolSettings.selectedShape === shp
+                            ? 'bg-indigo-600 text-white shadow'
+                            : 'text-slate-300 hover:bg-slate-750'
+                        }`}
+                      >
+                        {shp === 'line'
+                          ? 'Çizgi'
+                          : shp === 'arrow'
+                          ? 'Ok'
+                          : shp === 'rectangle'
+                          ? 'Kare'
+                          : shp === 'circle'
+                          ? 'Daire'
+                          : 'Üçgen'}
+                      </button>
+                    )
+                  )}
+                </div>
+
+                <div className="h-px bg-slate-750 my-0.5" />
+
+                <div className="flex items-center justify-between px-1">
+                  <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+                    Şekil İç Dolgusu
+                  </span>
+                  <span className="text-[10px] text-indigo-400 font-mono font-semibold">
+                    {toolSettings.shapeFillColor
+                      ? `%${Math.round((toolSettings.shapeFillOpacity ?? 0.25) * 100)}`
+                      : 'Dolgusuz'}
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-1.5 flex-wrap px-0.5">
+                  <button
+                    type="button"
+                    onClick={() => setShapeFillColor(undefined)}
+                    className={`w-6 h-6 rounded-md border flex items-center justify-center transition-all ${
+                      !toolSettings.shapeFillColor
+                        ? 'border-rose-500 bg-rose-500/20 text-rose-400 ring-1 ring-rose-400'
+                        : 'border-slate-700 bg-slate-800 text-slate-400 hover:text-slate-200'
+                    }`}
+                    title="Dolgusuz"
+                  >
+                    <Ban size={12} />
+                  </button>
+
+                  {[
+                    { name: 'Sarı', color: '#fef08a' },
+                    { name: 'Gül', color: '#fecdd3' },
+                    { name: 'Nane', color: '#a7f3d0' },
+                    { name: 'Mavi', color: '#bae6fd' },
+                    { name: 'Lavanta', color: '#ddd6fe' },
+                    { name: 'Turuncu', color: '#fed7aa' },
+                    { name: 'Grafit', color: '#cbd5e1' },
+                  ].map(({ name, color }) => (
+                    <button
+                      key={color}
+                      type="button"
+                      onClick={() => setShapeFillColor(color)}
+                      className={`w-6 h-6 rounded-md border transition-all flex items-center justify-center ${
+                        toolSettings.shapeFillColor === color
+                          ? 'border-white scale-110 shadow-sm ring-2 ring-indigo-500'
+                          : 'border-slate-700/80 hover:scale-105'
+                      }`}
+                      style={{ backgroundColor: color }}
+                      title={name}
+                    >
+                      {toolSettings.shapeFillColor === color && (
+                        <Check size={11} className="text-slate-900 font-bold" />
+                      )}
+                    </button>
+                  ))}
+                </div>
+
+                {toolSettings.shapeFillColor && (
+                  <div className="flex items-center gap-1 bg-slate-900 p-1 rounded-lg">
+                    <span className="text-[10px] text-slate-400 px-1 font-medium">Opaklık:</span>
+                    {[0.15, 0.3, 0.6, 1.0].map((op) => (
+                      <button
+                        key={op}
+                        type="button"
+                        onClick={() => setShapeFillOpacity(op)}
+                        className={`flex-1 py-0.5 text-[10px] rounded transition-colors font-mono ${
+                          Math.abs((toolSettings.shapeFillOpacity ?? 0.25) - op) < 0.08
+                            ? 'bg-indigo-600 text-white font-bold'
+                            : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+                        }`}
+                      >
+                        %{Math.round(op * 100)}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                <div className="h-px bg-slate-750 my-0.5" />
+
+                <div className="flex gap-1.5">
+                  <button
+                    type="button"
+                    onClick={toggleAngleSnap}
+                    className={`flex-1 px-2 py-1.5 rounded-lg text-xs font-medium flex items-center justify-between border transition-all ${
+                      toolSettings.angleSnap
+                        ? 'bg-indigo-600/20 border-indigo-500 text-indigo-300'
+                        : 'bg-slate-800 border-slate-700 text-slate-400'
+                    }`}
+                  >
+                    <span>15° Açı Kilidi</span>
+                    {toolSettings.angleSnap && <Check size={13} className="text-indigo-400" />}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={toggleGridSnap}
+                    className={`flex-1 px-2 py-1.5 rounded-lg text-xs font-medium flex items-center justify-between border transition-all ${
+                      toolSettings.gridSnap
+                        ? 'bg-indigo-600/20 border-indigo-500 text-indigo-300'
+                        : 'bg-slate-800 border-slate-700 text-slate-400'
+                    }`}
+                  >
+                    <span>Izgara Snap</span>
+                    {toolSettings.gridSnap && <Check size={13} className="text-indigo-400" />}
+                  </button>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={toggleAutoDetectShape}
+                  className={`w-full px-2.5 py-1.5 rounded-lg text-xs font-medium flex items-center justify-between border transition-all ${
+                    toolSettings.autoDetectShape
+                      ? 'bg-amber-500/20 border-amber-500/50 text-amber-300 font-semibold'
+                      : 'bg-slate-800 border-slate-700 text-slate-400'
+                  }`}
+                >
+                  <div className="flex items-center gap-1.5">
+                    <Sparkles size={13} className="text-amber-400" />
+                    <span>Hold-to-Snap Sabitleme</span>
+                  </div>
+                  {toolSettings.autoDetectShape && <Check size={13} className="text-amber-400" />}
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* 10. Text Tool */}
+          <button
+            type="button"
+            onClick={() => {
+              triggerHaptic('light');
+              setActiveTool('text');
+            }}
+            className={`p-2 rounded-xl transition-all flex items-center justify-center shrink-0 ${
+              activeTool === 'text'
+                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30 scale-105'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
+            }`}
+            title="Metin Kutusu ('T')"
+          >
+            <Type size={16} />
+          </button>
+
+          {/* 11. MORE INKING & STEM TOOLS DROPDOWN (Ruler, Compass, Protractor, Tape, Laser, Stamps, etc.) */}
+          <div className="relative shrink-0">
+            <button
+              type="button"
+              onClick={() => toggleDropdown('moreTools')}
+              className={`p-2 rounded-xl transition-all flex items-center justify-center gap-0.5 relative ${
+                isSecondaryToolActive
+                  ? 'bg-indigo-600/30 text-indigo-300 border border-indigo-500/40 ring-1 ring-indigo-400'
+                  : 'text-slate-400 hover:text-indigo-300 hover:bg-slate-700/50'
+              }`}
+              title="Geometri, STEM & İleri Çizim Araçları (Cetvel, Açıölçer, Pergel, Kaşe, vb.)"
+            >
+              <Compass size={16} />
+              <ChevronDown size={10} className="text-slate-400" />
+              {isSecondaryToolActive && (
+                <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-indigo-400 animate-pulse" />
+              )}
+            </button>
+
+            {openDropdown === 'moreTools' && (
+              <div className="absolute top-12 left-1/2 -translate-x-1/2 bg-slate-900 border border-slate-750 shadow-2xl rounded-2xl p-3 w-72 z-50 animate-in fade-in zoom-in-95 backdrop-blur-xl space-y-2.5">
+                <div className="text-[11px] font-bold text-slate-300 uppercase tracking-wider flex items-center justify-between pb-1.5 border-b border-slate-800">
+                  <span>Geometri & İleri Araçlar</span>
+                  <Compass size={13} className="text-indigo-400" />
+                </div>
+
+                {/* Sub-grid of advanced tools */}
+                <div className="grid grid-cols-4 gap-1.5">
+                  {/* Neon Pen */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveTool('neon');
+                      closeDropdown();
+                    }}
+                    className={`p-2 rounded-xl border flex flex-col items-center gap-1 text-[10px] font-medium transition-all ${
+                      activeTool === 'neon'
+                        ? 'bg-fuchsia-600/30 border-fuchsia-500 text-fuchsia-300'
+                        : 'bg-slate-800/60 border-slate-750 text-slate-400 hover:text-white'
+                    }`}
+                    title="Neon Kalemi"
+                  >
+                    <Flame size={16} className="text-fuchsia-400" />
+                    <span>Neon</span>
+                  </button>
+
+                  {/* Dashed Pen */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveTool('dashed');
+                      closeDropdown();
+                    }}
+                    className={`p-2 rounded-xl border flex flex-col items-center gap-1 text-[10px] font-medium transition-all ${
+                      activeTool === 'dashed'
+                        ? 'bg-indigo-600/30 border-indigo-500 text-indigo-300'
+                        : 'bg-slate-800/60 border-slate-750 text-slate-400 hover:text-white'
+                    }`}
+                    title="Kesikli Çizgi"
+                  >
+                    <Spline size={16} className="text-indigo-400" />
+                    <span>Kesikli</span>
+                  </button>
+
+                  {/* Tape Tool */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveTool('tape');
+                      closeDropdown();
+                    }}
+                    className={`p-2 rounded-xl border flex flex-col items-center gap-1 text-[10px] font-medium transition-all ${
+                      activeTool === 'tape'
+                        ? 'bg-amber-600/30 border-amber-500 text-amber-300'
+                        : 'bg-slate-800/60 border-slate-750 text-slate-400 hover:text-white'
+                    }`}
+                    title="Gizleme Bandı"
+                  >
+                    <Bandage size={16} className="text-amber-400" />
+                    <span>Bant</span>
+                  </button>
+
+                  {/* Laser Pointer */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveTool('laser');
+                      closeDropdown();
+                    }}
+                    className={`p-2 rounded-xl border flex flex-col items-center gap-1 text-[10px] font-medium transition-all ${
+                      activeTool === 'laser'
+                        ? 'bg-rose-600/30 border-rose-500 text-rose-300'
+                        : 'bg-slate-800/60 border-slate-750 text-slate-400 hover:text-white'
+                    }`}
+                    title="Lazer İşaretçi"
+                  >
+                    <Zap size={16} className="text-rose-400" />
+                    <span>Lazer</span>
+                  </button>
+
+                  {/* Ruler */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      toggleRuler();
+                      closeDropdown();
+                    }}
+                    className={`p-2 rounded-xl border flex flex-col items-center gap-1 text-[10px] font-medium transition-all ${
+                      rulerVisible
+                        ? 'bg-indigo-600/30 border-indigo-500 text-indigo-300'
+                        : 'bg-slate-800/60 border-slate-750 text-slate-400 hover:text-white'
+                    }`}
+                    title="Milimetrik Cetvel"
+                  >
+                    <Compass size={16} className="text-indigo-400" />
+                    <span>Cetvel</span>
+                  </button>
+
+                  {/* Protractor */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      toggleProtractor();
+                      closeDropdown();
+                    }}
+                    className={`p-2 rounded-xl border flex flex-col items-center gap-1 text-[10px] font-medium transition-all ${
+                      protractorVisible
+                        ? 'bg-indigo-600/30 border-indigo-500 text-indigo-300'
+                        : 'bg-slate-800/60 border-slate-750 text-slate-400 hover:text-white'
+                    }`}
+                    title="360° İletki / Açıölçer"
+                  >
+                    <Disc size={16} className="text-cyan-400" />
+                    <span>Açıölçer</span>
+                  </button>
+
+                  {/* Compass */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      toggleCompass();
+                      closeDropdown();
+                    }}
+                    className={`p-2 rounded-xl border flex flex-col items-center gap-1 text-[10px] font-medium transition-all ${
+                      compassVisible
+                        ? 'bg-indigo-600/30 border-indigo-500 text-indigo-300'
+                        : 'bg-slate-800/60 border-slate-750 text-slate-400 hover:text-white'
+                    }`}
+                    title="Hassas Pergel"
+                  >
+                    <CircleDot size={16} className="text-emerald-400" />
+                    <span>Pergel</span>
+                  </button>
+
+                  {/* Symmetry */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      toggleSymmetry();
+                      closeDropdown();
+                    }}
+                    className={`p-2 rounded-xl border flex flex-col items-center gap-1 text-[10px] font-medium transition-all ${
+                      symmetryEnabled
+                        ? 'bg-indigo-600/30 border-indigo-500 text-indigo-300'
+                        : 'bg-slate-800/60 border-slate-750 text-slate-400 hover:text-white'
+                    }`}
+                    title="Ayna / Simetri Çizimi"
+                  >
+                    <FlipHorizontal size={16} className="text-indigo-400" />
+                    <span>Simetri</span>
+                  </button>
+
+                  {/* Sticky Note */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      addStickyNoteToCurrentPage({
+                        id: `sn_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+                        x: 180,
+                        y: 200,
+                        width: 210,
+                        height: 180,
+                        color: 'yellow',
+                        text: '',
+                        createdAt: Date.now(),
+                      });
+                      closeDropdown();
+                    }}
+                    className="p-2 rounded-xl border bg-slate-800/60 border-slate-750 text-slate-400 hover:text-amber-300 flex flex-col items-center gap-1 text-[10px] font-medium transition-all"
+                    title="Yapışkan Post-It Notu"
+                  >
+                    <StickyNote size={16} className="text-amber-400" />
+                    <span>Not Ekle</span>
+                  </button>
+
+                  {/* Kaşe & Damga */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setStampCreatorModalOpen(true);
+                      closeDropdown();
+                    }}
+                    className="p-2 rounded-xl border bg-slate-800/60 border-slate-750 text-slate-400 hover:text-rose-300 flex flex-col items-center gap-1 text-[10px] font-medium transition-all"
+                    title="Dinamik Kaşe & Damga Stüdyosu"
+                  >
+                    <Stamp size={16} className="text-rose-400" />
+                    <span>Kaşe</span>
+                  </button>
+
+                  {/* Eyedropper */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveTool('eyedropper');
+                      closeDropdown();
+                    }}
+                    className={`p-2 rounded-xl border flex flex-col items-center gap-1 text-[10px] font-medium transition-all ${
+                      activeTool === 'eyedropper'
+                        ? 'bg-cyan-600/30 border-cyan-500 text-cyan-300'
+                        : 'bg-slate-800/60 border-slate-750 text-slate-400 hover:text-white'
+                    }`}
+                    title="Renk Damlalığı"
+                  >
+                    <Pipette size={16} className="text-cyan-400" />
+                    <span>Damlalık</span>
+                  </button>
+
+                  {/* Flood Fill */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveTool('fill');
+                      closeDropdown();
+                    }}
+                    className={`p-2 rounded-xl border flex flex-col items-center gap-1 text-[10px] font-medium transition-all ${
+                      activeTool === 'fill'
+                        ? 'bg-violet-600/30 border-violet-500 text-violet-300'
+                        : 'bg-slate-800/60 border-slate-750 text-slate-400 hover:text-white'
+                    }`}
+                    title="Boya Kovası"
+                  >
+                    <PaintBucket size={16} className="text-violet-400" />
+                    <span>Doldur</span>
+                  </button>
+
+                  {/* Zoom Window */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      toggleZoomWindow();
+                      closeDropdown();
+                    }}
+                    className={`p-2 rounded-xl border flex flex-col items-center gap-1 text-[10px] font-medium transition-all ${
+                      zoomWindowOpen
+                        ? 'bg-indigo-600/30 border-indigo-500 text-indigo-300'
+                        : 'bg-slate-800/60 border-slate-750 text-slate-400 hover:text-white'
+                    }`}
+                    title="Büyüteç Penceresi (Z)"
+                  >
+                    <ZoomIn size={16} className="text-indigo-400" />
+                    <span>Büyüteç</span>
+                  </button>
+
+                  {/* Scratchpad */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      toggleScratchpad();
+                      closeDropdown();
+                    }}
+                    className={`p-2 rounded-xl border flex flex-col items-center gap-1 text-[10px] font-medium transition-all ${
+                      scratchpadOpen
+                        ? 'bg-amber-600/30 border-amber-500 text-amber-300'
+                        : 'bg-slate-800/60 border-slate-750 text-slate-400 hover:text-white'
+                    }`}
+                    title="Hızlı Karalama (Q)"
+                  >
+                    <SquarePen size={16} className="text-amber-400" />
+                    <span>Karalama</span>
+                  </button>
+
+                  {/* Radar Minimap */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      toggleMinimap();
+                      closeDropdown();
+                    }}
+                    className={`p-2 rounded-xl border flex flex-col items-center gap-1 text-[10px] font-medium transition-all ${
+                      minimapVisible
+                        ? 'bg-indigo-600/30 border-indigo-500 text-indigo-300'
+                        : 'bg-slate-800/60 border-slate-750 text-slate-400 hover:text-white'
+                    }`}
+                    title="Tuval Radarı (N)"
+                  >
+                    <MapIcon size={16} className="text-indigo-400" />
+                    <span>Radar</span>
+                  </button>
+
+                  {/* Planner Tabs */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      togglePlannerTabs();
+                      closeDropdown();
+                    }}
+                    className={`p-2 rounded-xl border flex flex-col items-center gap-1 text-[10px] font-medium transition-all ${
+                      plannerTabsVisible
+                        ? 'bg-indigo-600/30 border-indigo-500 text-indigo-300'
+                        : 'bg-slate-800/60 border-slate-750 text-slate-400 hover:text-white'
+                    }`}
+                    title="Ajanda Sekmeleri (J)"
+                  >
+                    <Bookmark size={16} className="text-indigo-400" />
+                    <span>Ajanda</span>
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="w-px h-5 bg-slate-750 mx-1 shrink-0" />
+
+          {/* FAVORITE COLOR SLOTS */}
+          <div className="flex items-center gap-1 px-1 relative shrink-0">
+            {toolSettings.favoriteColors.map((color, index) => {
+              const isSlotActive =
+                toolSettings.activeColorIndex === index && toolSettings.color === color;
+              return (
+                <div key={index} className="relative">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      selectFavoriteColor(index);
+                      setActiveColorSlot(null);
+                    }}
+                    onContextMenu={(e) => {
+                      e.preventDefault();
+                      setActiveColorSlot(activeColorSlot === index ? null : index);
+                    }}
+                    className={`w-6 h-6 rounded-full transition-transform flex items-center justify-center shadow-sm ${
+                      isSlotActive
+                        ? 'ring-2 ring-white ring-offset-2 ring-offset-slate-800 scale-110'
+                        : 'hover:scale-105 opacity-80 hover:opacity-100 ring-1 ring-white/20'
+                    }`}
+                    style={{ backgroundColor: color }}
+                    title={`Renk Yuvası ${index + 1} (Sağ tıkla değiştir)`}
+                  >
+                    {isSlotActive && (
+                      <Check
+                        size={11}
+                        className={
+                          color === '#facc15' || color === '#ffffff' ? 'text-black font-bold' : 'text-white font-bold'
+                        }
+                      />
+                    )}
+                  </button>
+
+                  {activeColorSlot === index && (
+                    <div className="absolute top-9 left-1/2 -translate-x-1/2 bg-slate-900 border border-slate-700 p-2.5 rounded-xl shadow-2xl z-50 w-44 backdrop-blur-xl">
+                      <div className="text-[10px] font-semibold text-slate-400 mb-1.5">
+                        Rengi Değiştir
+                      </div>
+                      <div className="grid grid-cols-4 gap-1.5">
+                        {COLOR_PALETTE.map((c) => (
+                          <button
+                            key={c}
+                            type="button"
+                            onClick={() => {
+                              setFavoriteColor(index, c);
+                              setActiveColorSlot(null);
+                            }}
+                            className="w-6 h-6 rounded-full ring-1 ring-white/20 hover:scale-110 transition-transform"
+                            style={{ backgroundColor: c }}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="w-px h-5 bg-slate-750 mx-1 shrink-0" />
+
+          {/* FAVORITE SIZES */}
+          <div className="flex items-center gap-1 px-1 shrink-0">
+            {toolSettings.favoriteSizes.map((size, index) => {
+              const isSizeActive =
+                toolSettings.activeSizeIndex === index && toolSettings.size === size;
+              return (
+                <button
+                  key={index}
+                  type="button"
+                  onClick={() => selectFavoriteSize(index)}
+                  className={`w-6 h-6 rounded-lg font-mono text-[11px] font-semibold flex items-center justify-center transition-all ${
+                    isSizeActive
+                      ? 'bg-indigo-600 text-white shadow-sm ring-1 ring-indigo-400'
+                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
+                  }`}
+                  title={`Uç: ${size}px`}
+                >
+                  {size}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* RIGHT SECTION: Undo/Redo & Actions */}
+        <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
+          {/* Undo & Redo (Always visible) */}
+          <div className="flex items-center bg-slate-800/80 rounded-xl p-0.5 border border-slate-750">
+            <button
+              type="button"
+              onClick={() => {
+                triggerHaptic('light');
+                undo();
+              }}
+              disabled={undoStack.length === 0}
+              className={`p-1.5 rounded-lg transition-colors ${
+                undoStack.length > 0
+                  ? 'text-slate-300 hover:text-white hover:bg-slate-700'
+                  : 'text-slate-600 cursor-not-allowed'
+              }`}
+              title="Geri Al (Cmd+Z)"
+            >
+              <Undo2 size={16} />
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                triggerHaptic('light');
+                redo();
+              }}
+              disabled={redoStack.length === 0}
+              className={`p-1.5 rounded-lg transition-colors ${
+                redoStack.length > 0
+                  ? 'text-slate-300 hover:text-white hover:bg-slate-700'
+                  : 'text-slate-600 cursor-not-allowed'
+              }`}
+              title="Yinele (Cmd+Shift+Z)"
+            >
+              <Redo2 size={16} />
+            </button>
+          </div>
+
+          {/* Page Grid Manager (Always visible) */}
+          <button
+            type="button"
+            onClick={() => {
+              triggerHaptic('light');
+              setPageManagerModalOpen(true);
+            }}
+            className="p-2 text-slate-400 hover:text-indigo-400 hover:bg-slate-800 rounded-xl transition-colors"
+            title="Tüm Sayfaları Gör (Küçük Resim Izgarası)"
+          >
+            <Grid size={17} />
+          </button>
+
+          {/* Export Studio (Always visible) */}
+          <button
+            type="button"
+            onClick={() => {
+              triggerHaptic('light');
+              setExportModalOpen(true);
+            }}
+            className="p-2 text-slate-400 hover:text-emerald-400 hover:bg-slate-800 rounded-xl transition-colors"
+            title="Dışa Aktarma Stüdyosu (PDF, PNG, JPEG)"
+          >
+            <FileDown size={17} />
+          </button>
+
+          {/* DESKTOP-ONLY ACTIONS (>= 1280px / xl) */}
+          <div className="hidden xl:flex items-center gap-1">
+            {/* Stickers Drawer */}
+            <button
+              type="button"
+              onClick={() => setStickersDrawerOpen(true)}
+              className="p-2 text-amber-400 hover:text-amber-300 hover:bg-slate-800 rounded-xl transition-colors"
+              title="Çıkartmalar"
+            >
+              <Sparkles size={17} />
+            </button>
+
+            {/* Layers Drawer */}
+            <button
+              type="button"
+              onClick={() => setLayersDrawerOpen(true)}
+              className={`p-2 rounded-xl transition-all ${
+                layersDrawerOpen
+                  ? 'bg-indigo-600 text-white'
+                  : 'text-slate-400 hover:text-indigo-400 hover:bg-slate-800'
+              }`}
+              title="Katmanlar Yöneticisi"
+            >
+              <Layers size={17} />
+            </button>
+
+            {/* Template Selector */}
+            <button
+              type="button"
+              onClick={() => setTemplateModalOpen(true)}
+              className="p-2 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-xl transition-colors"
+              title="Şablon Değiştir"
+            >
+              <LayoutTemplate size={17} />
+            </button>
+
+            {/* Math AI */}
+            <button
+              type="button"
+              onClick={() => openMathModal()}
+              className="p-2 text-slate-400 hover:text-purple-400 hover:bg-slate-800 rounded-xl transition-colors"
+              title="Math AI Çözücü"
+            >
+              <Calculator size={17} />
+            </button>
+
+            {/* STEM Function Plotter */}
+            <button
+              type="button"
+              onClick={() => openFunctionPlotterModal()}
+              className="p-2 text-slate-400 hover:text-cyan-400 hover:bg-slate-800 rounded-xl transition-colors"
+              title="STEM 2D Fonksiyon Çizici"
+            >
+              <TrendingUp size={17} />
+            </button>
+
+            {/* Study Sets */}
+            <button
+              type="button"
+              onClick={() => setStudySetsModalOpen(true)}
+              className="p-2 text-slate-400 hover:text-amber-400 hover:bg-slate-800 rounded-xl transition-colors"
+              title="Çalışma Kartları"
+            >
+              <Brain size={17} />
+            </button>
+
+            {/* Split Screen Dual Notebook */}
+            <button
+              type="button"
+              onClick={() => {
+                if (splitNotebook.isOpen) {
+                  closeDualNotebook();
+                } else {
+                  const other = notebooks.find((n) => n.id !== activeNotebookId);
+                  openDualNotebook(other ? other.id : activeNotebookId || '');
+                }
+              }}
+              className={`p-2 rounded-xl transition-all ${
+                splitNotebook.isOpen
+                  ? 'bg-indigo-600 text-white'
+                  : 'text-slate-400 hover:text-indigo-400 hover:bg-slate-800'
+              }`}
+              title="Çift Defter Görünümü"
+            >
+              <Split size={17} />
+            </button>
+
+            {/* Pomodoro */}
+            <PomodoroBarWidget />
+
+            {/* Audio Recorder */}
+            <AudioPlayerBar />
+
+            {/* YouTube */}
+            <button
+              type="button"
+              onClick={toggleYouTube}
+              className={`px-2.5 py-1.5 rounded-xl font-medium text-xs flex items-center gap-1.5 transition-all shadow-sm ${
+                youtube.isOpen
+                  ? 'bg-red-600 text-white shadow-red-600/30'
+                  : 'bg-slate-800 hover:bg-slate-750 text-slate-300 hover:text-white border border-slate-700/60'
+              }`}
+              title="YouTube Paneli"
+            >
+              <Youtube size={15} className={youtube.isOpen ? 'fill-white' : 'text-red-500'} />
+              <span>YouTube</span>
+            </button>
+          </div>
+
+          {/* OVERFLOW ACTIONS DROPDOWN (< 1280px / Tablets & Mobile) */}
+          <div className="relative flex xl:hidden">
+            <button
+              type="button"
+              onClick={() => toggleDropdown('overflowActions')}
+              className={`p-2 rounded-xl transition-all relative ${
+                openDropdown === 'overflowActions'
+                  ? 'bg-indigo-600 text-white'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800'
+              }`}
+              title="Tüm İşlemler & Ekstra Araçlar"
+            >
+              <MoreHorizontal size={18} />
+              {isActivityActive && (
+                <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+              )}
+            </button>
+
+            {openDropdown === 'overflowActions' && (
+              <div className="absolute top-12 right-0 bg-slate-900 border border-slate-750 shadow-2xl rounded-2xl p-3.5 w-76 sm:w-80 z-50 animate-in fade-in zoom-in-95 backdrop-blur-2xl text-xs max-h-[82vh] overflow-y-auto space-y-3">
+                <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+                  <span className="font-bold text-white text-sm">İşlemler & Stüdyo</span>
+                  <button
+                    type="button"
+                    onClick={closeDropdown}
+                    className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800"
+                  >
+                    <X size={15} />
+                  </button>
+                </div>
+
+                {/* Section 1: Sayfa & Katmanlar */}
+                <div>
+                  <div className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider mb-1.5">
+                    Sayfa & Katmanlar
+                  </div>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setTemplateModalOpen(true);
+                        closeDropdown();
+                      }}
+                      className="p-2 bg-slate-800/60 hover:bg-slate-800 border border-slate-750 rounded-xl flex items-center gap-2 text-slate-300 hover:text-white text-left"
+                    >
+                      <LayoutTemplate size={15} className="text-indigo-400 shrink-0" />
+                      <span className="truncate">Şablon Değiştir</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setLayersDrawerOpen(true);
+                        closeDropdown();
+                      }}
+                      className="p-2 bg-slate-800/60 hover:bg-slate-800 border border-slate-750 rounded-xl flex items-center gap-2 text-slate-300 hover:text-white text-left"
+                    >
+                      <Layers size={15} className="text-cyan-400 shrink-0" />
+                      <span className="truncate">Katmanlar</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDocImportModalOpen(true);
+                        closeDropdown();
+                      }}
+                      className="p-2 bg-slate-800/60 hover:bg-slate-800 border border-slate-750 rounded-xl flex items-center gap-2 text-slate-300 hover:text-white text-left"
+                    >
+                      <UploadCloud size={15} className="text-amber-400 shrink-0" />
+                      <span className="truncate">PDF/Word Yükle</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        clearCurrentPageStrokes();
+                        closeDropdown();
+                      }}
+                      className="p-2 bg-slate-800/60 hover:bg-slate-800 border border-slate-750 rounded-xl flex items-center gap-2 text-rose-400 hover:text-rose-300 text-left"
+                    >
+                      <Trash2 size={15} className="shrink-0" />
+                      <span className="truncate">Sayfayı Temizle</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Section 2: STEM, Zeka & Notlar */}
+                <div>
+                  <div className="text-[10px] font-bold text-amber-400 uppercase tracking-wider mb-1.5">
+                    STEM, Zeka & Notlar
+                  </div>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        openMathModal();
+                        closeDropdown();
+                      }}
+                      className="p-2 bg-slate-800/60 hover:bg-slate-800 border border-slate-750 rounded-xl flex items-center gap-2 text-slate-300 hover:text-white text-left"
+                    >
+                      <Calculator size={15} className="text-purple-400 shrink-0" />
+                      <span className="truncate">Math AI Çözücü</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        openFunctionPlotterModal();
+                        closeDropdown();
+                      }}
+                      className="p-2 bg-slate-800/60 hover:bg-slate-800 border border-slate-750 rounded-xl flex items-center gap-2 text-slate-300 hover:text-white text-left"
+                    >
+                      <TrendingUp size={15} className="text-cyan-400 shrink-0" />
+                      <span className="truncate">Grafik Çizici</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setStudySetsModalOpen(true);
+                        closeDropdown();
+                      }}
+                      className="p-2 bg-slate-800/60 hover:bg-slate-800 border border-slate-750 rounded-xl flex items-center gap-2 text-slate-300 hover:text-white text-left"
+                    >
+                      <Brain size={15} className="text-amber-400 shrink-0" />
+                      <span className="truncate">Flaşkartlar</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setStickersDrawerOpen(true);
+                        closeDropdown();
+                      }}
+                      className="p-2 bg-slate-800/60 hover:bg-slate-800 border border-slate-750 rounded-xl flex items-center gap-2 text-slate-300 hover:text-white text-left"
+                    >
+                      <Sparkles size={15} className="text-amber-400 shrink-0" />
+                      <span className="truncate">Çıkartmalar</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Section 3: İşbirliği & Görünüm */}
+                <div>
+                  <div className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider mb-1.5">
+                    İşbirliği & Görünüm
+                  </div>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCollaborationModalOpen(true);
+                        closeDropdown();
+                      }}
+                      className="p-2 bg-slate-800/60 hover:bg-slate-800 border border-slate-750 rounded-xl flex items-center gap-2 text-slate-300 hover:text-white text-left"
+                    >
+                      <Users size={15} className="text-emerald-400 shrink-0" />
+                      <span className="truncate">Birlikte Çizim</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (splitNotebook.isOpen) {
+                          closeDualNotebook();
+                        } else {
+                          const other = notebooks.find((n) => n.id !== activeNotebookId);
+                          openDualNotebook(other ? other.id : activeNotebookId || '');
+                        }
+                        closeDropdown();
+                      }}
+                      className="p-2 bg-slate-800/60 hover:bg-slate-800 border border-slate-750 rounded-xl flex items-center gap-2 text-slate-300 hover:text-white text-left"
+                    >
+                      <Split size={15} className="text-indigo-400 shrink-0" />
+                      <span className="truncate">Çift Defter</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const next = !presentationMode;
+                        setPresentationMode(next);
+                        if (next && document.documentElement.requestFullscreen) {
+                          document.documentElement.requestFullscreen().catch(() => {});
+                        }
+                        closeDropdown();
+                      }}
+                      className="p-2 bg-slate-800/60 hover:bg-slate-800 border border-slate-750 rounded-xl flex items-center gap-2 text-slate-300 hover:text-white text-left"
+                    >
+                      <Presentation size={15} className="text-rose-400 shrink-0" />
+                      <span className="truncate">Sunum Modu</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        invertCurrentPageInks();
+                        closeDropdown();
+                      }}
+                      className="p-2 bg-slate-800/60 hover:bg-slate-800 border border-slate-750 rounded-xl flex items-center gap-2 text-slate-300 hover:text-white text-left"
+                    >
+                      <Sun size={15} className="text-amber-300 shrink-0" />
+                      <span className="truncate">Mürekkep Zıtlığı</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShortcutsModalOpen(true);
+                        closeDropdown();
+                      }}
+                      className="p-2 bg-slate-800/60 hover:bg-slate-800 border border-slate-750 rounded-xl flex items-center gap-2 text-slate-300 hover:text-white text-left"
+                    >
+                      <Keyboard size={15} className="text-amber-400 shrink-0" />
+                      <span className="truncate">Kısayol Tuşları</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (activeNotebook) exportNotebookAsNotefree(activeNotebook);
+                        closeDropdown();
+                      }}
+                      className="p-2 bg-slate-800/60 hover:bg-slate-800 border border-slate-750 rounded-xl flex items-center gap-2 text-slate-300 hover:text-white text-left"
+                    >
+                      <FolderDown size={15} className="text-indigo-400 shrink-0" />
+                      <span className="truncate">.notefree İndir</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Section 4: Medya & Çalışma Çubukları */}
+                <div className="pt-2 border-t border-slate-800 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                      Medya & Ses
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        toggleYouTube();
+                        closeDropdown();
+                      }}
+                      className="px-2.5 py-1 rounded-lg bg-red-600/20 text-red-400 border border-red-500/30 text-[11px] font-bold flex items-center gap-1.5"
+                    >
+                      <Youtube size={14} />
+                      <span>YouTube</span>
+                    </button>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <PomodoroBarWidget />
+                    <AudioPlayerBar />
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </header>
+
+      {/* 2. DEDICATED MOBILE INKING SUB-TOOLBAR (Visible only on Mobile < 768px) */}
+      <div className="flex md:hidden h-11 bg-slate-925 border-b border-slate-800 items-center px-2 gap-1 overflow-x-auto scrollbar-none select-none">
+        {/* Core Pens for Mobile */}
         <button
-          onClick={() => setActiveTool('ballpoint')}
-          className={`p-2 rounded-xl transition-all flex items-center justify-center ${
+          type="button"
+          onClick={() => {
+            triggerHaptic('light');
+            setActiveTool('ballpoint');
+          }}
+          className={`p-1.5 rounded-lg shrink-0 ${
             activeTool === 'ballpoint'
-              ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30 scale-105'
-              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
+              ? 'bg-indigo-600 text-white shadow'
+              : 'text-slate-400 hover:text-white'
           }`}
-          title="Tükenmez Kalem (Pürüzsüz sabit kalınlık)"
+          title="Tükenmez Kalem"
         >
           <PenTool size={16} />
         </button>
 
-        {/* Pencil / Graphite */}
         <button
-          onClick={() => setActiveTool('pencil')}
-          className={`p-2 rounded-xl transition-all flex items-center justify-center ${
-            activeTool === 'pencil'
-              ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30 scale-105'
-              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
+          type="button"
+          onClick={() => {
+            triggerHaptic('light');
+            setActiveTool('fountain');
+          }}
+          className={`p-1.5 rounded-lg shrink-0 ${
+            activeTool === 'fountain'
+              ? 'bg-indigo-600 text-white shadow'
+              : 'text-slate-400 hover:text-white'
           }`}
-          title="Kurşun Kalem & Karakalem (Doğal grafit dokusu)"
+          title="Dolma Kalem"
+        >
+          <Feather size={16} />
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            triggerHaptic('light');
+            setActiveTool('pencil');
+          }}
+          className={`p-1.5 rounded-lg shrink-0 ${
+            activeTool === 'pencil'
+              ? 'bg-indigo-600 text-white shadow'
+              : 'text-slate-400 hover:text-white'
+          }`}
+          title="Kurşun Kalem"
         >
           <Pencil size={16} />
         </button>
 
-        {/* Fineliner / Technical Pen */}
         <button
-          onClick={() => setActiveTool('fineliner')}
-          className={`p-2 rounded-xl transition-all flex items-center justify-center ${
-            activeTool === 'fineliner'
-              ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30 scale-105'
-              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
-          }`}
-          title="Teknik Çizim Kalemi / Fineliner (Titreşimsiz mikron hassasiyet)"
-        >
-          <PenLine size={16} />
-        </button>
-
-        {/* Brush Pen */}
-        <button
-          onClick={() => setActiveTool('brush')}
-          className={`p-2 rounded-xl transition-all flex items-center justify-center ${
-            activeTool === 'brush'
-              ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30 scale-105'
-              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
-          }`}
-          title="Fırça / Kaligrafi Kalemi"
-        >
-          <Paintbrush size={16} />
-        </button>
-
-        {/* Highlighter */}
-        <button
-          onClick={() => setActiveTool('highlighter')}
-          className={`p-2 rounded-xl transition-all flex items-center justify-center ${
+          type="button"
+          onClick={() => {
+            triggerHaptic('light');
+            setActiveTool('highlighter');
+          }}
+          className={`p-1.5 rounded-lg shrink-0 ${
             activeTool === 'highlighter'
-              ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/30 scale-105'
-              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
+              ? 'bg-amber-500 text-slate-950 font-bold shadow'
+              : 'text-slate-400 hover:text-white'
           }`}
-          title="Fosforlu Kalem (Multiply blend mode)"
+          title="Fosforlu Kalem"
         >
           <Highlighter size={16} />
         </button>
 
-        {/* Neon Glow Pen */}
         <button
-          onClick={() => setActiveTool('neon')}
-          className={`p-2 rounded-xl transition-all flex items-center justify-center ${
-            activeTool === 'neon'
-              ? 'bg-fuchsia-600 text-white shadow-md shadow-fuchsia-600/40 scale-105 ring-1 ring-fuchsia-400'
-              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
+          type="button"
+          onClick={() => {
+            triggerHaptic('light');
+            if (activeTool === 'eraser') {
+              toggleDropdown('eraser');
+            } else {
+              setActiveTool('eraser');
+            }
+          }}
+          className={`p-1.5 rounded-lg shrink-0 ${
+            activeTool === 'eraser'
+              ? 'bg-rose-600 text-white shadow'
+              : 'text-slate-400 hover:text-white'
           }`}
-          title="Neon Parıltı Kalemi (Koyu kağıtlarda parıldayan neon aurası)"
+          title="Silgi (Tekrar tıklayarak ayarları açın)"
         >
-          <Flame size={16} />
+          <Eraser size={16} />
         </button>
 
-        {/* Dashed / Spline Pen */}
         <button
-          onClick={() => setActiveTool('dashed')}
-          className={`p-2 rounded-xl transition-all flex items-center justify-center ${
-            activeTool === 'dashed'
-              ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30 scale-105'
-              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
-          }`}
-          title="Kesikli Çizgi Kalemi (Geometri ve grafik diyagramları)"
-        >
-          <Spline size={16} />
-        </button>
-
-        {/* GoodNotes 6 Tape Tool */}
-        <button
-          onClick={() => setActiveTool('tape')}
-          className={`p-2 rounded-xl transition-all flex items-center justify-center ${
-            activeTool === 'tape'
-              ? 'bg-amber-600 text-white shadow-md shadow-amber-600/30 scale-105 ring-1 ring-amber-400'
-              : 'text-amber-400 hover:text-amber-200 hover:bg-slate-700/50'
-          }`}
-          title="Gizleme Bandı (Tape Tool - Tıklayınca açılıp kapanan çalışma bandı)"
-        >
-          <Bandage size={16} />
-        </button>
-
-        {/* Eraser with Dropdown Settings */}
-        <div className="relative">
-          <button
-            onClick={() => {
-              if (activeTool === 'eraser') {
-                setEraserMenuOpen(!eraserMenuOpen);
-              } else {
-                setActiveTool('eraser');
-              }
-            }}
-            className={`p-2 rounded-xl transition-all flex items-center justify-center ${
-              activeTool === 'eraser'
-                ? 'bg-rose-600 text-white shadow-md shadow-rose-600/30 scale-105'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
-            }`}
-            title="Silgi (Tekrar tıklayarak ayarları açın)"
-          >
-            <Eraser size={16} />
-          </button>
-
-          {eraserMenuOpen && (
-            <div className="absolute top-12 left-0 bg-slate-800 border border-slate-700 shadow-2xl rounded-2xl p-3 w-56 z-50 animate-in fade-in zoom-in-95">
-              <div className="text-[11px] font-semibold text-slate-400 mb-2 uppercase tracking-wider">
-                Silgi Ayarları
-              </div>
-
-              {/* Mode Toggle */}
-              <div className="flex bg-slate-900 rounded-lg p-0.5 mb-2.5">
-                <button
-                  onClick={() => setEraserMode('stroke')}
-                  className={`flex-1 py-1 text-xs rounded-md transition-colors ${
-                    toolSettings.eraserMode === 'stroke'
-                      ? 'bg-rose-600 text-white font-medium'
-                      : 'text-slate-400'
-                  }`}
-                >
-                  Tüm Çizgi
-                </button>
-                <button
-                  onClick={() => setEraserMode('pixel')}
-                  className={`flex-1 py-1 text-xs rounded-md transition-colors ${
-                    toolSettings.eraserMode === 'pixel'
-                      ? 'bg-rose-600 text-white font-medium'
-                      : 'text-slate-400'
-                  }`}
-                >
-                  Piksel
-                </button>
-              </div>
-
-              {/* Erase Highlighter Only Toggle */}
-              <label className="flex items-center justify-between text-xs text-slate-200 py-1.5 cursor-pointer hover:text-white">
-                <span>Yalnızca Fosforluyu Sil</span>
-                <input
-                  type="checkbox"
-                  checked={toolSettings.eraseHighlighterOnly}
-                  onChange={toggleEraseHighlighterOnly}
-                  className="rounded accent-rose-500 cursor-pointer"
-                />
-              </label>
-
-              {/* Auto Deselect Toggle */}
-              <label className="flex items-center justify-between text-xs text-slate-200 py-1.5 cursor-pointer hover:text-white">
-                <span>Otomatik Kaleme Dön</span>
-                <input
-                  type="checkbox"
-                  checked={toolSettings.autoDeselectEraser}
-                  onChange={toggleAutoDeselectEraser}
-                  className="rounded accent-rose-500 cursor-pointer"
-                />
-              </label>
-            </div>
-          )}
-        </div>
-
-        {/* Lasso Tool */}
-        <button
-          onClick={() => setActiveTool('lasso')}
-          className={`p-2 rounded-xl transition-all flex items-center justify-center ${
+          type="button"
+          onClick={() => {
+            triggerHaptic('light');
+            setActiveTool('lasso');
+          }}
+          className={`p-1.5 rounded-lg shrink-0 ${
             activeTool === 'lasso'
-              ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30 scale-105'
-              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
+              ? 'bg-indigo-600 text-white shadow'
+              : 'text-slate-400 hover:text-white'
           }`}
-          title="Kement Aracı (Lasso - Çizimleri seç, taşı, döndür, rengini değiştir)"
+          title="Kement Aracı"
         >
           <Scissors size={16} />
         </button>
 
-        {/* Shapes Menu */}
-        <div className="relative">
-          <button
-            onClick={() => {
-              setActiveTool('shape');
-              setShapeMenuOpen(!shapeMenuOpen);
-            }}
-            className={`p-2 rounded-xl transition-all flex items-center justify-center ${
-              activeTool === 'shape'
-                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
-            }`}
-            title="Geometrik Şekiller"
-          >
-            <Shapes size={16} />
-          </button>
-
-          {shapeMenuOpen && (
-            <div className="absolute top-12 left-0 bg-slate-800 border border-slate-750 shadow-2xl rounded-2xl p-2 flex flex-col gap-2 z-50 animate-in fade-in zoom-in-95 min-w-[280px]">
-              <div className="text-[11px] font-semibold text-slate-400 px-1 uppercase tracking-wider">Şekil Türü</div>
-              <div className="flex gap-1">
-                {(['line', 'arrow', 'rectangle', 'circle', 'triangle'] as ShapeType[]).map(
-                  (shp) => (
-                    <button
-                      key={shp}
-                      onClick={() => {
-                        setSelectedShape(shp);
-                        setShapeMenuOpen(false);
-                      }}
-                      className={`flex-1 py-1.5 text-xs rounded-lg capitalize transition-colors font-medium text-center ${
-                        toolSettings.selectedShape === shp
-                          ? 'bg-indigo-600 text-white shadow'
-                          : 'text-slate-300 hover:bg-slate-750'
-                      }`}
-                    >
-                      {shp === 'line'
-                        ? 'Çizgi'
-                        : shp === 'arrow'
-                        ? 'Ok'
-                        : shp === 'rectangle'
-                        ? 'Kare'
-                        : shp === 'circle'
-                        ? 'Daire'
-                        : 'Üçgen'}
-                    </button>
-                  )
-                )}
-              </div>
-
-              {/* FAZ L: Shape Fill Color & Opacity Controls */}
-              <div className="h-px bg-slate-700/60 my-0.5" />
-
-              <div className="flex items-center justify-between px-1">
-                <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
-                  Şekil İç Dolgusu
-                </span>
-                <span className="text-[10px] text-indigo-400 font-mono font-semibold">
-                  {toolSettings.shapeFillColor
-                    ? `%${Math.round((toolSettings.shapeFillOpacity ?? 0.25) * 100)}`
-                    : 'Dolgusuz'}
-                </span>
-              </div>
-
-              {/* Color Swatches */}
-              <div className="flex items-center gap-1.5 flex-wrap px-0.5">
-                {/* No fill / transparent button */}
-                <button
-                  type="button"
-                  onClick={() => setShapeFillColor(undefined)}
-                  className={`w-6 h-6 rounded-md border flex items-center justify-center transition-all ${
-                    !toolSettings.shapeFillColor
-                      ? 'border-rose-500 bg-rose-500/20 text-rose-400 ring-1 ring-rose-400'
-                      : 'border-slate-700 bg-slate-800 text-slate-400 hover:text-slate-200'
-                  }`}
-                  title="Dolgusuz (Şeffaf İç)"
-                >
-                  <Ban size={12} />
-                </button>
-
-                {/* Preset pastel fill colors */}
-                {[
-                  { name: 'Sarı', color: '#fef08a' },
-                  { name: 'Gül', color: '#fecdd3' },
-                  { name: 'Nane', color: '#a7f3d0' },
-                  { name: 'Mavi', color: '#bae6fd' },
-                  { name: 'Lavanta', color: '#ddd6fe' },
-                  { name: 'Turuncu', color: '#fed7aa' },
-                  { name: 'Grafit', color: '#cbd5e1' },
-                ].map(({ name, color }) => (
-                  <button
-                    key={color}
-                    type="button"
-                    onClick={() => setShapeFillColor(color)}
-                    className={`w-6 h-6 rounded-md border transition-all relative flex items-center justify-center ${
-                      toolSettings.shapeFillColor === color
-                        ? 'border-white scale-110 shadow-sm ring-2 ring-indigo-500'
-                        : 'border-slate-700/80 hover:scale-105'
-                    }`}
-                    style={{ backgroundColor: color }}
-                    title={name}
-                  >
-                    {toolSettings.shapeFillColor === color && (
-                      <Check size={11} className="text-slate-900 font-bold" />
-                    )}
-                  </button>
-                ))}
-              </div>
-
-              {/* Opacity presets (visible when fill is active) */}
-              {toolSettings.shapeFillColor && (
-                <div className="flex items-center gap-1 bg-slate-900 p-1 rounded-lg">
-                  <span className="text-[10px] text-slate-400 px-1 font-medium">Opaklık:</span>
-                  {[0.15, 0.3, 0.6, 1.0].map((op) => (
-                    <button
-                      key={op}
-                      type="button"
-                      onClick={() => setShapeFillOpacity(op)}
-                      className={`flex-1 py-0.5 text-[10px] rounded transition-colors font-mono ${
-                        Math.abs((toolSettings.shapeFillOpacity ?? 0.25) - op) < 0.08
-                          ? 'bg-indigo-600 text-white font-bold'
-                          : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
-                      }`}
-                    >
-                      %{Math.round(op * 100)}
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              <div className="h-px bg-slate-700/60 my-0.5" />
-
-              <div className="text-[11px] font-semibold text-slate-400 px-1 uppercase tracking-wider">Hassas Manyetik Hizalama</div>
-              <div className="flex gap-1.5">
-                <button
-                  type="button"
-                  onClick={toggleAngleSnap}
-                  className={`flex-1 px-2.5 py-1.5 rounded-lg text-xs font-medium flex items-center justify-between border transition-all ${
-                    toolSettings.angleSnap
-                      ? 'bg-indigo-600/20 border-indigo-500 text-indigo-300'
-                      : 'bg-slate-750/50 border-slate-700 text-slate-400 hover:text-slate-200'
-                  }`}
-                  title="15° manyetik açı kilitleri (0°, 15°, 30°, 45°, 90°)"
-                >
-                  <span>15° Açı Kilidi</span>
-                  {toolSettings.angleSnap && <Check size={13} className="text-indigo-400" />}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={toggleGridSnap}
-                  className={`flex-1 px-2.5 py-1.5 rounded-lg text-xs font-medium flex items-center justify-between border transition-all ${
-                    toolSettings.gridSnap
-                      ? 'bg-indigo-600/20 border-indigo-500 text-indigo-300'
-                      : 'bg-slate-750/50 border-slate-700 text-slate-400 hover:text-slate-200'
-                  }`}
-                  title="Defter ızgara ve çizgilerine manyetik kenetlenme"
-                >
-                  <span>Izgara Snap</span>
-                  {toolSettings.gridSnap && <Check size={13} className="text-indigo-400" />}
-                </button>
-              </div>
-
-              {/* FAZ X: Hold-to-Snap Shape Refining Toggle */}
-              <div className="h-px bg-slate-700/60 my-0.5" />
-              <button
-                type="button"
-                onClick={toggleAutoDetectShape}
-                className={`w-full px-2.5 py-1.5 rounded-lg text-xs font-medium flex items-center justify-between border transition-all ${
-                  toolSettings.autoDetectShape
-                    ? 'bg-amber-500/20 border-amber-500/50 text-amber-300 font-semibold'
-                    : 'bg-slate-750/50 border-slate-700 text-slate-400 hover:text-slate-200'
-                }`}
-                title="Serbest çizim yaparken uç duraklatıldığında otomatik düzgünleştir ve şekle kenetle"
-              >
-                <div className="flex items-center gap-1.5">
-                  <Sparkles size={13} className="text-amber-400" />
-                  <span>Çizip Bekleyince Şekli Sabitle (Hold-to-Snap)</span>
-                </div>
-                {toolSettings.autoDetectShape && <Check size={13} className="text-amber-400" />}
-              </button>
-            </div>
-          )}
-        </div>
-
-        {/* Laser Pointer */}
         <button
-          onClick={() => setActiveTool('laser')}
-          className={`p-2 rounded-xl transition-all flex items-center justify-center ${
-            activeTool === 'laser'
-              ? 'bg-red-500 text-white shadow-md shadow-red-500/40 scale-105 animate-pulse'
-              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
+          type="button"
+          onClick={() => {
+            triggerHaptic('light');
+            if (activeTool === 'shape') {
+              toggleDropdown('shape');
+            } else {
+              setActiveTool('shape');
+            }
+          }}
+          className={`p-1.5 rounded-lg shrink-0 ${
+            activeTool === 'shape'
+              ? 'bg-indigo-600 text-white shadow'
+              : 'text-slate-400 hover:text-white'
           }`}
-          title="Lazer İşaretçi (Sunum ve ders anlatımı için geçici iz)"
+          title="Şekiller (Tekrar tıklayarak ayarları açın)"
         >
-          <Zap size={16} />
+          <Shapes size={16} />
         </button>
 
-        {/* Text Tool */}
         <button
-          onClick={() => setActiveTool('text')}
-          className={`p-2 rounded-xl transition-all flex items-center justify-center ${
+          type="button"
+          onClick={() => {
+            triggerHaptic('light');
+            setActiveTool('text');
+          }}
+          className={`p-1.5 rounded-lg shrink-0 ${
             activeTool === 'text'
-              ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30 scale-105'
-              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
+              ? 'bg-indigo-600 text-white shadow'
+              : 'text-slate-400 hover:text-white'
           }`}
-          title="Metin Kutusu ('T' - Klavye ile zengin yazı yaz)"
+          title="Metin Kutusu"
         >
           <Type size={16} />
         </button>
 
-        {/* Interactive Millimeter Ruler */}
         <button
-          onClick={toggleRuler}
-          className={`p-2 rounded-xl transition-all flex items-center justify-center ${
+          type="button"
+          onClick={() => {
+            triggerHaptic('light');
+            toggleRuler();
+          }}
+          className={`p-1.5 rounded-lg shrink-0 ${
             rulerVisible
-              ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30 scale-105 ring-1 ring-indigo-400'
-              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
+              ? 'bg-indigo-600 text-white shadow'
+              : 'text-slate-400 hover:text-white'
           }`}
-          title="İnteraktif Cetvel (GoodNotes Stili Dönen Milimetrik Cetvel)"
+          title="Cetvel"
         >
           <Compass size={16} />
         </button>
 
-        {/* 🌟 Faz B: 360° İletki / Açıölçer (Protractor) */}
         <button
-          onClick={toggleProtractor}
-          className={`p-2 rounded-xl transition-all flex items-center justify-center ${
-            protractorVisible
-              ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30 scale-105 ring-1 ring-indigo-400'
-              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
-          }`}
-          title="360° İletki / Açıölçer (Dönen Akrilik Açıölçer)"
-        >
-          <Disc size={16} />
-        </button>
-
-        {/* 🧭 Faz D: Hassas Pergel / Çember & Yay Aracı (Compass) */}
-        <button
-          onClick={toggleCompass}
-          className={`p-2 rounded-xl transition-all flex items-center justify-center ${
-            compassVisible
-              ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30 scale-105 ring-1 ring-indigo-400'
-              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
-          }`}
-          title="Hassas Pergel / Çember & Yay Aracı (Compass Caliper)"
-        >
-          <CircleDot size={16} />
-        </button>
-
-        {/* 🪞 Faz D: Gerçek Zamanlı Simetri & Ayna Çizim (Symmetry Mode) */}
-        <button
-          onClick={toggleSymmetry}
-          className={`p-2 rounded-xl transition-all flex items-center justify-center ${
-            symmetryEnabled
-              ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30 scale-105 ring-1 ring-indigo-400'
-              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
-          }`}
-          title="Gerçek Zamanlı Ayna / Simetri Çizim Modu"
-        >
-          <FlipHorizontal size={16} />
-        </button>
-
-        {/* 📌 Faz B: Yapışkan Notlar (3D Post-it Sticky Notes) */}
-        <button
+          type="button"
           onClick={() => {
-            if (activeTool === 'sticky-note') {
-              addStickyNoteToCurrentPage({
-                id: `sn_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-                x: 180,
-                y: 200,
-                width: 210,
-                height: 180,
-                color: 'yellow',
-                text: '',
-                createdAt: Date.now(),
-              });
-            } else {
-              setActiveTool('sticky-note');
-            }
+            triggerHaptic('light');
+            setActiveTool('tape');
           }}
-          className={`p-2 rounded-xl transition-all flex items-center justify-center ${
-            activeTool === 'sticky-note'
-              ? 'bg-amber-400 text-amber-950 shadow-md shadow-amber-400/40 scale-105 ring-1 ring-amber-300 font-bold'
-              : 'text-slate-400 hover:text-amber-300 hover:bg-slate-700/50'
+          className={`p-1.5 rounded-lg shrink-0 ${
+            activeTool === 'tape'
+              ? 'bg-amber-600 text-white shadow'
+              : 'text-slate-400 hover:text-white'
           }`}
-          title="Yapışkan Not (Post-It - Sayfaya tıklayarak veya basarak 3D renkli yapışkan not ekle)"
+          title="Bant"
         >
-          <StickyNote size={16} />
+          <Bandage size={16} />
         </button>
 
-        {/* 🔲 Faz AC: Dinamik Kaşe & Mühür Tasarımcı */}
         <button
-          onClick={() => setStampCreatorModalOpen(true)}
-          className={`p-2 rounded-xl transition-all flex items-center justify-center ${
-            stampCreatorModalOpen
-              ? 'bg-rose-600 text-white shadow-md shadow-rose-600/40 scale-105 ring-1 ring-rose-400 font-bold'
-              : 'text-slate-400 hover:text-rose-400 hover:bg-slate-700/50'
-          }`}
-          title="Dinamik Kaşe & Mühür Tasarla (ONAYLANDI, ÖNEMLİ, ÇÖZÜLDÜ Damgaları)"
+          type="button"
+          onClick={() => {
+            triggerHaptic('light');
+            setStampCreatorModalOpen(true);
+          }}
+          className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 shrink-0"
+          title="Damga Tasarla"
         >
           <Stamp size={16} />
         </button>
 
-        {/* GoodNotes Handwriting Zoom Window Box */}
+        {/* More Tools Button on Mobile */}
         <button
-          onClick={toggleZoomWindow}
-          className={`p-2 rounded-xl transition-all flex items-center justify-center ${
-            zoomWindowOpen
-              ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30 scale-105 ring-1 ring-indigo-400'
-              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
-          }`}
-          title="Büyüteç Yazım Penceresi (GoodNotes Zoom Window - Z)"
-        >
-          <ZoomIn size={16} />
-        </button>
-
-        {/* 📝 Faz W: Floating Quick Scratchpad (Hızlı Karalama Panosu) */}
-        <button
-          onClick={toggleScratchpad}
-          className={`p-2 rounded-xl transition-all flex items-center justify-center ${
-            scratchpadOpen
-              ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/30 scale-105 ring-1 ring-amber-300 font-bold'
-              : 'text-slate-400 hover:text-amber-300 hover:bg-slate-700/50'
-          }`}
-          title="Hızlı Karalama Panosu / Quick Notes (Q)"
-        >
-          <SquarePen size={16} />
-        </button>
-
-        {/* 🗺️ Faz Y: Tuval Radarı & Hassas Gezgin (Radar Minimap) */}
-        <button
-          onClick={toggleMinimap}
-          className={`p-2 rounded-xl transition-all flex items-center justify-center ${
-            minimapVisible
-              ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30 scale-105 ring-1 ring-indigo-400 font-bold'
-              : 'text-slate-400 hover:text-indigo-300 hover:bg-slate-700/50'
-          }`}
-          title="Tuval Radarı / Mini Harita Gezgini (N)"
-        >
-          <MapIcon size={16} />
-        </button>
-
-        {/* 📑 Faz AA: Dijital Ajanda Sekmeleri (Planner Tabs - J) */}
-        <button
-          onClick={togglePlannerTabs}
-          className={`p-2 rounded-xl transition-all flex items-center justify-center ${
-            plannerTabsVisible
-              ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30 scale-105 ring-1 ring-indigo-400 font-bold'
-              : 'text-slate-400 hover:text-indigo-300 hover:bg-slate-700/50'
-          }`}
-          title="Dijital Ajanda Sekmeleri (Planner Edge Tabs - J)"
-        >
-          <Bookmark size={16} />
-        </button>
-
-        {/* 🔗 Faz AA: İnteraktif Sayfa Köprüsü / Hotspot Ekle */}
-        <button
+          type="button"
           onClick={() => {
-            openLinkModal({
-              initialTargetPage: 0,
-              initialLabel: 'Sayfa Bağlantısı',
-              initialColor: '#6366f1',
-              onSave: ({ targetPageIndex, url, label, color }) => {
-                addPageLinkToCurrentPage({
-                  id: `link_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-                  x: 180,
-                  y: 200,
-                  width: 160,
-                  height: 48,
-                  targetPageIndex,
-                  url,
-                  label,
-                  color,
-                  isHotspot: true,
-                });
-              },
-            });
+            triggerHaptic('light');
+            toggleDropdown('moreTools');
           }}
-          className="p-2 rounded-xl transition-all flex items-center justify-center text-slate-400 hover:text-indigo-300 hover:bg-slate-700/50"
-          title="İnteraktif Sayfa Köprüsü / Hotspot Alanı Ekle"
-        >
-          <Link2 size={16} />
-        </button>
-
-        {/* 🎨 Faz 1: Renk Damlalığı (Eyedropper) */}
-        <button
-          onClick={() => setActiveTool('eyedropper')}
-          className={`p-2 rounded-xl transition-all flex items-center justify-center ${
-            activeTool === 'eyedropper'
-              ? 'bg-cyan-600 text-white shadow-md shadow-cyan-600/40 scale-105 ring-1 ring-cyan-300'
-              : 'text-slate-400 hover:text-cyan-300 hover:bg-slate-700/50'
+          className={`p-1.5 rounded-lg shrink-0 relative ${
+            openDropdown === 'moreTools' || isSecondaryToolActive
+              ? 'bg-indigo-600 text-white shadow'
+              : 'text-slate-400 hover:text-white'
           }`}
-          title="Renk Damlalığı (Tuvaldeki veya görseldeki herhangi bir piksel rengini seç)"
+          title="Tüm Geometri ve İleri Araçlar"
         >
-          <Pipette size={16} />
-        </button>
-
-        {/* 🪣 Faz 1: Akıllı Alan Doldurma / Boya Kovası (Flood Fill Bucket) */}
-        <button
-          onClick={() => setActiveTool('fill')}
-          className={`p-2 rounded-xl transition-all flex items-center justify-center ${
-            activeTool === 'fill'
-              ? 'bg-violet-600 text-white shadow-md shadow-violet-600/40 scale-105 ring-1 ring-violet-300'
-              : 'text-slate-400 hover:text-violet-300 hover:bg-slate-700/50'
-          }`}
-          title="Akıllı Alan Doldurma (Kapalı çizim ve şekillerin içini tek tıkla boya)"
-        >
-          <PaintBucket size={16} />
-        </button>
-
-        {/* 🎚️ Faz 1: Çizgi Sabitleyici & Hassasiyet Ayarları (Streamline Stabilizer) */}
-        <div className="relative">
-          <button
-            onClick={() => setArtistMenuOpen(!artistMenuOpen)}
-            className={`p-2 rounded-xl transition-all flex items-center justify-center ${
-              artistMenuOpen
-                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30 ring-1 ring-indigo-300'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
-            }`}
-            title="Çizgi Sabitleyici & Hassasiyet Ayarları (Streamline Stabilizer)"
-          >
-            <SlidersHorizontal size={16} />
-          </button>
-
-          {artistMenuOpen && (
-            <div className="absolute top-12 left-1/2 -translate-x-1/2 bg-slate-900 border border-slate-700 shadow-2xl rounded-2xl p-3.5 w-64 z-50 animate-in fade-in zoom-in-95 backdrop-blur-md">
-              <div className="text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-2.5 flex items-center justify-between">
-                <span>Sanatçı & Çizim Motoru</span>
-                <Sparkles size={12} className="text-indigo-400" />
-              </div>
-
-              {/* Streamline Stabilizer Slider */}
-              <div className="mb-3">
-                <div className="flex items-center justify-between text-xs mb-1">
-                  <span className="text-slate-300 font-medium">Çizgi Sabitleyici</span>
-                  <span className="font-mono text-indigo-400 font-bold">
-                    %{Math.round((toolSettings.streamline ?? 0.55) * 100)}
-                  </span>
-                </div>
-                <input
-                  type="range"
-                  min="0"
-                  max="0.95"
-                  step="0.05"
-                  value={toolSettings.streamline ?? 0.55}
-                  onChange={(e) => setStreamline(parseFloat(e.target.value))}
-                  className="w-full h-1.5 accent-indigo-500 rounded-lg cursor-pointer bg-slate-800"
-                />
-                <p className="text-[10px] text-slate-400 mt-1">
-                  {(toolSettings.streamline ?? 0.55) === 0
-                    ? 'Kapalı (Ham Çizim)'
-                    : (toolSettings.streamline ?? 0.55) < 0.4
-                    ? 'Hafif Yumuşatma'
-                    : (toolSettings.streamline ?? 0.55) < 0.75
-                    ? 'Dengeli Hatlar'
-                    : 'Maksimum Titreme Engelleyici (Kaligrafi)'}
-                </p>
-              </div>
-
-              {/* Flood Fill Tolerance */}
-              <div className="pt-2 border-t border-slate-800">
-                <div className="flex items-center justify-between text-xs mb-1">
-                  <span className="text-slate-300 font-medium">Boya Kovası Toleransı</span>
-                  <span className="font-mono text-violet-400 font-bold">
-                    {toolSettings.fillTolerance ?? 35}
-                  </span>
-                </div>
-                <input
-                  type="range"
-                  min="10"
-                  max="80"
-                  step="2"
-                  value={toolSettings.fillTolerance ?? 35}
-                  onChange={(e) => setFillTolerance(parseInt(e.target.value, 10))}
-                  className="w-full h-1.5 accent-violet-500 rounded-lg cursor-pointer bg-slate-800"
-                />
-                <p className="text-[10px] text-slate-400 mt-1">
-                  Çizgileri aşmadan en temiz dolgu derinliği
-                </p>
-              </div>
-
-              {/* Faz A: Palm Rejection & Tilt Shading Toggles */}
-              <div className="pt-2.5 mt-2.5 border-t border-slate-800 space-y-2">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-slate-300 font-medium">Avuç İçi Reddi (Palm)</span>
-                  <button
-                    type="button"
-                    onClick={togglePalmRejection}
-                    className={`px-2 py-0.5 rounded text-[11px] font-semibold border transition-all ${
-                      toolSettings.palmRejection
-                        ? 'bg-indigo-600/30 border-indigo-500 text-indigo-300'
-                        : 'bg-slate-800 border-slate-700 text-slate-400'
-                    }`}
-                  >
-                    {toolSettings.palmRejection ? 'Aktif' : 'Kapalı'}
-                  </button>
-                </div>
-
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-slate-300 font-medium">Kalem Eğimi (Tilt Shading)</span>
-                  <button
-                    type="button"
-                    onClick={toggleTiltShading}
-                    className={`px-2 py-0.5 rounded text-[11px] font-semibold border transition-all ${
-                      toolSettings.tiltShading
-                        ? 'bg-indigo-600/30 border-indigo-500 text-indigo-300'
-                        : 'bg-slate-800 border-slate-700 text-slate-400'
-                    }`}
-                  >
-                    {toolSettings.tiltShading ? 'Aktif' : 'Kapalı'}
-                  </button>
-                </div>
-
-                {/* ✍️ FAZ Z: Scribble-to-Erase & Circle-to-Lasso Smart Gestures */}
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-slate-300 font-medium">Karalayarak Silme (Scribble)</span>
-                  <button
-                    type="button"
-                    onClick={toggleScribbleToErase}
-                    className={`px-2 py-0.5 rounded text-[11px] font-semibold border transition-all ${
-                      toolSettings.scribbleToErase !== false
-                        ? 'bg-indigo-600/30 border-indigo-500 text-indigo-300'
-                        : 'bg-slate-800 border-slate-700 text-slate-400'
-                    }`}
-                  >
-                    {toolSettings.scribbleToErase !== false ? 'Aktif' : 'Kapalı'}
-                  </button>
-                </div>
-
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-slate-300 font-medium">Daireyle Kement (Circle-to-Lasso)</span>
-                  <button
-                    type="button"
-                    onClick={toggleCircleToLasso}
-                    className={`px-2 py-0.5 rounded text-[11px] font-semibold border transition-all ${
-                      toolSettings.circleToLasso !== false
-                        ? 'bg-indigo-600/30 border-indigo-500 text-indigo-300'
-                        : 'bg-slate-800 border-slate-700 text-slate-400'
-                    }`}
-                  >
-                    {toolSettings.circleToLasso !== false ? 'Aktif' : 'Kapalı'}
-                  </button>
-                </div>
-
-                {/* FAZ M: Stylus Hardware Double-Tap & Barrel Button Action */}
-                <div className="pt-2 border-t border-slate-800 space-y-1.5">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-slate-300 font-medium">Apple Pencil / Stylus</span>
-                    <span className="text-[10px] text-amber-400 font-mono font-medium">Çift Tıklama & Tuş</span>
-                  </div>
-                  <select
-                    value={toolSettings.stylusDoubleTapAction ?? 'switch-eraser'}
-                    onChange={(e) => setStylusDoubleTapAction(e.target.value as StylusDoubleTapAction)}
-                    className="w-full bg-slate-900 border border-slate-700 text-slate-200 text-xs rounded-lg px-2 py-1.5 focus:outline-none focus:border-indigo-500 font-medium cursor-pointer"
-                  >
-                    <option value="switch-eraser">🖊️ ↔ 🧹 Kalem / Silgi Değiştir</option>
-                    <option value="switch-last-tool">🔄 Son Kullanılan Araca Geç</option>
-                    <option value="show-color-palette">🎨 Renk Yuvası Değiştir</option>
-                    <option value="undo">↩️ Son Çizimi Geri Al (Undo)</option>
-                    <option value="none">🚫 Devre Dışı</option>
-                  </select>
-                  <p className="text-[10px] text-slate-400 leading-tight">
-                    Apple Pencil çift dokunuşunda veya Wacom/S-Pen fıçı tuşunda tetiklenir.
-                  </p>
-                </div>
-              </div>
-            </div>
+          <Sparkles size={16} />
+          {isSecondaryToolActive && (
+            <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
           )}
-        </div>
+        </button>
 
-        <div className="w-px h-5 bg-slate-700 mx-1" />
+        <div className="w-px h-4 bg-slate-800 mx-1 shrink-0" />
 
-        {/* 🌟 GoodNotes 3 Favorite Color Slots */}
-        <div className="flex items-center gap-1.5 px-1 relative">
-          {toolSettings.favoriteColors.map((color, index) => {
+        {/* Favorite Colors on Mobile */}
+        <div className="flex items-center gap-1.5 shrink-0">
+          {toolSettings.favoriteColors.map((color, idx) => {
             const isSlotActive =
-              toolSettings.activeColorIndex === index && toolSettings.color === color;
+              toolSettings.activeColorIndex === idx && toolSettings.color === color;
             return (
-              <div key={index} className="relative">
-                <button
-                  onClick={() => selectFavoriteColor(index)}
-                  onContextMenu={(e) => {
-                    e.preventDefault();
-                    setActiveColorSlot(activeColorSlot === index ? null : index);
-                  }}
-                  className={`w-6 h-6 rounded-full transition-transform flex items-center justify-center shadow-sm ${
-                    isSlotActive
-                      ? 'ring-2 ring-white ring-offset-2 ring-offset-slate-800 scale-110'
-                      : 'hover:scale-105 opacity-80 hover:opacity-100 ring-1 ring-white/20'
-                  }`}
-                  style={{ backgroundColor: color }}
-                  title={`Favori Renk ${index + 1} (Sağ tıkla değiştir)`}
-                >
-                  {isSlotActive && (
-                    <Check
-                      size={11}
-                      className={color === '#facc15' || color === '#ffffff' ? 'text-black' : 'text-white'}
-                    />
-                  )}
-                </button>
-
-                {/* Color Change Popover */}
-                {activeColorSlot === index && (
-                  <div className="absolute top-9 left-1/2 -translate-x-1/2 bg-slate-850 border border-slate-700 p-2.5 rounded-xl shadow-2xl z-50 w-44">
-                    <div className="text-[10px] font-semibold text-slate-400 mb-1.5">
-                      Favori Rengi Değiştir
-                    </div>
-                    <div className="grid grid-cols-5 gap-1.5 mb-2">
-                      {COLOR_PALETTE.map((c) => (
-                        <button
-                          key={c}
-                          onClick={() => {
-                            setFavoriteColor(index, c);
-                            setActiveColorSlot(null);
-                          }}
-                          className="w-5 h-5 rounded-full ring-1 ring-white/20 hover:scale-110"
-                          style={{ backgroundColor: c }}
-                        />
-                      ))}
-                    </div>
-                  </div>
+              <button
+                key={idx}
+                type="button"
+                onClick={() => {
+                  triggerHaptic('light');
+                  selectFavoriteColor(idx);
+                  setActiveColorSlot(activeColorSlot === idx ? null : idx);
+                }}
+                className={`w-5 h-5 rounded-full flex items-center justify-center transition-transform ${
+                  isSlotActive
+                    ? 'ring-2 ring-white scale-110 shadow'
+                    : 'opacity-80 hover:opacity-100 ring-1 ring-white/20'
+                }`}
+                style={{ backgroundColor: color }}
+              >
+                {isSlotActive && (
+                  <Check
+                    size={9}
+                    className={
+                      color === '#facc15' || color === '#ffffff' ? 'text-black font-bold' : 'text-white font-bold'
+                    }
+                  />
                 )}
-              </div>
+              </button>
             );
           })}
         </div>
 
-        <div className="w-px h-5 bg-slate-700 mx-1" />
+        <div className="w-px h-4 bg-slate-800 mx-1 shrink-0" />
 
-        {/* 🌟 GoodNotes 3 Favorite Size Slots */}
-        <div className="flex items-center gap-1 px-1">
-          {toolSettings.favoriteSizes.map((size, index) => {
+        {/* Favorite Sizes on Mobile */}
+        <div className="flex items-center gap-1 shrink-0">
+          {toolSettings.favoriteSizes.map((size, idx) => {
             const isSizeActive =
-              toolSettings.activeSizeIndex === index && toolSettings.size === size;
+              toolSettings.activeSizeIndex === idx && toolSettings.size === size;
             return (
               <button
-                key={index}
-                onClick={() => selectFavoriteSize(index)}
-                className={`w-6 h-6 rounded-lg font-mono text-[11px] font-semibold flex items-center justify-center transition-all ${
+                key={idx}
+                type="button"
+                onClick={() => selectFavoriteSize(idx)}
+                className={`w-5 h-5 rounded-md font-mono text-[10px] font-semibold flex items-center justify-center ${
                   isSizeActive
-                    ? 'bg-indigo-600 text-white shadow-sm ring-1 ring-indigo-400'
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
+                    ? 'bg-indigo-600 text-white shadow ring-1 ring-indigo-400'
+                    : 'text-slate-400 hover:text-slate-200'
                 }`}
-                title={`Uç Kalınlığı: ${size}px`}
               >
                 {size}
               </button>
@@ -1173,246 +1848,394 @@ export const Toolbar: React.FC = () => {
         </div>
       </div>
 
-      {/* 3. Right Section: Document Actions & YouTube */}
-      <div className="flex items-center gap-1 sm:gap-2">
-        {/* Undo & Redo */}
-        <div className="flex items-center bg-slate-800/80 rounded-xl p-0.5 border border-slate-750">
-          <button
-            onClick={undo}
-            disabled={undoStack.length === 0}
-            className={`p-1.5 rounded-lg transition-colors ${
-              undoStack.length > 0
-                ? 'text-slate-300 hover:text-white hover:bg-slate-700'
-                : 'text-slate-600 cursor-not-allowed'
-            }`}
-            title="Geri Al"
-          >
-            <Undo2 size={16} />
-          </button>
-          <button
-            onClick={redo}
-            disabled={redoStack.length === 0}
-            className={`p-1.5 rounded-lg transition-colors ${
-              redoStack.length > 0
-                ? 'text-slate-300 hover:text-white hover:bg-slate-700'
-                : 'text-slate-600 cursor-not-allowed'
-            }`}
-            title="Yinele"
-          >
-            <Redo2 size={16} />
-          </button>
-        </div>
+      {/* 3. DEDICATED MOBILE FLOATING POPOVERS (Guaranteed unclipped by horizontal scroll) */}
+      <div className="md:hidden">
+        {openDropdown === 'eraser' && (
+          <div className="fixed top-26 left-3 bg-slate-900 border border-slate-750 shadow-2xl rounded-2xl p-3 w-60 z-50 animate-in fade-in zoom-in-95 backdrop-blur-xl">
+            <div className="text-[11px] font-semibold text-slate-400 mb-2 uppercase tracking-wider">
+              Silgi Ayarları
+            </div>
+            <div className="flex bg-slate-950 rounded-lg p-0.5 mb-2.5">
+              <button
+                type="button"
+                onClick={() => {
+                  setEraserMode('stroke');
+                  closeDropdown();
+                }}
+                className={`flex-1 py-1 text-xs rounded-md transition-colors ${
+                  toolSettings.eraserMode === 'stroke'
+                    ? 'bg-rose-600 text-white font-medium'
+                    : 'text-slate-400'
+                }`}
+              >
+                Tüm Çizgi
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setEraserMode('pixel');
+                  closeDropdown();
+                }}
+                className={`flex-1 py-1 text-xs rounded-md transition-colors ${
+                  toolSettings.eraserMode === 'pixel'
+                    ? 'bg-rose-600 text-white font-medium'
+                    : 'text-slate-400'
+                }`}
+              >
+                Piksel
+              </button>
+            </div>
+            <label className="flex items-center justify-between text-xs text-slate-200 py-1.5 cursor-pointer hover:text-white">
+              <span>Yalnızca Fosforluyu Sil</span>
+              <input
+                type="checkbox"
+                checked={toolSettings.eraseHighlighterOnly}
+                onChange={toggleEraseHighlighterOnly}
+                className="rounded accent-rose-500 cursor-pointer"
+              />
+            </label>
+            <label className="flex items-center justify-between text-xs text-slate-200 py-1.5 cursor-pointer hover:text-white">
+              <span>Otomatik Kaleme Dön</span>
+              <input
+                type="checkbox"
+                checked={toolSettings.autoDeselectEraser}
+                onChange={toggleAutoDeselectEraser}
+                className="rounded accent-rose-500 cursor-pointer"
+              />
+            </label>
+          </div>
+        )}
 
-        {/* Clear Current Page */}
-        <button
-          onClick={clearCurrentPageStrokes}
-          className="p-2 text-slate-400 hover:text-rose-400 hover:bg-slate-800 rounded-xl transition-colors hidden md:block"
-          title="Sayfadaki Çizimleri Temizle"
-        >
-          <Trash2 size={16} />
-        </button>
+        {openDropdown === 'shape' && (
+          <div className="fixed top-26 left-3 bg-slate-900 border border-slate-750 shadow-2xl rounded-2xl p-3 flex flex-col gap-2.5 z-50 animate-in fade-in zoom-in-95 min-w-[280px] max-w-[92vw] backdrop-blur-xl">
+            <div className="text-[11px] font-semibold text-slate-400 px-1 uppercase tracking-wider">
+              Şekil Türü
+            </div>
+            <div className="flex gap-1">
+              {(['line', 'arrow', 'rectangle', 'circle', 'triangle'] as ShapeType[]).map((shp) => (
+                <button
+                  key={shp}
+                  type="button"
+                  onClick={() => {
+                    setSelectedShape(shp);
+                    closeDropdown();
+                  }}
+                  className={`flex-1 py-1.5 text-xs rounded-lg capitalize transition-colors font-medium text-center ${
+                    toolSettings.selectedShape === shp
+                      ? 'bg-indigo-600 text-white shadow'
+                      : 'text-slate-300 hover:bg-slate-750'
+                  }`}
+                >
+                  {shp === 'line' ? 'Çizgi' : shp === 'arrow' ? 'Ok' : shp === 'rectangle' ? 'Kare' : shp === 'circle' ? 'Daire' : 'Üçgen'}
+                </button>
+              ))}
+            </div>
+            <div className="h-px bg-slate-750 my-0.5" />
+            <div className="flex items-center justify-between px-1">
+              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+                Şekil İç Dolgusu
+              </span>
+              <span className="text-[10px] text-indigo-400 font-mono font-semibold">
+                {toolSettings.shapeFillColor ? `%${Math.round((toolSettings.shapeFillOpacity ?? 0.25) * 100)}` : 'Dolgusuz'}
+              </span>
+            </div>
+            <div className="flex items-center gap-1.5 flex-wrap px-0.5">
+              <button
+                type="button"
+                onClick={() => setShapeFillColor(undefined)}
+                className={`w-6 h-6 rounded-md border flex items-center justify-center transition-all ${
+                  !toolSettings.shapeFillColor
+                    ? 'border-rose-500 bg-rose-500/20 text-rose-400 ring-1 ring-rose-400'
+                    : 'border-slate-700 bg-slate-800 text-slate-400 hover:text-slate-200'
+                }`}
+                title="Dolgusuz"
+              >
+                <Ban size={12} />
+              </button>
+              {[
+                { name: 'Sarı', color: '#fef08a' },
+                { name: 'Gül', color: '#fecdd3' },
+                { name: 'Nane', color: '#a7f3d0' },
+                { name: 'Mavi', color: '#bae6fd' },
+                { name: 'Lavanta', color: '#ddd6fe' },
+                { name: 'Turuncu', color: '#fed7aa' },
+                { name: 'Grafit', color: '#cbd5e1' },
+              ].map(({ name, color }) => (
+                <button
+                  key={color}
+                  type="button"
+                  onClick={() => setShapeFillColor(color)}
+                  className={`w-6 h-6 rounded-md border transition-all ${
+                    toolSettings.shapeFillColor === color
+                      ? 'ring-2 ring-white scale-110'
+                      : 'border-transparent opacity-80 hover:opacity-100'
+                  }`}
+                  style={{ backgroundColor: color }}
+                  title={name}
+                />
+              ))}
+            </div>
+          </div>
+        )}
 
-        {/* Elements / Stickers Drawer Button */}
-        <button
-          onClick={() => setStickersDrawerOpen(true)}
-          className="p-2 text-amber-400 hover:text-amber-300 hover:bg-slate-800 rounded-xl transition-colors"
-          title="Öğeler & Çıkartmalar (Stickers Drawer)"
-        >
-          <Sparkles size={17} />
-        </button>
+        {openDropdown === 'moreTools' && (
+          <div className="fixed top-26 left-3 right-3 sm:right-auto sm:w-80 bg-slate-900 border border-slate-750 shadow-2xl rounded-2xl p-3 z-50 animate-in fade-in zoom-in-95 backdrop-blur-2xl space-y-2.5 max-h-[75vh] overflow-y-auto">
+            <div className="text-[11px] font-bold text-slate-300 uppercase tracking-wider flex items-center justify-between pb-1.5 border-b border-slate-800">
+              <span>Geometri & İleri Araçlar</span>
+              <Compass size={13} className="text-indigo-400" />
+            </div>
+            <div className="grid grid-cols-4 gap-1.5">
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveTool('neon');
+                  closeDropdown();
+                }}
+                className={`p-2 rounded-xl border flex flex-col items-center gap-1 text-[10px] font-medium transition-all ${
+                  activeTool === 'neon'
+                    ? 'bg-fuchsia-600/30 border-fuchsia-500 text-fuchsia-300'
+                    : 'bg-slate-800/60 border-slate-750 text-slate-400 hover:text-white'
+                }`}
+                title="Neon Kalemi"
+              >
+                <Flame size={16} className="text-fuchsia-400" />
+                <span>Neon</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveTool('dashed');
+                  closeDropdown();
+                }}
+                className={`p-2 rounded-xl border flex flex-col items-center gap-1 text-[10px] font-medium transition-all ${
+                  activeTool === 'dashed'
+                    ? 'bg-indigo-600/30 border-indigo-500 text-indigo-300'
+                    : 'bg-slate-800/60 border-slate-750 text-slate-400 hover:text-white'
+                }`}
+                title="Kesikli Çizgi"
+              >
+                <Spline size={16} className="text-indigo-400" />
+                <span>Kesikli</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveTool('tape');
+                  closeDropdown();
+                }}
+                className={`p-2 rounded-xl border flex flex-col items-center gap-1 text-[10px] font-medium transition-all ${
+                  activeTool === 'tape'
+                    ? 'bg-amber-600/30 border-amber-500 text-amber-300'
+                    : 'bg-slate-800/60 border-slate-750 text-slate-400 hover:text-white'
+                }`}
+                title="Gizleme Bandı"
+              >
+                <Bandage size={16} className="text-amber-400" />
+                <span>Bant</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveTool('laser');
+                  closeDropdown();
+                }}
+                className={`p-2 rounded-xl border flex flex-col items-center gap-1 text-[10px] font-medium transition-all ${
+                  activeTool === 'laser'
+                    ? 'bg-rose-600/30 border-rose-500 text-rose-300'
+                    : 'bg-slate-800/60 border-slate-750 text-slate-400 hover:text-white'
+                }`}
+                title="Lazer İşaretçi"
+              >
+                <Zap size={16} className="text-rose-400" />
+                <span>Lazer</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  toggleRuler();
+                  closeDropdown();
+                }}
+                className={`p-2 rounded-xl border flex flex-col items-center gap-1 text-[10px] font-medium transition-all ${
+                  rulerVisible
+                    ? 'bg-indigo-600/30 border-indigo-500 text-indigo-300'
+                    : 'bg-slate-800/60 border-slate-750 text-slate-400 hover:text-white'
+                }`}
+                title="Milimetrik Cetvel"
+              >
+                <Compass size={16} className="text-indigo-400" />
+                <span>Cetvel</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  toggleProtractor();
+                  closeDropdown();
+                }}
+                className={`p-2 rounded-xl border flex flex-col items-center gap-1 text-[10px] font-medium transition-all ${
+                  protractorVisible
+                    ? 'bg-indigo-600/30 border-indigo-500 text-indigo-300'
+                    : 'bg-slate-800/60 border-slate-750 text-slate-400 hover:text-white'
+                }`}
+                title="360° İletki / Açıölçer"
+              >
+                <Disc size={16} className="text-cyan-400" />
+                <span>Açıölçer</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  toggleCompass();
+                  closeDropdown();
+                }}
+                className={`p-2 rounded-xl border flex flex-col items-center gap-1 text-[10px] font-medium transition-all ${
+                  compassVisible
+                    ? 'bg-indigo-600/30 border-indigo-500 text-indigo-300'
+                    : 'bg-slate-800/60 border-slate-750 text-slate-400 hover:text-white'
+                }`}
+                title="Hassas Pergel"
+              >
+                <CircleDot size={16} className="text-emerald-400" />
+                <span>Pergel</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  toggleSymmetry();
+                  closeDropdown();
+                }}
+                className={`p-2 rounded-xl border flex flex-col items-center gap-1 text-[10px] font-medium transition-all ${
+                  symmetryEnabled
+                    ? 'bg-indigo-600/30 border-indigo-500 text-indigo-300'
+                    : 'bg-slate-800/60 border-slate-750 text-slate-400 hover:text-white'
+                }`}
+                title="Ayna / Simetri Çizimi"
+              >
+                <FlipHorizontal size={16} className="text-indigo-400" />
+                <span>Simetri</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  addStickyNoteToCurrentPage({
+                    id: `sn_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+                    x: 180,
+                    y: 200,
+                    width: 210,
+                    height: 180,
+                    color: 'yellow',
+                    text: '',
+                    createdAt: Date.now(),
+                  });
+                  closeDropdown();
+                }}
+                className="p-2 rounded-xl border bg-slate-800/60 border-slate-750 text-slate-400 hover:text-amber-300 flex flex-col items-center gap-1 text-[10px] font-medium transition-all"
+                title="Yapışkan Post-It Notu"
+              >
+                <StickyNote size={16} className="text-amber-400" />
+                <span>Not Ekle</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setStampCreatorModalOpen(true);
+                  closeDropdown();
+                }}
+                className="p-2 rounded-xl border bg-slate-800/60 border-slate-750 text-slate-400 hover:text-rose-300 flex flex-col items-center gap-1 text-[10px] font-medium transition-all"
+                title="Dinamik Kaşe & Damga Stüdyosu"
+              >
+                <Stamp size={16} className="text-rose-400" />
+                <span>Kaşe</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveTool('eyedropper');
+                  closeDropdown();
+                }}
+                className={`p-2 rounded-xl border flex flex-col items-center gap-1 text-[10px] font-medium transition-all ${
+                  activeTool === 'eyedropper'
+                    ? 'bg-pink-600/30 border-pink-500 text-pink-300'
+                    : 'bg-slate-800/60 border-slate-750 text-slate-400 hover:text-white'
+                }`}
+                title="Renk Damlalığı (Eyedropper)"
+              >
+                <Pipette size={16} className="text-pink-400" />
+                <span>Damlalık</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveTool('fill');
+                  closeDropdown();
+                }}
+                className={`p-2 rounded-xl border flex flex-col items-center gap-1 text-[10px] font-medium transition-all ${
+                  activeTool === 'fill'
+                    ? 'bg-cyan-600/30 border-cyan-500 text-cyan-300'
+                    : 'bg-slate-800/60 border-slate-750 text-slate-400 hover:text-white'
+                }`}
+                title="Boya Kovası (Doldurma)"
+              >
+                <PaintBucket size={16} className="text-cyan-400" />
+                <span>Doldur</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  toggleZoomWindow();
+                  closeDropdown();
+                }}
+                className={`p-2 rounded-xl border flex flex-col items-center gap-1 text-[10px] font-medium transition-all ${
+                  zoomWindowOpen
+                    ? 'bg-indigo-600/30 border-indigo-500 text-indigo-300'
+                    : 'bg-slate-800/60 border-slate-750 text-slate-400 hover:text-white'
+                }`}
+                title="Büyüteç Hassas Çizim Penceresi"
+              >
+                <ZoomIn size={16} className="text-indigo-400" />
+                <span>Büyüteç</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  toggleScratchpad();
+                  closeDropdown();
+                }}
+                className={`p-2 rounded-xl border flex flex-col items-center gap-1 text-[10px] font-medium transition-all ${
+                  scratchpadOpen
+                    ? 'bg-amber-600/30 border-amber-500 text-amber-300'
+                    : 'bg-slate-800/60 border-slate-750 text-slate-400 hover:text-white'
+                }`}
+                title="Yüzen Karalama Defteri"
+              >
+                <SquarePen size={16} className="text-amber-400" />
+                <span>Karalama</span>
+              </button>
+            </div>
+          </div>
+        )}
 
-        {/* Page Manager Grid View */}
-        <button
-          onClick={() => setPageManagerModalOpen(true)}
-          className="p-2 text-slate-400 hover:text-indigo-400 hover:bg-slate-800 rounded-xl transition-colors"
-          title="Sayfa Düzenleyici & Küçük Resim Izgarası (GoodNotes Grid)"
-        >
-          <Grid size={17} />
-        </button>
-
-        {/* Multi-Layer Engine Drawer */}
-        <button
-          onClick={() => setLayersDrawerOpen(true)}
-          className={`p-2 rounded-xl transition-all ${
-            layersDrawerOpen
-              ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30 ring-1 ring-indigo-400'
-              : 'text-slate-400 hover:text-indigo-400 hover:bg-slate-800'
-          }`}
-          title="Katmanlar Yöneticisi (Çizim, Fosfor, Metin, Çıkartma, Bant Katmanları)"
-        >
-          <Layers size={17} />
-        </button>
-
-        {/* CollaNote Style Live WebRTC Collaboration */}
-        <button
-          onClick={() => setCollaborationModalOpen(true)}
-          className={`p-2 rounded-xl transition-all relative ${
-            collaboration.isConnected
-              ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/30 ring-1 ring-emerald-400'
-              : 'text-slate-400 hover:text-emerald-400 hover:bg-slate-800'
-          }`}
-          title={
-            collaboration.isConnected
-              ? `Canlı Oturum Aktif (${collaboration.roomId}) - ${collaboration.peers.length + 1} Katılımcı`
-              : 'Canlı Birlikte Çizim (CollaNote Stili P2P Oda Kodu)'
-          }
-        >
-          <Users size={17} />
-          {collaboration.isConnected && (
-            <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-emerald-300 ring-2 ring-slate-900 animate-ping" />
-          )}
-        </button>
-
-        {/* Template Selector */}
-        <button
-          onClick={() => setTemplateModalOpen(true)}
-          className="p-2 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-xl transition-colors"
-          title="Defter Şablonunu Değiştir"
-        >
-          <LayoutTemplate size={17} />
-        </button>
-
-        {/* PDF & Word Import */}
-        <button
-          onClick={() => setDocImportModalOpen(true)}
-          className="p-2 text-slate-400 hover:text-indigo-400 hover:bg-slate-800 rounded-xl transition-colors hidden sm:block"
-          title="PDF veya Word İçe Aktar"
-        >
-          <UploadCloud size={17} />
-        </button>
-
-        {/* 🖼️ Faz E: Export & Share Studio (PDF, PNG, JPEG) */}
-        <button
-          onClick={() => setExportModalOpen(true)}
-          className="p-2 text-slate-400 hover:text-emerald-400 hover:bg-slate-800 rounded-xl transition-colors"
-          title="Dışa Aktar & Paylaş (PDF, PNG, JPEG)"
-        >
-          <FileDown size={17} />
-        </button>
-
-        {/* GoodNotes 6 Study Sets / Flashcards */}
-        <button
-          onClick={() => setStudySetsModalOpen(true)}
-          className="p-2 text-slate-400 hover:text-amber-400 hover:bg-slate-800 rounded-xl transition-colors relative"
-          title="Çalışma Kartları & Aktif Hatırlama (GoodNotes Study Sets)"
-        >
-          <Brain size={17} />
-          {activeNotebook?.flashcards && activeNotebook.flashcards.length > 0 && (
-            <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
-          )}
-        </button>
-
-        {/* 🧠 GoodNotes 6 Math AI & Equation Solver */}
-        <button
-          onClick={() => openMathModal()}
-          className={`p-2 rounded-xl transition-all ${
-            mathModalOpen
-              ? 'bg-purple-600 text-white shadow-md shadow-purple-600/30 ring-1 ring-purple-400'
-              : 'text-slate-400 hover:text-purple-400 hover:bg-slate-800'
-          }`}
-          title="Yapay Zeka Matematik & Denklem Çözücü (GoodNotes 6 Math AI)"
-        >
-          <Calculator size={17} />
-        </button>
-
-        {/* 📈 Faz AB: STEM 2D Matematik Fonksiyon & Grafik Çizici */}
-        <button
-          onClick={() => openFunctionPlotterModal()}
-          className={`p-2 rounded-xl transition-all ${
-            functionPlotterModalOpen
-              ? 'bg-cyan-600 text-white shadow-md shadow-cyan-600/30 ring-1 ring-cyan-400'
-              : 'text-slate-400 hover:text-cyan-400 hover:bg-slate-800'
-          }`}
-          title="STEM 2D Fonksiyon & Grafik Çizici (Cartesian Function Grapher)"
-        >
-          <TrendingUp size={17} />
-        </button>
-
-        {/* 📖 Dual Notebook Split-Screen Mode */}
-        <button
-          onClick={() => {
-            if (splitNotebook.isOpen) {
-              closeDualNotebook();
-            } else {
-              const other = notebooks.find((n) => n.id !== activeNotebookId);
-              if (other) {
-                openDualNotebook(other.id);
-              } else {
-                openDualNotebook(activeNotebookId || '');
-              }
-            }
-          }}
-          className={`p-2 rounded-xl transition-all ${
-            splitNotebook.isOpen
-              ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30 ring-1 ring-indigo-400'
-              : 'text-slate-400 hover:text-indigo-400 hover:bg-slate-800'
-          }`}
-          title={
-            splitNotebook.isOpen
-              ? 'Çift Defter Görünümünü Kapat'
-              : 'Çift Defter Yan Yana Aç (Dual Notebook Split-Screen)'
-          }
-        >
-          <Split size={17} />
-        </button>
-
-        {/* Presentation Mode Toggle */}
-        <button
-          onClick={() => {
-            const next = !presentationMode;
-            setPresentationMode(next);
-            if (next && document.documentElement.requestFullscreen) {
-              document.documentElement.requestFullscreen().catch(() => {});
-            }
-          }}
-          className={`p-2 rounded-xl transition-colors ${
-            presentationMode
-              ? 'bg-indigo-600 text-white shadow-md ring-1 ring-indigo-400'
-              : 'text-slate-400 hover:text-indigo-400 hover:bg-slate-800'
-          }`}
-          title="Sunum Modu (Tam Ekran & Lazer)"
-        >
-          <Presentation size={17} />
-        </button>
-
-        {/* Smart Ink Contrast Inversion */}
-        <button
-          onClick={invertCurrentPageInks}
-          className="p-2 text-slate-400 hover:text-amber-300 hover:bg-slate-800 rounded-xl transition-colors hidden sm:block"
-          title="Akıllı Mürekkep Kontrastı (Siyah/Beyaz Yazı Renklerini Uyarla)"
-        >
-          <Sun size={17} />
-        </button>
-
-        {/* Export .notefree Notebook Package */}
-        <button
-          onClick={() => activeNotebook && exportNotebookAsNotefree(activeNotebook)}
-          className="p-2 text-slate-400 hover:text-indigo-400 hover:bg-slate-800 rounded-xl transition-colors hidden sm:block"
-          title="Defteri .notefree Dosyası Olarak Dışa Aktar"
-        >
-          <FolderDown size={17} />
-        </button>
-
-        {/* 🍅 Faz D: Pomodoro Sayacı & Web Audio Ambiyans Üreteci */}
-        <PomodoroBarWidget />
-
-        {/* 🎙️ Notability Audio Recording & Note Replay */}
-        <AudioPlayerBar />
-
-        {/* YouTube Split Screen Button */}
-        <button
-          onClick={toggleYouTube}
-          className={`px-2.5 py-1.5 rounded-xl font-medium text-xs flex items-center gap-1.5 transition-all shadow-sm ${
-            youtube.isOpen
-              ? 'bg-red-600 text-white shadow-red-600/30 ring-1 ring-red-400/50'
-              : 'bg-slate-800 hover:bg-slate-750 text-slate-300 hover:text-white border border-slate-700/60'
-          }`}
-          title="YouTube Video Panelini Aç/Kapat"
-        >
-          <Youtube size={15} className={youtube.isOpen ? 'fill-white' : 'text-red-500'} />
-          <span className="hidden md:inline">YouTube</span>
-        </button>
+        {activeColorSlot !== null && (
+          <div className="fixed top-26 right-3 bg-slate-900 border border-slate-700 p-2.5 rounded-xl shadow-2xl z-50 w-44 backdrop-blur-xl animate-in fade-in zoom-in-95">
+            <div className="text-[10px] font-semibold text-slate-400 mb-1.5">
+              Rengi Değiştir
+            </div>
+            <div className="grid grid-cols-4 gap-1.5">
+              {COLOR_PALETTE.map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  onClick={() => {
+                    setFavoriteColor(activeColorSlot, c);
+                    setActiveColorSlot(null);
+                  }}
+                  className="w-6 h-6 rounded-full ring-1 ring-white/20 hover:scale-110 transition-transform"
+                  style={{ backgroundColor: c }}
+                />
+              ))}
+            </div>
+          </div>
+        )}
       </div>
-    </header>
+    </div>
   );
 };

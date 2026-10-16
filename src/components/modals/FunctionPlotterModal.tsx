@@ -517,7 +517,10 @@ export const FunctionPlotterModal: React.FC = () => {
   };
 
   // Mouse pan handlers
-  const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
+  const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    try {
+      (e.currentTarget as HTMLCanvasElement).setPointerCapture(e.pointerId);
+    } catch (_) {}
     isDraggingRef.current = true;
     dragStartRef.current = {
       clientX: e.clientX,
@@ -529,7 +532,7 @@ export const FunctionPlotterModal: React.FC = () => {
     };
   };
 
-  const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+  const handlePointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
@@ -555,7 +558,10 @@ export const FunctionPlotterModal: React.FC = () => {
     }
   };
 
-  const handleMouseUp = () => {
+  const handlePointerUp = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    try {
+      (e.currentTarget as HTMLCanvasElement).releasePointerCapture(e.pointerId);
+    } catch (_) {}
     isDraggingRef.current = false;
   };
 
@@ -757,32 +763,32 @@ export const FunctionPlotterModal: React.FC = () => {
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-slate-950/80 backdrop-blur-md select-none animate-in fade-in duration-150">
       <div className="relative w-full max-w-5xl h-[88vh] bg-slate-900 border border-slate-700/80 rounded-3xl shadow-2xl flex flex-col overflow-hidden">
         {/* Top Modal Header */}
-        <div className="px-6 py-3.5 bg-slate-850 border-b border-slate-750 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-2xl bg-gradient-to-tr from-indigo-500 to-cyan-500 flex items-center justify-center text-white shadow-lg shadow-indigo-500/20">
-              <TrendingUp size={19} />
+        <div className="px-4 sm:px-6 py-3.5 bg-slate-850 border-b border-slate-750 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+            <div className="w-8 h-8 sm:w-9 sm:h-9 shrink-0 rounded-2xl bg-gradient-to-tr from-indigo-500 to-cyan-500 flex items-center justify-center text-white shadow-lg shadow-indigo-500/20">
+              <TrendingUp size={18} />
             </div>
-            <div>
-              <h2 className="text-sm sm:text-base font-bold text-white flex items-center gap-2">
-                <span>STEM 2D Matematik Fonksiyon & Grafik Çizici</span>
-                <span className="text-[10px] bg-indigo-500/20 text-indigo-300 px-2 py-0.5 rounded-full font-mono font-semibold">
+            <div className="min-w-0">
+              <h2 className="text-xs sm:text-base font-bold text-white flex items-center gap-2 truncate">
+                <span className="truncate">STEM 2D Grafik Çizici</span>
+                <span className="hidden sm:inline text-[10px] bg-indigo-500/20 text-indigo-300 px-2 py-0.5 rounded-full font-mono font-semibold">
                   Faz AB
                 </span>
               </h2>
-              <p className="text-[11px] text-slate-400">
+              <p className="hidden md:block text-[11px] text-slate-400 truncate">
                 Gerçek zamanlı cebirsel ve trigonometrik fonksiyon analizi, kök tespiti ve tuvale damgalama
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
             <button
               onClick={handleStampToCanvas}
-              className="flex items-center gap-1.5 bg-gradient-to-r from-indigo-600 to-cyan-600 hover:from-indigo-500 hover:to-cyan-500 text-white font-bold text-xs px-3.5 py-1.5 rounded-xl shadow-md shadow-indigo-600/30 hover:scale-105 transition-all"
+              className="flex items-center gap-1.5 bg-gradient-to-r from-indigo-600 to-cyan-600 hover:from-indigo-500 hover:to-cyan-500 text-white font-bold text-xs px-2.5 sm:px-3.5 py-1.5 rounded-xl shadow-md shadow-indigo-600/30 hover:scale-105 transition-all"
               title="Grafiği aktif sayfaya vektör vuruş olarak ekle"
             >
               <Download size={14} />
-              <span>Sayfaya Damgala</span>
+              <span className="hidden xs:inline">Sayfaya </span><span>Damgala</span>
             </button>
 
             <button
@@ -790,7 +796,7 @@ export const FunctionPlotterModal: React.FC = () => {
                 triggerHaptic('light');
                 closeFunctionPlotterModal();
               }}
-              className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition-colors"
+              className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition-colors shrink-0"
             >
               <X size={18} />
             </button>
@@ -803,10 +809,10 @@ export const FunctionPlotterModal: React.FC = () => {
           <div className="flex-1 relative flex flex-col bg-slate-950 overflow-hidden">
             <canvas
               ref={canvasRef}
-              onMouseDown={handleMouseDown}
-              onMouseMove={handleMouseMove}
-              onMouseUp={handleMouseUp}
-              onMouseLeave={handleMouseUp}
+              onPointerDown={handlePointerDown}
+              onPointerMove={handlePointerMove}
+              onPointerUp={handlePointerUp}
+              onPointerCancel={handlePointerUp}
               onWheel={handleWheel}
               className="w-full h-full cursor-crosshair select-none touch-none"
             />

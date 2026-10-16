@@ -89,6 +89,7 @@ export const NotebookWorkspace: React.FC = () => {
   } = useNotebookStore();
 
   const [lockModalOpen, setLockModalOpen] = useState(false);
+  const [viewMenuOpen, setViewMenuOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
 
   const activeNotebook = notebooks.find((n) => n.id === activeNotebookId);
@@ -580,23 +581,28 @@ export const NotebookWorkspace: React.FC = () => {
         {/* === Resizable Dual Split Divider === */}
         {isSplit && secondaryNotebook && (
           <div
-            className="w-2 bg-slate-800/90 hover:bg-indigo-500 cursor-col-resize transition-colors relative z-20 flex items-center justify-center group"
+            className="w-2.5 bg-slate-800/90 hover:bg-indigo-500 active:bg-indigo-600 cursor-col-resize transition-colors relative z-20 flex items-center justify-center group touch-none select-none"
             title="Sürükleyerek defterlerin genişlik oranını ayarlayın"
-            onMouseDown={(e) => {
+            onPointerDown={(e) => {
+              try {
+                (e.currentTarget as HTMLDivElement).setPointerCapture(e.pointerId);
+              } catch (_) {}
               const startX = e.clientX;
               const startRatio = splitNotebook.splitRatio;
               const containerWidth =
                 containerRef.current?.parentElement?.clientWidth || window.innerWidth;
-              const onMouseMove = (moveEvent: MouseEvent) => {
+              const onPointerMove = (moveEvent: PointerEvent) => {
                 const deltaRatio = (moveEvent.clientX - startX) / containerWidth;
                 setDualNotebookRatio(startRatio + deltaRatio);
               };
-              const onMouseUp = () => {
-                window.removeEventListener('mousemove', onMouseMove);
-                window.removeEventListener('mouseup', onMouseUp);
+              const onPointerUp = () => {
+                window.removeEventListener('pointermove', onPointerMove);
+                window.removeEventListener('pointerup', onPointerUp);
+                window.removeEventListener('pointercancel', onPointerUp);
               };
-              window.addEventListener('mousemove', onMouseMove);
-              window.addEventListener('mouseup', onMouseUp);
+              window.addEventListener('pointermove', onPointerMove);
+              window.addEventListener('pointerup', onPointerUp);
+              window.addEventListener('pointercancel', onPointerUp);
             }}
           >
             <GripVertical size={14} className="text-slate-500 group-hover:text-white" />
@@ -707,8 +713,8 @@ export const NotebookWorkspace: React.FC = () => {
       {/* 🧠 Faz H: Active Recall Tape Quiz Floating Toolbar */}
       <TapeQuizToolbar />
 
-      {/* Floating Zoom & View Controls Dock (Bottom Left) */}
-      <div className="fixed bottom-5 left-5 z-30 flex items-center bg-slate-900/90 backdrop-blur-md border border-slate-800/80 rounded-2xl px-2 py-1.5 shadow-2xl gap-1">
+      {/* Desktop Floating Zoom & View Controls Dock (Bottom Left - >= 1024px) */}
+      <div className="fixed bottom-5 left-5 z-30 hidden lg:flex items-center bg-slate-900/90 backdrop-blur-md border border-slate-800/80 rounded-2xl px-2 py-1.5 shadow-2xl gap-1">
         <button
           onClick={() => setZoom(zoom - 0.1)}
           disabled={zoom <= 0.4}
@@ -840,37 +846,157 @@ export const NotebookWorkspace: React.FC = () => {
         </button>
       </div>
 
+      {/* Mobile / Tablet Collapsible View Controls Pill (Bottom Left - < 1024px) */}
+      <div className="fixed bottom-4 left-4 z-30 flex lg:hidden items-center select-none">
+        <button
+          type="button"
+          onClick={() => {
+            triggerHaptic('light');
+            setViewMenuOpen(!viewMenuOpen);
+          }}
+          className="flex items-center gap-1.5 bg-slate-900/95 backdrop-blur-md border border-slate-750 px-2.5 py-1.5 rounded-2xl shadow-2xl text-xs font-semibold text-slate-200 hover:text-white"
+          title="Görünüm ve Büyütme Menüsü"
+        >
+          <ZoomIn size={14} className="text-indigo-400" />
+          <span className="font-mono">{Math.round(zoom * 100)}%</span>
+        </button>
+
+        {viewMenuOpen && (
+          <div className="absolute bottom-12 left-0 w-64 bg-slate-900/98 border border-slate-700 shadow-2xl rounded-2xl p-3 z-40 animate-in fade-in zoom-in-95 backdrop-blur-xl space-y-2.5 text-xs text-white">
+            <div className="flex items-center justify-between pb-1.5 border-b border-slate-800">
+              <span className="font-bold text-slate-200">Görünüm & Büyütme</span>
+              <span className="font-mono text-indigo-400 font-bold">%{Math.round(zoom * 100)}</span>
+            </div>
+
+            {/* Zoom controls */}
+            <div className="flex items-center justify-between bg-slate-800/80 p-1 rounded-xl">
+              <button
+                type="button"
+                onClick={() => setZoom(Math.max(0.4, zoom - 0.1))}
+                className="p-1.5 text-slate-300 hover:text-white rounded-lg bg-slate-700/50"
+              >
+                <ZoomOut size={14} />
+              </button>
+              <button
+                type="button"
+                onClick={resetView}
+                className="px-2 py-1 text-slate-300 hover:text-indigo-300 font-mono text-[11px]"
+              >
+                Sıfırla (%100)
+              </button>
+              <button
+                type="button"
+                onClick={() => setZoom(Math.min(3.0, zoom + 0.1))}
+                className="p-1.5 text-slate-300 hover:text-white rounded-lg bg-slate-700/50"
+              >
+                <ZoomIn size={14} />
+              </button>
+            </div>
+
+            {/* View mode toggles */}
+            <div className="space-y-1 pt-1 border-t border-slate-800">
+              {canvasMode === 'paged' && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setViewMode(viewMode === 'continuous' ? 'single' : 'continuous');
+                      setViewMenuOpen(false);
+                    }}
+                    className="w-full flex items-center justify-between p-1.5 rounded-lg text-slate-300 hover:bg-slate-800"
+                  >
+                    <span>Kesintisiz Akış Modu</span>
+                    <span className="text-[10px] text-indigo-400 font-semibold">{viewMode === 'continuous' ? 'Açık' : 'Kapalı'}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      toggleTwoPageSpread();
+                      setViewMenuOpen(false);
+                    }}
+                    className="w-full flex items-center justify-between p-1.5 rounded-lg text-slate-300 hover:bg-slate-800"
+                  >
+                    <span>İkili Kitap Modu</span>
+                    <span className="text-[10px] text-indigo-400 font-semibold">{twoPageSpread ? 'Açık' : 'Kapalı'}</span>
+                  </button>
+                </>
+              )}
+
+              <button
+                type="button"
+                onClick={() => {
+                  setCanvasMode(canvasMode === 'infinite' ? 'paged' : 'infinite');
+                  setViewMenuOpen(false);
+                }}
+                className="w-full flex items-center justify-between p-1.5 rounded-lg text-slate-300 hover:bg-slate-800"
+              >
+                <span>Sonsuz Tuval</span>
+                <span className="text-[10px] text-amber-400 font-semibold">{canvasMode === 'infinite' ? 'Açık' : 'Kapalı'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  toggleMarginWorkspace();
+                  setViewMenuOpen(false);
+                }}
+                className="w-full flex items-center justify-between p-1.5 rounded-lg text-slate-300 hover:bg-slate-800"
+              >
+                <span>Kenarlık Çalışma Alanı</span>
+                <span className="text-[10px] text-indigo-400 font-semibold">{marginWorkspaceOpen ? 'Açık' : 'Kapalı'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  togglePlannerTabs();
+                  setViewMenuOpen(false);
+                }}
+                className="w-full flex items-center justify-between p-1.5 rounded-lg text-slate-300 hover:bg-slate-800"
+              >
+                <span>Ajanda Fihrist Sekmeleri</span>
+                <span className="text-[10px] text-indigo-400 font-semibold">{plannerTabsVisible ? 'Açık' : 'Kapalı'}</span>
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* Floating Quick Elements Button (Bottom Right) */}
       <button
+        type="button"
         onClick={() => setStickersDrawerOpen(true)}
-        className="fixed bottom-5 right-5 z-30 flex items-center gap-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-bold text-xs px-3.5 py-2 rounded-2xl shadow-xl shadow-amber-500/20 hover:scale-105 transition-all"
+        className="fixed bottom-4 right-4 z-30 flex items-center gap-1.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-bold text-xs px-3 py-2 rounded-2xl shadow-xl shadow-amber-500/20 hover:scale-105 transition-all"
         title="Çıkartmalar ve Notlar Çekmecesi (Elements)"
       >
         <Sparkles size={16} />
-        <span>Çıkartmalar</span>
+        <span className="hidden sm:inline">Çıkartmalar</span>
       </button>
 
-      {/* 📝 Faz W: Floating Quick Scratchpad Launcher (Bottom Right) */}
+      {/* 📝 Faz W: Floating Quick Scratchpad Launcher (Bottom Right - Hidden on tablets/mobile to avoid clutter) */}
       <button
+        type="button"
         onClick={() => {
           triggerHaptic('light');
           toggleScratchpad();
         }}
-        className="fixed bottom-5 right-36 z-30 flex items-center gap-1.5 bg-slate-900/90 hover:bg-slate-800 text-amber-400 font-bold text-xs px-3 py-2 rounded-2xl shadow-xl border border-amber-500/30 hover:border-amber-400 hover:scale-105 transition-all backdrop-blur-md"
+        className="fixed bottom-5 right-36 z-30 hidden xl:flex items-center gap-1.5 bg-slate-900/90 hover:bg-slate-800 text-amber-400 font-bold text-xs px-3 py-2 rounded-2xl shadow-xl border border-amber-500/30 hover:border-amber-400 hover:scale-105 transition-all backdrop-blur-md"
         title="Hızlı Karalama Panosu / Quick Notes (Q)"
       >
         <SquarePen size={15} />
-        <span className="hidden sm:inline">Hızlı Not</span>
+        <span>Hızlı Not</span>
         <span className="text-[10px] bg-slate-800 text-amber-300 px-1.5 py-0.5 rounded font-mono font-semibold">Q</span>
       </button>
 
-      {/* 🗺️ Faz Y: Interactive Radar Minimap Launcher (Bottom Right) */}
+      {/* 🗺️ Faz Y: Interactive Radar Minimap Launcher (Bottom Right - Hidden on tablets/mobile to avoid clutter) */}
       <button
+        type="button"
         onClick={() => {
           triggerHaptic('light');
           toggleMinimap();
         }}
-        className={`fixed bottom-5 right-64 z-30 flex items-center gap-1.5 ${
+        className={`fixed bottom-5 right-64 z-30 hidden xl:flex items-center gap-1.5 ${
           minimapVisible
             ? 'bg-indigo-600 text-white border-indigo-400'
             : 'bg-slate-900/90 text-indigo-400 border-indigo-500/30 hover:border-indigo-400'
@@ -878,7 +1004,7 @@ export const NotebookWorkspace: React.FC = () => {
         title="Tuval Radarı / Mini Harita Gezgini (N)"
       >
         <MapIcon size={15} />
-        <span className="hidden sm:inline">Radar</span>
+        <span>Radar</span>
         <span className="text-[10px] bg-slate-800 text-indigo-300 px-1.5 py-0.5 rounded font-mono font-semibold">N</span>
       </button>
 

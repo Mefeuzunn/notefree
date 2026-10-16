@@ -101,56 +101,56 @@ export const StudySetsModal: React.FC = () => {
     <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 select-none animate-in fade-in duration-200">
       <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
         {/* Modal Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-amber-500 to-rose-500 flex items-center justify-center text-white shadow-lg shadow-amber-500/20">
-              <Brain size={20} />
+        <div className="flex flex-wrap sm:flex-nowrap items-center justify-between gap-2.5 px-4 sm:px-6 py-3.5 border-b border-slate-800">
+          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-gradient-to-tr from-amber-500 to-rose-500 flex items-center justify-center text-white shadow-lg shadow-amber-500/20 shrink-0">
+              <Brain size={19} />
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="text-base font-bold text-slate-100">Çalışma Kartları (Study Sets)</h3>
-                <span className="text-[10px] font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/30 px-2 py-0.5 rounded-full">
-                  GoodNotes 6 Modu
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5 sm:gap-2">
+                <h3 className="text-sm sm:text-base font-bold text-slate-100 truncate">Çalışma Kartları</h3>
+                <span className="hidden sm:inline text-[10px] font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/30 px-2 py-0.5 rounded-full">
+                  Study Sets
                 </span>
               </div>
-              <p className="text-xs text-slate-400">
+              <p className="text-[11px] text-slate-400 truncate">
                 {activeNotebook?.title} • {flashcards.length} Kart
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <div className="flex bg-slate-800/80 p-1 rounded-xl text-xs font-medium">
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+            <div className="flex bg-slate-800/80 p-0.5 sm:p-1 rounded-xl text-xs font-medium">
               <button
                 onClick={() => {
                   setActiveTab('study');
                   restartSession();
                 }}
-                className={`px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 ${
+                className={`px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-lg transition-colors flex items-center gap-1 sm:gap-1.5 text-xs ${
                   activeTab === 'study'
-                    ? 'bg-indigo-600 text-white shadow-sm'
+                    ? 'bg-indigo-600 text-white shadow-sm font-semibold'
                     : 'text-slate-400 hover:text-slate-200'
                 }`}
               >
-                <Flame size={14} />
+                <Flame size={13} />
                 <span>Çalış</span>
               </button>
               <button
                 onClick={() => setActiveTab('manage')}
-                className={`px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 ${
+                className={`px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-lg transition-colors flex items-center gap-1 sm:gap-1.5 text-xs ${
                   activeTab === 'manage'
-                    ? 'bg-indigo-600 text-white shadow-sm'
+                    ? 'bg-indigo-600 text-white shadow-sm font-semibold'
                     : 'text-slate-400 hover:text-slate-200'
                 }`}
               >
-                <Layers size={14} />
-                <span>Kartlarım ({flashcards.length})</span>
+                <Layers size={13} />
+                <span>Kartlar ({flashcards.length})</span>
               </button>
             </div>
 
             <button
               onClick={() => setStudySetsModalOpen(false)}
-              className="p-2 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-xl transition-colors ml-2"
+              className="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-xl transition-colors ml-1 shrink-0"
             >
               <X size={18} />
             </button>

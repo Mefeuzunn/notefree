@@ -201,12 +201,12 @@ export const PageScrubberBar: React.FC = () => {
       )}
 
       {/* Main Scrubber Pill Bar */}
-      <div className="bg-slate-900/95 text-white px-3 py-2 rounded-2xl border border-slate-700/80 shadow-2xl backdrop-blur-md flex items-center gap-2 ring-1 ring-black/10">
+      <div className="bg-slate-900/95 text-white px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-2xl border border-slate-700/80 shadow-2xl backdrop-blur-md flex items-center gap-1 sm:gap-2 ring-1 ring-black/10 max-w-[94vw]">
         {/* Quick Jump: First Page */}
         <button
           onClick={() => jumpTo(0)}
           disabled={activePageIndex === 0}
-          className={`p-1.5 rounded-lg transition-colors ${
+          className={`p-1.5 rounded-lg transition-colors hidden sm:flex ${
             activePageIndex > 0
               ? 'text-slate-300 hover:text-white hover:bg-slate-800'
               : 'text-slate-600 cursor-not-allowed'
@@ -237,7 +237,7 @@ export const PageScrubberBar: React.FC = () => {
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
           onPointerLeave={handleTrackLeave}
-          className="relative w-36 sm:w-56 h-6 flex items-center cursor-pointer group px-1"
+          className="relative w-20 xs:w-28 sm:w-56 h-6 flex items-center cursor-pointer group px-1"
           title="Kaydırarak sayfalar arasında hızla gezin"
         >
           {/* Track Line */}
@@ -292,7 +292,7 @@ export const PageScrubberBar: React.FC = () => {
         <button
           onClick={() => jumpTo(totalPages - 1)}
           disabled={activePageIndex >= totalPages - 1}
-          className={`p-1.5 rounded-lg transition-colors ${
+          className={`p-1.5 rounded-lg transition-colors hidden sm:flex ${
             activePageIndex < totalPages - 1
               ? 'text-slate-300 hover:text-white hover:bg-slate-800'
               : 'text-slate-600 cursor-not-allowed'
