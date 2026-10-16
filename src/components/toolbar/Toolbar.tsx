@@ -139,6 +139,7 @@ export const Toolbar: React.FC = () => {
     setLayersDrawerOpen,
     toggleAngleSnap,
     toggleGridSnap,
+    toggleAutoDetectShape,
     togglePalmRejection,
     toggleTiltShading,
     setStylusDoubleTapAction,
@@ -664,6 +665,25 @@ export const Toolbar: React.FC = () => {
                   {toolSettings.gridSnap && <Check size={13} className="text-indigo-400" />}
                 </button>
               </div>
+
+              {/* FAZ X: Hold-to-Snap Shape Refining Toggle */}
+              <div className="h-px bg-slate-700/60 my-0.5" />
+              <button
+                type="button"
+                onClick={toggleAutoDetectShape}
+                className={`w-full px-2.5 py-1.5 rounded-lg text-xs font-medium flex items-center justify-between border transition-all ${
+                  toolSettings.autoDetectShape
+                    ? 'bg-amber-500/20 border-amber-500/50 text-amber-300 font-semibold'
+                    : 'bg-slate-750/50 border-slate-700 text-slate-400 hover:text-slate-200'
+                }`}
+                title="Serbest çizim yaparken uç duraklatıldığında otomatik düzgünleştir ve şekle kenetle"
+              >
+                <div className="flex items-center gap-1.5">
+                  <Sparkles size={13} className="text-amber-400" />
+                  <span>Çizip Bekleyince Şekli Sabitle (Hold-to-Snap)</span>
+                </div>
+                {toolSettings.autoDetectShape && <Check size={13} className="text-amber-400" />}
+              </button>
             </div>
           )}
         </div>

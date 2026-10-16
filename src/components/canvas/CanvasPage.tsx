@@ -163,6 +163,18 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
   const holdAnchorPointRef = useRef<{ x: number; y: number } | null>(null);
   const didTriggerHoldToLassoRef = useRef<boolean>(false);
 
+  // FAZ X: Hold-to-Snap Shape Refining Gesture Refs
+  const holdToShapeTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const holdToShapeAnchorRef = useRef<{ x: number; y: number } | null>(null);
+  const snappedShapeStateRef = useRef<{
+    type: ShapeType;
+    start: StrokePoint;
+    currentEnd: StrokePoint;
+    points: StrokePoint[];
+    shapeFillColor?: string;
+    shapeFillOpacity?: number;
+  } | null>(null);
+
   // Faz 1 interactive states
   const [eyedropperLoupe, setEyedropperLoupe] = useState<{ x: number; y: number; hex: string } | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -531,6 +543,14 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
     }
     holdAnchorPointRef.current = null;
 
+    // Reset FAZ X Hold-to-Shape gesture state
+    if (holdToShapeTimerRef.current) {
+      clearTimeout(holdToShapeTimerRef.current);
+      holdToShapeTimerRef.current = null;
+    }
+    holdToShapeAnchorRef.current = null;
+    snappedShapeStateRef.current = null;
+
     let { x, y } = getCanvasCoords(e);
 
     // FAZ P: Ruler Magnetic Edge Snapping
@@ -843,6 +863,132 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
       }
     }
 
+    // 📐 FAZ X: GoodNotes-Style Hold-to-Snap Shape Refining & Real-Time Morphing
+    if (
+      toolSettings.autoDetectShape &&
+      penTools.includes(activeTool) &&
+      !didTriggerHoldToLassoRef.current
+    ) {
+      if (!snappedShapeStateRef.current) {
+        // Pen is inking: detect pause at end of stroke
+        if (currentPointsRef.current.length >= 8) {
+          if (!holdToShapeTimerRef.current) {
+            holdToShapeAnchorRef.current = { x, y };
+            holdToShapeTimerRef.current = setTimeout(() => {
+              if (currentPointsRef.current.length >= 8) {
+                const detected = detectGeometricShape(currentPointsRef.current, {
+                  angleSnap: toolSettings.angleSnap,
+                  gridSnap: toolSettings.gridSnap,
+                });
+                if (detected) {
+                  const startPt = currentPointsRef.current[0];
+                  const lastPt = currentPointsRef.current[currentPointsRef.current.length - 1];
+                  snappedShapeStateRef.current = {
+                    type: detected.type,
+                    start: startPt,
+                    currentEnd: lastPt,
+                    points: detected.replacementPoints,
+                    shapeFillColor: toolSettings.shapeFillColor,
+                    shapeFillOpacity: toolSettings.shapeFillOpacity,
+                  };
+                  triggerHaptic('snap');
+                  const shapeNames: Record<ShapeType, string> = {
+                    line: 'Çizgi',
+                    arrow: 'Ok',
+                    rectangle: 'Dikdörtgen',
+                    circle: 'Daire / Elips',
+                    triangle: 'Üçgen',
+                  };
+                  setToastMessage(`📐 Şekil Sabitlendi: ${shapeNames[detected.type] || detected.type}`);
+                  setTimeout(() => setToastMessage(null), 1400);
+
+                  // Trigger live render on canvas
+                  const live = liveCanvasRef.current;
+                  if (live) {
+                    const lCtx = live.getContext('2d');
+                    if (lCtx) {
+                      lCtx.clearRect(0, 0, live.width, live.height);
+                      lCtx.save();
+                      lCtx.scale(dpr, dpr);
+                      drawStrokeOnCanvas(
+                        lCtx,
+                        {
+                          tool: activeTool as any,
+                          color: toolSettings.color,
+                          size: toolSettings.size,
+                          points: detected.replacementPoints,
+                        },
+                        0
+                      );
+                      lCtx.restore();
+                    }
+                  }
+                }
+              }
+              holdToShapeTimerRef.current = null;
+            }, 430);
+          } else if (holdToShapeAnchorRef.current) {
+            const distFromAnchor = Math.hypot(x - holdToShapeAnchorRef.current.x, y - holdToShapeAnchorRef.current.y);
+            if (distFromAnchor > 18) {
+              clearTimeout(holdToShapeTimerRef.current);
+              holdToShapeTimerRef.current = null;
+              holdToShapeAnchorRef.current = { x, y };
+            }
+          }
+        }
+      } else {
+        // User is holding down and actively dragging/scaling the snapped shape!
+        const currentSnapped = snappedShapeStateRef.current;
+        let start = currentSnapped.start;
+        let end: StrokePoint = { x, y, pressure: 0.6 };
+
+        if (toolSettings.angleSnap || toolSettings.gridSnap) {
+          const snapped = applyPrecisionSnapping(start, end, toolSettings.angleSnap, toolSettings.gridSnap);
+          start = snapped.start;
+          end = snapped.end;
+        }
+
+        let updatedPoints: StrokePoint[] = [];
+        switch (currentSnapped.type) {
+          case 'line':
+            updatedPoints = interpolateLine(start, end);
+            break;
+          case 'arrow':
+            updatedPoints = generateArrowPoints(start, end);
+            break;
+          case 'rectangle':
+            updatedPoints = generateRectanglePoints(
+              Math.min(start.x, end.x),
+              Math.min(start.y, end.y),
+              Math.max(start.x, end.x),
+              Math.max(start.y, end.y)
+            );
+            break;
+          case 'circle': {
+            const rx = Math.abs(end.x - start.x) / 2;
+            const ry = Math.abs(end.y - start.y) / 2;
+            updatedPoints = generateEllipsePoints((start.x + end.x) / 2, (start.y + end.y) / 2, rx, ry);
+            break;
+          }
+          case 'triangle':
+            updatedPoints = generateTrianglePoints(
+              Math.min(start.x, end.x),
+              Math.min(start.y, end.y),
+              Math.max(start.x, end.x),
+              Math.max(start.y, end.y)
+            );
+            break;
+        }
+
+        snappedShapeStateRef.current = {
+          ...currentSnapped,
+          start,
+          currentEnd: end,
+          points: updatedPoints,
+        };
+      }
+    }
+
     // Live Collaboration: Broadcast cursor and stroke points
     if (collaboration.isConnected) {
       updateMyCursor(x, y);
@@ -888,6 +1034,63 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
         isRevealed: false,
         timestamp: Date.now(),
       });
+    } else if (snappedShapeStateRef.current) {
+      // 📐 FAZ X: Draw the morphed snapped shape!
+      const snapped = snappedShapeStateRef.current;
+
+      // Draw shape fill if enabled
+      if (snapped.shapeFillColor && ['rectangle', 'circle', 'triangle'].includes(snapped.type)) {
+        ctx.save();
+        ctx.fillStyle = snapped.shapeFillColor;
+        ctx.globalAlpha = snapped.shapeFillOpacity ?? 0.25;
+        ctx.beginPath();
+        if (snapped.type === 'circle') {
+          const minX = Math.min(snapped.start.x, snapped.currentEnd.x);
+          const minY = Math.min(snapped.start.y, snapped.currentEnd.y);
+          const maxX = Math.max(snapped.start.x, snapped.currentEnd.x);
+          const maxY = Math.max(snapped.start.y, snapped.currentEnd.y);
+          ctx.ellipse((minX + maxX) / 2, (minY + maxY) / 2, (maxX - minX) / 2, (maxY - minY) / 2, 0, 0, Math.PI * 2);
+        } else if (snapped.type === 'rectangle') {
+          const minX = Math.min(snapped.start.x, snapped.currentEnd.x);
+          const minY = Math.min(snapped.start.y, snapped.currentEnd.y);
+          ctx.rect(minX, minY, Math.abs(snapped.currentEnd.x - snapped.start.x), Math.abs(snapped.currentEnd.y - snapped.start.y));
+        } else if (snapped.type === 'triangle') {
+          const minX = Math.min(snapped.start.x, snapped.currentEnd.x);
+          const minY = Math.min(snapped.start.y, snapped.currentEnd.y);
+          const maxX = Math.max(snapped.start.x, snapped.currentEnd.x);
+          const maxY = Math.max(snapped.start.y, snapped.currentEnd.y);
+          ctx.moveTo((minX + maxX) / 2, minY);
+          ctx.lineTo(maxX, maxY);
+          ctx.lineTo(minX, maxY);
+          ctx.closePath();
+        }
+        ctx.fill();
+        ctx.restore();
+      }
+
+      drawStrokeOnCanvas(
+        ctx,
+        {
+          tool: activeTool as any,
+          color: toolSettings.color,
+          size: toolSettings.size,
+          points: snapped.points,
+        },
+        0
+      );
+
+      // Snap highlight indicator handles at ends
+      ctx.save();
+      ctx.fillStyle = '#6366f1';
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 1.5;
+      [snapped.start, snapped.currentEnd].forEach((pt) => {
+        ctx.beginPath();
+        ctx.arc(pt.x, pt.y, 4, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+      });
+      ctx.restore();
     } else {
       drawStrokeOnCanvas(
         ctx,
@@ -1064,6 +1267,13 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
     }
     holdAnchorPointRef.current = null;
 
+    // FAZ X: Clear Hold-to-Shape timer
+    if (holdToShapeTimerRef.current) {
+      clearTimeout(holdToShapeTimerRef.current);
+      holdToShapeTimerRef.current = null;
+    }
+    holdToShapeAnchorRef.current = null;
+
     if (didTriggerHoldToLassoRef.current) {
       didTriggerHoldToLassoRef.current = false;
       setIsDrawing(false);
@@ -1175,8 +1385,19 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
     let committedStart = finalPoints[0];
     let committedEnd = finalPoints[finalPoints.length - 1];
 
+    // 📐 FAZ X: If stroke was refined via GoodNotes Hold-to-Snap gesture
+    if (snappedShapeStateRef.current) {
+      const snapped = snappedShapeStateRef.current;
+      finalPoints = [...snapped.points];
+      committedShapeType = snapped.type;
+      committedStart = snapped.start;
+      committedEnd = snapped.currentEnd;
+      snappedShapeStateRef.current = null;
+      triggerHaptic('success');
+    }
+
     // FAZ P: If stroke was drawn along ruler, straighten it into precision line
-    if (rulerVisible && rulerEdgeSnap && finalPoints.length >= 2 && activeTool !== 'shape') {
+    if (rulerVisible && rulerEdgeSnap && finalPoints.length >= 2 && activeTool !== 'shape' && !committedShapeType) {
       const pStart = finalPoints[0];
       const pEnd = finalPoints[finalPoints.length - 1];
       const snapStart = getSnapToRulerPoint(pStart.x, pStart.y, rulerPosition, rulerWidth, 85, rulerAngle, 32);
@@ -1237,6 +1458,8 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
           );
           break;
       }
+    } else if (committedShapeType) {
+      // Shape was already committed via Hold-to-Snap or Ruler, no need to re-detect
     } else if (toolSettings.autoDetectShape) {
       const detected = detectGeometricShape(finalPoints, {
         angleSnap: toolSettings.angleSnap,
