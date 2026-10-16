@@ -1,5 +1,4 @@
-import React from 'react';
-import { X, Keyboard, Sparkles, PenTool, Eraser, Scissors, Highlighter, Type, StickyNote, Ruler, ZoomIn, Bookmark, Search, RotateCcw, ArrowLeftRight, Map as MapIcon, Link2, TrendingUp, Stamp, FileDown, Table2, Workflow, ListTree, Presentation } from 'lucide-react';
+import { X, Keyboard, Sparkles, PenTool, Eraser, Scissors, Highlighter, Type, StickyNote, Ruler, ZoomIn, Bookmark, Search, RotateCcw, ArrowLeftRight, Map as MapIcon, Link2, TrendingUp, Stamp, FileDown, Table2, Workflow, ListTree, Presentation, GraduationCap } from 'lucide-react';
 import { triggerHaptic } from '../../engine/hapticFeedback';
 
 interface ShortcutsModalProps {
@@ -27,6 +26,8 @@ const DRAWING_SHORTCUTS: ShortcutItem[] = [
 ];
 
 const UTILITY_SHORTCUTS: ShortcutItem[] = [
+  { key: 'Cornell Stüdyosu', label: 'Cornell Not Alma & Aktif Hatırlama Stüdyosu', desc: 'Walter Pauk metodu ile sol sütun ipuçları, sağ sütun ders notları, alt özet ve ezberleme katlama modu', icon: <GraduationCap size={15} /> },
+  { key: 'Alt + C', label: 'Cornell Katlama / Ezber Modu', desc: 'Cornell sayfasında notları veya ipuçlarını gizleyip ezberden aktif hatırlama testini başlat', icon: <GraduationCap size={15} /> },
   { key: 'Dışa Aktar', label: 'PDF / Belge Dışa Aktarma Stüdyosu', desc: 'Filigranlı, Bates numaralı, çok katmanlı PDF veya Retina PNG/JPEG olarak dışa aktar', icon: <FileDown size={15} /> },
   { key: 'Damga & Kaşe', label: 'Dinamik Kaşe & Mühür Stüdyosu', desc: 'Gerçekçi mühür efektli onay/dikkat damgaları ve kişisel çizim çıkartmalar tasarla', icon: <Stamp size={15} /> },
   { key: 'Grafik Çizici', label: 'STEM 2D Fonksiyon Çizici', desc: 'Matematiksel fonksiyon grafikleri çiz, kökleri analiz et ve sayfaya vektör olarak damgala', icon: <TrendingUp size={15} /> },

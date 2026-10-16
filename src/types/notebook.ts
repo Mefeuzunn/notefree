@@ -78,7 +78,22 @@ export interface CustomTemplateItem {
   width?: number;
   height?: number;
   createdAt: number;
+  category?: 'planner' | 'study' | 'grid' | 'creative' | 'custom' | 'imported';
+  sourceFileName?: string;
+  pageNumber?: number;
 }
+
+export type CornellStudyMode = 'none' | 'hide-notes' | 'hide-cues';
+
+export interface CornellBlockConfig {
+  topic?: string;
+  course?: string;
+  date?: string;
+  cues?: string;
+  notes?: string;
+  summary?: string;
+}
+
 
 export interface StrokePoint {
   x: number;

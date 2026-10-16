@@ -90,6 +90,7 @@ export const NotebookWorkspace: React.FC = () => {
     presentationMode,
     setPresentationMode,
     setShortcutsModalOpen,
+    toggleCornellStudyMode,
   } = useNotebookStore();
 
   const [lockModalOpen, setLockModalOpen] = useState(false);
@@ -328,6 +329,12 @@ export const NotebookWorkspace: React.FC = () => {
         setActiveTool('sticky-note');
         triggerHaptic('light');
         showShortcutHud('Yapışkan Not', 'S');
+        return;
+      } else if (e.altKey && key === 'c') {
+        e.preventDefault();
+        toggleCornellStudyMode();
+        triggerHaptic('medium');
+        showShortcutHud('Cornell Ezber Modu', 'Alt + C');
         return;
       } else if (key === 'c') {
         e.preventDefault();

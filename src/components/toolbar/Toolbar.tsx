@@ -74,6 +74,7 @@ import {
   MoreHorizontal,
   X,
   ChevronDown,
+  GraduationCap,
 } from 'lucide-react';
 import { ShapeType, StylusDoubleTapAction } from '../../types/notebook';
 import { AudioPlayerBar } from '../audio/AudioPlayerBar';
@@ -136,6 +137,8 @@ export const Toolbar: React.FC = () => {
     youtube,
     toggleYouTube,
     setTemplateModalOpen,
+    cornellStudyMode,
+    setCornellAssistantModalOpen,
     setDocImportModalOpen,
     setStickersDrawerOpen,
     sidebarOpen,
@@ -223,6 +226,7 @@ export const Toolbar: React.FC = () => {
 
   const activeNotebook = notebooks.find((n) => n.id === activeNotebookId);
   const totalPages = activeNotebook ? activeNotebook.pages.length : 1;
+  const currentPage = activeNotebook?.pages[activePageIndex];
 
   const toggleDropdown = (
     name: 'eraser' | 'shape' | 'artist' | 'moreTools' | 'overflowActions'
@@ -1405,6 +1409,27 @@ export const Toolbar: React.FC = () => {
               title="Şablon Değiştir"
             >
               <LayoutTemplate size={17} />
+            </button>
+
+            {/* Cornell Studio & Active Recall Button */}
+            <button
+              type="button"
+              onClick={() => setCornellAssistantModalOpen(true)}
+              className={`p-2 rounded-xl transition-all relative ${
+                currentPage?.template === 'cornell'
+                  ? 'text-amber-400 bg-amber-500/15 hover:bg-amber-500/25 ring-1 ring-amber-500/40'
+                  : 'text-slate-400 hover:text-amber-400 hover:bg-slate-800'
+              }`}
+              title={
+                currentPage?.template === 'cornell'
+                  ? `Cornell Stüdyosu (${cornellStudyMode !== 'none' ? 'Ezber Modu Aktif' : 'Normal'})`
+                  : 'Cornell Not Alma Stüdyosu'
+              }
+            >
+              <GraduationCap size={17} />
+              {currentPage?.template === 'cornell' && cornellStudyMode !== 'none' && (
+                <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-amber-400 animate-ping" />
+              )}
             </button>
 
             {/* Math AI */}

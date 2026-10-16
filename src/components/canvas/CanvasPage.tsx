@@ -72,6 +72,9 @@ import {
   Globe,
   ExternalLink,
   Baseline,
+  GraduationCap,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 
 interface CanvasPageProps {
@@ -164,8 +167,14 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
     rulerEdgeSnap,
     openLinkModal,
     navigateToPage,
+    cornellStudyMode,
+    setCornellStudyMode,
+    toggleCornellStudyMode,
+    setCornellAssistantModalOpen,
+    stampCornellBlocksToPage,
   } = useNotebookStore();
 
+  const [cornellRevealTemporarily, setCornellRevealTemporarily] = useState(false);
   const [isDrawing, setIsDrawing] = useState(false);
   const [isDraggingLasso, setIsDraggingLasso] = useState(false);
   const [lassoDragStart, setLassoDragStart] = useState<{ x: number; y: number } | null>(null);
@@ -2449,6 +2458,153 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
         >
           <div className="w-14 h-14 rounded-full border-2 border-indigo-500 bg-indigo-500/25 animate-ping" />
         </div>
+      )}
+
+      {/* 🎓 FAZ AM: Cornell Interactive Active Recall & Fold Study Blind */}
+      {page.template === 'cornell' && (
+        <>
+          {/* Top-Right Floating Cornell Quick Toolbar */}
+          <div
+            className="absolute z-20 top-2 right-4 flex items-center gap-1.5 bg-slate-900/90 backdrop-blur-md border border-slate-700/80 rounded-full px-2.5 py-1 shadow-lg select-none text-[11px]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              onClick={() => setCornellAssistantModalOpen(true)}
+              className="flex items-center gap-1 text-amber-400 hover:text-amber-300 font-semibold transition-colors"
+              title="Cornell Not Alma Stüdyosu"
+            >
+              <GraduationCap size={14} />
+              <span>Cornell</span>
+            </button>
+            <span className="text-slate-600">|</span>
+            <button
+              type="button"
+              onClick={() => toggleCornellStudyMode()}
+              className={`px-2 py-0.5 rounded-full transition-all flex items-center gap-1 text-[10px] font-medium ${
+                cornellStudyMode !== 'none'
+                  ? 'bg-amber-500 text-slate-950 font-bold shadow-sm'
+                  : 'text-slate-300 hover:text-white hover:bg-slate-800'
+              }`}
+              title="Ezberleme & Katlama Modu (Active Recall)"
+            >
+              {cornellStudyMode !== 'none' ? <EyeOff size={11} /> : <Eye size={11} />}
+              <span>
+                {cornellStudyMode === 'hide-notes'
+                  ? 'Notlar Gizli'
+                  : cornellStudyMode === 'hide-cues'
+                  ? 'İpuçları Gizli'
+                  : 'Ezber Modu'}
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={() => stampCornellBlocksToPage(pageIndex)}
+              className="p-1 text-slate-400 hover:text-indigo-300 rounded-full hover:bg-slate-800 transition-colors"
+              title="4 Cornell Metin Bölgesini Ekle"
+            >
+              <Sparkles size={11} />
+            </button>
+          </div>
+
+          {/* Active Recall Blinds Mask */}
+          {cornellStudyMode === 'hide-notes' && (
+            <div
+              className={`absolute z-30 transition-all duration-200 select-none flex flex-col items-center justify-center text-center p-4 rounded-xl border-2 border-dashed ${
+                cornellRevealTemporarily
+                  ? 'opacity-10 pointer-events-none border-transparent'
+                  : 'backdrop-blur-md bg-slate-950/92 border-amber-500/50 shadow-2xl pointer-events-auto'
+              }`}
+              style={{
+                left: `${220 * scale}px`,
+                top: `${70 * scale}px`,
+                width: `${Math.max(120, (page.width - 220 - 30) * scale)}px`,
+                height: `${Math.max(120, (page.height - 160 - 70) * scale)}px`,
+              }}
+            >
+              <div className="w-12 h-12 rounded-2xl bg-amber-500/20 text-amber-300 flex items-center justify-center mb-2.5 shadow-inner border border-amber-500/40">
+                <GraduationCap size={24} />
+              </div>
+              <h3 className="text-xs sm:text-sm font-bold text-white mb-1">
+                🧠 Notlar Gizlendi (Ezber Testi)
+              </h3>
+              <p className="text-[11px] text-amber-200/80 max-w-xs mb-3.5 leading-relaxed hidden sm:block">
+                Sol sütundaki ipuçlarına ve sorulara bakarak ders notlarını zihninizden tekrarlayın.
+              </p>
+              <div className="flex items-center gap-2 flex-wrap justify-center">
+                <button
+                  type="button"
+                  onMouseDown={() => setCornellRevealTemporarily(true)}
+                  onMouseUp={() => setCornellRevealTemporarily(false)}
+                  onTouchStart={() => setCornellRevealTemporarily(true)}
+                  onTouchEnd={() => setCornellRevealTemporarily(false)}
+                  className="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs shadow transition-transform active:scale-95 flex items-center gap-1.5"
+                >
+                  <Eye size={13} />
+                  <span>Basılı Tutup Gör</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCornellStudyMode('hide-cues')}
+                  className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs border border-slate-700 transition-colors"
+                >
+                  İpuçlarını Gizle
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCornellStudyMode('none')}
+                  className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
+                  title="Modu Kapat"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            </div>
+          )}
+
+          {cornellStudyMode === 'hide-cues' && (
+            <div
+              className={`absolute z-30 transition-all duration-200 select-none flex flex-col items-center justify-center text-center p-3 rounded-xl border-2 border-dashed ${
+                cornellRevealTemporarily
+                  ? 'opacity-10 pointer-events-none border-transparent'
+                  : 'backdrop-blur-md bg-slate-950/92 border-cyan-500/50 shadow-2xl pointer-events-auto'
+              }`}
+              style={{
+                left: `${30 * scale}px`,
+                top: `${70 * scale}px`,
+                width: `${Math.max(80, (220 - 30) * scale)}px`,
+                height: `${Math.max(120, (page.height - 160 - 70) * scale)}px`,
+              }}
+            >
+              <div className="w-10 h-10 rounded-xl bg-cyan-500/20 text-cyan-300 flex items-center justify-center mb-2 border border-cyan-500/40">
+                <GraduationCap size={20} />
+              </div>
+              <h4 className="text-xs font-bold text-white mb-1">
+                İpuçları Gizli
+              </h4>
+              <p className="text-[10px] text-cyan-200/80 mb-3 leading-tight hidden sm:block">
+                Notlara bakarak soruları hatırlayın.
+              </p>
+              <button
+                type="button"
+                onMouseDown={() => setCornellRevealTemporarily(true)}
+                onMouseUp={() => setCornellRevealTemporarily(false)}
+                onTouchStart={() => setCornellRevealTemporarily(true)}
+                onTouchEnd={() => setCornellRevealTemporarily(false)}
+                className="px-2.5 py-1 rounded bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-[11px] mb-2 shadow"
+              >
+                Basılı Tut Gör
+              </button>
+              <button
+                type="button"
+                onClick={() => setCornellStudyMode('none')}
+                className="text-[10px] text-slate-400 hover:text-white"
+              >
+                Kapat
+              </button>
+            </div>
+          )}
+        </>
       )}
 
       {/* Faz 1: Floating Status Toast */}

@@ -207,3 +207,72 @@ export async function renderPdfPageAsTemplateImage(
     height: Math.round(viewport.height / 2),
   };
 }
+
+/**
+ * FAZ AM: Returns the total number of pages in a PDF file
+ */
+export async function getPdfPageCount(file: File): Promise<number> {
+  const arrayBuffer = await file.arrayBuffer();
+  const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+  const pdfDoc = await loadingTask.promise;
+  return pdfDoc.numPages;
+}
+
+/**
+ * FAZ AM: Batch converts multiple or all pages of a PDF file into reusable template images
+ */
+export async function renderAllPdfPagesAsTemplateImages(
+  file: File,
+  options?: {
+    pageNumbers?: number[];
+    maxPages?: number;
+    scale?: number;
+    onProgress?: (current: number, total: number) => void;
+  }
+): Promise<Array<{ pageNumber: number; dataUrl: string; width: number; height: number }>> {
+  const arrayBuffer = await file.arrayBuffer();
+  const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+  const pdfDoc = await loadingTask.promise;
+  const total = pdfDoc.numPages;
+
+  let pagesToRender: number[] = [];
+  if (options?.pageNumbers && options.pageNumbers.length > 0) {
+    pagesToRender = options.pageNumbers.filter((p) => p >= 1 && p <= total);
+  } else {
+    const limit = options?.maxPages ? Math.min(options.maxPages, total) : total;
+    for (let i = 1; i <= limit; i++) {
+      pagesToRender.push(i);
+    }
+  }
+
+  const scale = options?.scale ?? 1.8;
+  const results: Array<{ pageNumber: number; dataUrl: string; width: number; height: number }> = [];
+
+  for (let idx = 0; idx < pagesToRender.length; idx++) {
+    const pNum = pagesToRender[idx];
+    options?.onProgress?.(idx + 1, pagesToRender.length);
+
+    const page = await pdfDoc.getPage(pNum);
+    const viewport = page.getViewport({ scale });
+
+    const canvas = document.createElement('canvas');
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+    const ctx = canvas.getContext('2d');
+
+    if (ctx) {
+      // @ts-ignore - pdfjs-dist typing
+      await page.render({ canvasContext: ctx, viewport }).promise;
+      const dataUrl = canvas.toDataURL('image/png');
+      results.push({
+        pageNumber: pNum,
+        dataUrl,
+        width: Math.round(viewport.width / (scale / 1.0)),
+        height: Math.round(viewport.height / (scale / 1.0)),
+      });
+    }
+  }
+
+  return results;
+}
+

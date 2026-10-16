@@ -40,7 +40,10 @@ import {
   ConnectorAnchor,
   ConnectorStyle,
   ConnectorArrowType,
+  CornellStudyMode,
+  CornellBlockConfig,
 } from '../types/notebook';
+import { renderPageToCanvas } from '../services/exportService';
 import { collaborationService } from '../services/collaborationService';
 import { db, initStorage, saveNotebookToDB, importNotebookFromNotefree } from '../services/storage';
 import {
@@ -161,6 +164,8 @@ interface NotebookStoreState {
   // Modals & Panels
   templateModalOpen: boolean;
   customTemplates: CustomTemplateItem[];
+  cornellStudyMode: CornellStudyMode;
+  cornellAssistantModalOpen: boolean;
   docImportModalOpen: boolean;
   newNotebookModalOpen: boolean;
   pageManagerModalOpen: boolean;
@@ -206,7 +211,9 @@ interface NotebookStoreState {
     title: string,
     coverColor: string,
     template?: PageTemplate,
-    coverStyle?: CoverStyle
+    coverStyle?: CoverStyle,
+    paperColor?: PaperColor,
+    customTemplateId?: string
   ) => Promise<string>;
   deleteNotebook: (id: string) => Promise<void>;
   updateNotebookTitle: (id: string, title: string) => Promise<void>;
@@ -226,7 +233,14 @@ interface NotebookStoreState {
     applyToAllPages?: boolean
   ) => Promise<void>;
   addCustomTemplate: (template: CustomTemplateItem) => void;
+  addCustomTemplates: (templates: CustomTemplateItem[]) => void;
+  renameCustomTemplate: (id: string, newName: string) => void;
   deleteCustomTemplate: (id: string) => void;
+  saveCurrentPageAsCustomTemplate: (name: string, category?: CustomTemplateItem['category']) => Promise<CustomTemplateItem | null>;
+  setCornellStudyMode: (mode: CornellStudyMode) => void;
+  toggleCornellStudyMode: () => void;
+  setCornellAssistantModalOpen: (open: boolean) => void;
+  stampCornellBlocksToPage: (pageIndex?: number, config?: CornellBlockConfig) => Promise<void>;
   updateCurrentPagePitch: (
     customPitch?: number,
     customLineColor?: string,
@@ -865,6 +879,8 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
       return [];
     }
   })(),
+  cornellStudyMode: 'none',
+  cornellAssistantModalOpen: false,
   docImportModalOpen: false,
   newNotebookModalOpen: false,
   pageManagerModalOpen: false,
@@ -1027,18 +1043,34 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
     title: string,
     coverColor: string,
     template: PageTemplate = 'lined',
-    coverStyle: CoverStyle = 'classic'
+    coverStyle: CoverStyle = 'classic',
+    paperColor: PaperColor = 'white',
+    customTemplateId?: string
   ) => {
     const newId = `nb_${Date.now()}`;
     const pageId = `pg_${Date.now()}_1`;
+    let backgroundImageUrl: string | undefined = undefined;
+    let width = 800;
+    let height = 1130;
+
+    if (customTemplateId) {
+      const customTpl = get().customTemplates.find((t) => t.id === customTemplateId);
+      if (customTpl) {
+        backgroundImageUrl = customTpl.dataUrl;
+        if (customTpl.width) width = customTpl.width;
+        if (customTpl.height) height = customTpl.height;
+      }
+    }
+
     const newPage: Page = {
       id: pageId,
       pageNumber: 1,
-      template,
-      paperColor: 'white',
+      template: customTemplateId ? 'blank' : template,
+      paperColor,
       strokes: [],
-      width: 800,
-      height: 1130,
+      backgroundImageUrl,
+      width,
+      height,
       title: 'Sayfa 1',
     };
 
@@ -1242,6 +1274,34 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
     });
   },
 
+  addCustomTemplates: (templates: CustomTemplateItem[]) => {
+    set((state) => {
+      const newIds = new Set(templates.map((t) => t.id));
+      const filteredExisting = state.customTemplates.filter((t) => !newIds.has(t.id));
+      const updated = [...templates, ...filteredExisting];
+      try {
+        localStorage.setItem('notefree_custom_templates', JSON.stringify(updated));
+      } catch (e) {
+        console.warn('Could not save custom templates to localStorage', e);
+      }
+      return { customTemplates: updated };
+    });
+  },
+
+  renameCustomTemplate: (id: string, newName: string) => {
+    set((state) => {
+      const updated = state.customTemplates.map((t) =>
+        t.id === id ? { ...t, name: newName.trim() || t.name } : t
+      );
+      try {
+        localStorage.setItem('notefree_custom_templates', JSON.stringify(updated));
+      } catch (e) {
+        console.warn('Could not update custom templates in localStorage', e);
+      }
+      return { customTemplates: updated };
+    });
+  },
+
   deleteCustomTemplate: (id: string) => {
     set((state) => {
       const updated = state.customTemplates.filter((t) => t.id !== id);
@@ -1252,6 +1312,151 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
       }
       return { customTemplates: updated };
     });
+  },
+
+  saveCurrentPageAsCustomTemplate: async (name: string, category: CustomTemplateItem['category'] = 'custom') => {
+    const { notebooks, activeNotebookId, activePageIndex, addCustomTemplate } = get();
+    const currentNotebook = notebooks.find((n) => n.id === activeNotebookId);
+    const currentPage = currentNotebook?.pages[activePageIndex];
+    if (!currentPage) return null;
+
+    try {
+      const canvas = await renderPageToCanvas(currentPage, {
+        scale: 1.5,
+        includeTemplate: true,
+        includeTexts: true,
+        includeStickers: true,
+        includeStickyNotes: true,
+      });
+      const dataUrl = canvas.toDataURL('image/png');
+      const newTemplate: CustomTemplateItem = {
+        id: `custom_tpl_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+        name: name.trim() || `${currentNotebook.title} - Sayfa ${activePageIndex + 1}`,
+        dataUrl,
+        width: currentPage.width,
+        height: currentPage.height,
+        createdAt: Date.now(),
+        category,
+        sourceFileName: currentNotebook.title,
+        pageNumber: activePageIndex + 1,
+      };
+      addCustomTemplate(newTemplate);
+      return newTemplate;
+    } catch (err) {
+      console.error('Failed to capture page as custom template', err);
+      return null;
+    }
+  },
+
+  setCornellStudyMode: (mode: CornellStudyMode) => {
+    set({ cornellStudyMode: mode });
+  },
+
+  toggleCornellStudyMode: () => {
+    set((state) => ({
+      cornellStudyMode:
+        state.cornellStudyMode === 'none'
+          ? 'hide-notes'
+          : state.cornellStudyMode === 'hide-notes'
+          ? 'hide-cues'
+          : 'none',
+    }));
+  },
+
+  setCornellAssistantModalOpen: (open: boolean) => {
+    set({ cornellAssistantModalOpen: open });
+  },
+
+  stampCornellBlocksToPage: async (pageIndex?: number, config?: CornellBlockConfig) => {
+    const { notebooks, activeNotebookId, activePageIndex } = get();
+    if (!activeNotebookId) return;
+    const currentNb = notebooks.find((n) => n.id === activeNotebookId);
+    if (!currentNb) return;
+    const targetIndex = pageIndex ?? activePageIndex;
+    const targetPage = currentNb.pages[targetIndex];
+    if (!targetPage) return;
+
+    const width = targetPage.width || 800;
+    const height = targetPage.height || 1100;
+    const headerY = 70;
+    const summaryY = height - 160;
+    const cueColX = 220;
+
+    const todayStr =
+      config?.date ||
+      new Date().toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' });
+    const courseStr = config?.course || 'Genel Konu & Ders';
+    const topicStr = config?.topic || 'Ders Başlığı';
+
+    const now = Date.now();
+    const isDark = targetPage.paperColor === 'dark';
+
+    const newAnnotations: TextAnnotation[] = [
+      // 1. Header Box
+      {
+        id: `txt_cornell_header_${now}`,
+        x: 35,
+        y: 16,
+        text: `📚 ${courseStr}   |   🎯 ${topicStr}   |   📅 ${todayStr}`,
+        fontSize: 15,
+        color: isDark ? '#93c5fd' : '#1e3a8a',
+        fontFamily: 'Inter',
+        width: Math.max(300, width - 70),
+      },
+      // 2. Cue Box
+      {
+        id: `txt_cornell_cue_${now + 1}`,
+        x: 35,
+        y: headerY + 12,
+        text:
+          config?.cues ||
+          `❓ İPUÇLARI / SORULAR:\n• Anahtar terimler\n• Hatırlatıcı kelimeler\n• Sınav sorusu: ...?`,
+        fontSize: 14,
+        color: isDark ? '#fcd34d' : '#b45309',
+        fontFamily: 'Inter',
+        width: cueColX - 45,
+      },
+      // 3. Notes Box
+      {
+        id: `txt_cornell_notes_${now + 2}`,
+        x: cueColX + 15,
+        y: headerY + 12,
+        text:
+          config?.notes ||
+          `📝 DERS NOTLARI:\n1. Ana fikirler ve detaylar\n2. Tanımlar ve formüller\n3. Adım adım açıklamalar`,
+        fontSize: 15,
+        color: isDark ? '#f8fafc' : '#0f172a',
+        fontFamily: 'Inter',
+        width: width - cueColX - 50,
+      },
+      // 4. Summary Box
+      {
+        id: `txt_cornell_summary_${now + 3}`,
+        x: 35,
+        y: summaryY + 12,
+        text:
+          config?.summary ||
+          `📌 ÖZET (2-3 Cümle):\nBu sayfanın en kritik çıkarımı ve temel ana fikri burada sentezlenir.`,
+        fontSize: 14,
+        color: isDark ? '#86efac' : '#15803d',
+        fontFamily: 'Inter',
+        width: Math.max(300, width - 70),
+      },
+    ];
+
+    const updatedPage = {
+      ...targetPage,
+      template: 'cornell' as PageTemplate,
+      texts: [...(targetPage.texts || []), ...newAnnotations],
+    };
+
+    const updatedPages = currentNb.pages.map((p, idx) => (idx === targetIndex ? updatedPage : p));
+    const updatedNotebook = { ...currentNb, pages: updatedPages, updatedAt: Date.now() };
+
+    set({
+      notebooks: notebooks.map((n) => (n.id === activeNotebookId ? updatedNotebook : n)),
+    });
+    await saveNotebookToDB(updatedNotebook);
   },
 
   updateCurrentPagePitch: async (

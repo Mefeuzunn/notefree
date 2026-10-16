@@ -19,6 +19,7 @@ import { OutlineDrawer } from './components/modals/OutlineDrawer';
 import { CollaborationModal } from './components/modals/CollaborationModal';
 import { FloatingScratchpad } from './components/scratchpad/FloatingScratchpad';
 import { ShortcutsModal } from './components/modals/ShortcutsModal';
+import { CornellAssistantModal } from './components/modals/CornellAssistantModal';
 import { PresentationHUD } from './components/presentation/PresentationHUD';
 import {
   BookOpen,
@@ -109,6 +110,7 @@ export const App: React.FC = () => {
 
       {/* 5. Global Modals & Drawers */}
       <TemplateSelectorModal />
+      <CornellAssistantModal />
       <DocImportModal />
       <NewNotebookModal />
       <StickersDrawer />
