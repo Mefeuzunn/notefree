@@ -33,6 +33,7 @@ import { ExportModal } from './modals/ExportModal';
 import { MarginStudyWorkspace } from './margin/MarginStudyWorkspace';
 import { TapeQuizToolbar } from './canvas/TapeQuizToolbar';
 import { PageScrubberBar } from './navigation/PageScrubberBar';
+import { triggerHaptic } from '../engine/hapticFeedback';
 
 export const NotebookWorkspace: React.FC = () => {
   const {
@@ -119,6 +120,7 @@ export const NotebookWorkspace: React.FC = () => {
         }
       }
       if (nextIdx !== activePageIndex) {
+        triggerHaptic('medium');
         setPageFlipDirection(direction);
         setActivePageIndex(nextIdx);
         setTimeout(() => setPageFlipDirection(null), 300);

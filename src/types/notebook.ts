@@ -47,7 +47,8 @@ export type PageTemplate =
   | 'engineering-1mm'
   | 'language-vocab'
   | 'guitar-tab'
-  | 'planner-habit';
+  | 'planner-habit'
+  | 'tianzige-kanji';
 
 export type PaperColor = 'white' | 'cream' | 'yellow-pad' | 'dark' | 'kraft';
 

@@ -13,6 +13,7 @@ import {
   Sparkles,
   RotateCcw,
 } from 'lucide-react';
+import { triggerHaptic } from '../../engine/hapticFeedback';
 
 export const TapeQuizToolbar: React.FC = () => {
   const {
@@ -62,6 +63,7 @@ export const TapeQuizToolbar: React.FC = () => {
   const isRevealed = activeTape?.isRevealed;
 
   const handleRate = (rating: 'good' | 'hard' | 'again') => {
+    triggerHaptic(rating === 'good' ? 'success' : 'medium');
     setScore((prev) => ({
       ...prev,
       [rating]: prev[rating] + 1,
@@ -70,6 +72,7 @@ export const TapeQuizToolbar: React.FC = () => {
   };
 
   const handleResetQuiz = () => {
+    triggerHaptic('light');
     setScore({ good: 0, hard: 0, again: 0 });
     hideAllTapes(activePageIndex);
   };
@@ -111,7 +114,10 @@ export const TapeQuizToolbar: React.FC = () => {
 
         {/* Current Tape Reveal / Hide Toggle */}
         <button
-          onClick={() => toggleTapeReveal(activePageIndex, activeTape.id)}
+          onClick={() => {
+            triggerHaptic('light');
+            toggleTapeReveal(activePageIndex, activeTape.id);
+          }}
           className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all shadow-sm ${
             isRevealed
               ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 hover:bg-amber-500/30'

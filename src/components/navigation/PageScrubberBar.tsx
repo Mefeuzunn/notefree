@@ -13,6 +13,7 @@ import {
   LayoutGrid,
   Bookmark,
 } from 'lucide-react';
+import { triggerHaptic } from '../../engine/hapticFeedback';
 
 interface MiniPagePreviewProps {
   page: Page;
@@ -119,12 +120,22 @@ export const PageScrubberBar: React.FC = () => {
     return Math.min(totalPages - 1, Math.floor(ratio * totalPages));
   };
 
+  const jumpTo = (idx: number) => {
+    if (idx >= 0 && idx < totalPages && idx !== activePageIndex) {
+      triggerHaptic('light');
+      setActivePageIndex(idx);
+    }
+  };
+
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     e.stopPropagation();
     setIsScrubbing(true);
     const idx = getIndexFromPointer(e.clientX);
     setHoverIndex(idx);
-    setActivePageIndex(idx);
+    if (idx !== activePageIndex) {
+      triggerHaptic('light');
+      setActivePageIndex(idx);
+    }
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
   };
 
@@ -133,7 +144,10 @@ export const PageScrubberBar: React.FC = () => {
       e.stopPropagation();
       const idx = getIndexFromPointer(e.clientX);
       setHoverIndex(idx);
-      setActivePageIndex(idx);
+      if (idx !== activePageIndex) {
+        triggerHaptic('light');
+        setActivePageIndex(idx);
+      }
     } else {
       const idx = getIndexFromPointer(e.clientX);
       setHoverIndex(idx);
@@ -189,7 +203,7 @@ export const PageScrubberBar: React.FC = () => {
       <div className="bg-slate-900/95 text-white px-3 py-2 rounded-2xl border border-slate-700/80 shadow-2xl backdrop-blur-md flex items-center gap-2 ring-1 ring-black/10">
         {/* Quick Jump: First Page */}
         <button
-          onClick={() => setActivePageIndex(0)}
+          onClick={() => jumpTo(0)}
           disabled={activePageIndex === 0}
           className={`p-1.5 rounded-lg transition-colors ${
             activePageIndex > 0
@@ -203,7 +217,7 @@ export const PageScrubberBar: React.FC = () => {
 
         {/* Previous Page */}
         <button
-          onClick={() => setActivePageIndex(Math.max(0, activePageIndex - 1))}
+          onClick={() => jumpTo(activePageIndex - 1)}
           disabled={activePageIndex === 0}
           className={`p-1.5 rounded-lg transition-colors ${
             activePageIndex > 0
@@ -261,7 +275,7 @@ export const PageScrubberBar: React.FC = () => {
 
         {/* Next Page */}
         <button
-          onClick={() => setActivePageIndex(Math.min(totalPages - 1, activePageIndex + 1))}
+          onClick={() => jumpTo(activePageIndex + 1)}
           disabled={activePageIndex >= totalPages - 1}
           className={`p-1.5 rounded-lg transition-colors ${
             activePageIndex < totalPages - 1
@@ -275,7 +289,7 @@ export const PageScrubberBar: React.FC = () => {
 
         {/* Quick Jump: Last Page */}
         <button
-          onClick={() => setActivePageIndex(totalPages - 1)}
+          onClick={() => jumpTo(totalPages - 1)}
           disabled={activePageIndex >= totalPages - 1}
           className={`p-1.5 rounded-lg transition-colors ${
             activePageIndex < totalPages - 1
@@ -296,7 +310,10 @@ export const PageScrubberBar: React.FC = () => {
 
         {/* Bookmark Star Toggle */}
         <button
-          onClick={() => togglePageBookmark(activePageIndex)}
+          onClick={() => {
+            triggerHaptic('light');
+            togglePageBookmark(activePageIndex);
+          }}
           className={`p-1.5 rounded-lg transition-colors ${
             currentPage?.isBookmarked
               ? 'text-amber-400 hover:bg-slate-800'

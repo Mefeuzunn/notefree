@@ -562,6 +562,67 @@ export function drawPaperTemplate(
       ctx.restore();
       break;
     }
+
+    case 'tianzige-kanji': {
+      // East Asian Character Grid (Tianzige 田字格 & Miyige 米字格)
+      const cellSize = customPitch && customPitch >= 36 && customPitch <= 90 ? customPitch : 54;
+      const startX = 45;
+      const startY = 85;
+      const cols = Math.floor((width - startX * 2) / cellSize);
+      const rows = Math.floor((height - startY - 40) / cellSize);
+
+      ctx.save();
+      // Header
+      ctx.font = 'bold 12px Inter, sans-serif';
+      ctx.fillStyle = palette.text;
+      ctx.fillText('🈯 DOĞU ASYA KARAKTER & KANJİ ÇALIŞMA DEFTERİ (TIANZIGE)', 45, 45);
+
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          const cellX = startX + c * cellSize;
+          const cellY = startY + r * cellSize;
+
+          // Outer solid square border
+          ctx.strokeStyle = activeLineColor;
+          ctx.lineWidth = 1.0;
+          ctx.setLineDash([]);
+          ctx.strokeRect(cellX, cellY, cellSize, cellSize);
+
+          // Inner dashed cross (田字格)
+          ctx.save();
+          ctx.strokeStyle = activeLineColor;
+          ctx.lineWidth = 0.6;
+          ctx.setLineDash([3, 3]);
+
+          // Horizontal midline
+          ctx.beginPath();
+          ctx.moveTo(cellX, cellY + cellSize / 2);
+          ctx.lineTo(cellX + cellSize, cellY + cellSize / 2);
+          ctx.stroke();
+
+          // Vertical midline
+          ctx.beginPath();
+          ctx.moveTo(cellX + cellSize / 2, cellY);
+          ctx.lineTo(cellX + cellSize / 2, cellY + cellSize);
+          ctx.stroke();
+
+          // Subtle diagonal guidelines (米字格)
+          ctx.lineWidth = 0.4;
+          ctx.setLineDash([2, 4]);
+          ctx.beginPath();
+          ctx.moveTo(cellX, cellY);
+          ctx.lineTo(cellX + cellSize, cellY + cellSize);
+          ctx.moveTo(cellX + cellSize, cellY);
+          ctx.lineTo(cellX, cellY + cellSize);
+          ctx.stroke();
+
+          ctx.restore();
+        }
+      }
+
+      ctx.restore();
+      break;
+    }
   }
 
   ctx.restore();

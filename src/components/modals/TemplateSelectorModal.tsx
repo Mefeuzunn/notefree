@@ -48,6 +48,7 @@ const TEMPLATES: TemplateItem[] = [
 
   // Language & Creative
   { id: 'language-vocab', name: 'Dil & Kelime Defteri', desc: '3 sütunlu Kelime | Anlam | Cümle şablonu', icon: '🌍', category: 'creative' },
+  { id: 'tianzige-kanji', name: 'Asya Karakterleri (Tianzige & Kanji)', desc: 'Çince Hanzi ve Japonca Kanji kare kılavuzu', icon: '🈯', category: 'creative' },
   { id: 'guitar-tab', name: 'Gitar Tablatür (TAB)', desc: '6 telli gitar ve bas nota portesi', icon: '🎸', category: 'creative' },
   { id: 'music', name: 'Müzik Portesi (Dizek)', desc: 'Klasik 5 çizgili nota ve beste yazımı', icon: '🎵', category: 'creative' },
 ];

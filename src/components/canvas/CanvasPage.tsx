@@ -37,6 +37,7 @@ import { ShapeNodeEditor } from './ShapeNodeEditor';
 import { getSnapToRulerPoint, formatRulerMeasurement } from '../../engine/rulerHelper';
 import { collaborationService } from '../../services/collaborationService';
 import { HandwritingOcrModal } from '../modals/HandwritingOcrModal';
+import { triggerHaptic } from '../../engine/hapticFeedback';
 import {
   Move,
   RotateCw,
@@ -155,6 +156,11 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
   const hasStylusUsedRef = useRef<boolean>(false);
   const lastPenTapRef = useRef<{ time: number; x: number; y: number } | null>(null);
   const [selectedShapeStrokeId, setSelectedShapeStrokeId] = useState<string | null>(null);
+
+  // FAZ T: Hold-to-Lasso Gesture Refs
+  const holdToLassoTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const holdAnchorPointRef = useRef<{ x: number; y: number } | null>(null);
+  const didTriggerHoldToLassoRef = useRef<boolean>(false);
 
   // Faz 1 interactive states
   const [eyedropperLoupe, setEyedropperLoupe] = useState<{ x: number; y: number; hex: string } | null>(null);
@@ -516,6 +522,14 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
     setActivePageIndex(pageIndex);
     e.currentTarget.setPointerCapture(e.pointerId);
 
+    // Reset FAZ T Hold-to-Lasso gesture state
+    didTriggerHoldToLassoRef.current = false;
+    if (holdToLassoTimerRef.current) {
+      clearTimeout(holdToLassoTimerRef.current);
+      holdToLassoTimerRef.current = null;
+    }
+    holdAnchorPointRef.current = null;
+
     let { x, y } = getCanvasCoords(e);
 
     // FAZ P: Ruler Magnetic Edge Snapping
@@ -745,6 +759,7 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
       return;
     }
 
+    if (didTriggerHoldToLassoRef.current) return;
     if (!isDrawing) return;
 
     if (activeTool === 'eraser') {
@@ -761,6 +776,71 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
       tiltX: e.tiltX,
       tiltY: e.tiltY,
     });
+
+    // 🎯 FAZ T: GoodNotes-Style Hold-to-Lasso Gesture Detection
+    const penTools = ['pen', 'ballpoint', 'fountain', 'brush', 'highlighter', 'pencil', 'fineliner'];
+    if (penTools.includes(activeTool) && currentPointsRef.current.length >= 10) {
+      const startPt = currentPointsRef.current[0];
+      const distToStart = Math.hypot(x - startPt.x, y - startPt.y);
+
+      // Check if current drawing point is close to start point (closed loop)
+      if (distToStart < 55) {
+        if (!holdToLassoTimerRef.current) {
+          holdAnchorPointRef.current = { x, y };
+          holdToLassoTimerRef.current = setTimeout(() => {
+            const polygon = [...currentPointsRef.current];
+            const capturedStrokes = page.strokes.filter((s) => isStrokeCapturedByLasso(s, polygon));
+
+            if (capturedStrokes.length > 0) {
+              didTriggerHoldToLassoRef.current = true;
+              triggerHaptic('selection');
+
+              // Clear temporary ink from live preview canvas
+              const live = liveCanvasRef.current;
+              if (live) {
+                const liveCtx = live.getContext('2d');
+                if (liveCtx) liveCtx.clearRect(0, 0, live.width, live.height);
+              }
+
+              const bounds = computeGroupBounds(capturedStrokes);
+              setLassoSelection({
+                pageId: page.id,
+                strokeIds: capturedStrokes.map((s) => s.id),
+                bounds,
+                originalStrokes: capturedStrokes,
+                offsetX: 0,
+                offsetY: 0,
+                scaleX: 1,
+                scaleY: 1,
+                rotation: 0,
+              });
+
+              setActiveTool('lasso');
+              setIsDrawing(false);
+              currentPointsRef.current = [];
+              setToastMessage('🎯 Daire İle Kement Seçildi!');
+              setTimeout(() => setToastMessage(null), 1800);
+            }
+            holdToLassoTimerRef.current = null;
+            holdAnchorPointRef.current = null;
+          }, 420);
+        } else if (holdAnchorPointRef.current) {
+          // If pen moved more than 20px during the pause, cancel the timer
+          const moveFromAnchor = Math.hypot(x - holdAnchorPointRef.current.x, y - holdAnchorPointRef.current.y);
+          if (moveFromAnchor > 20) {
+            clearTimeout(holdToLassoTimerRef.current);
+            holdToLassoTimerRef.current = null;
+            holdAnchorPointRef.current = null;
+          }
+        }
+      } else {
+        if (holdToLassoTimerRef.current) {
+          clearTimeout(holdToLassoTimerRef.current);
+          holdToLassoTimerRef.current = null;
+          holdAnchorPointRef.current = null;
+        }
+      }
+    }
 
     // Live Collaboration: Broadcast cursor and stroke points
     if (collaboration.isConnected) {
@@ -977,6 +1057,21 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
 
   // Pointer Up
   const handlePointerUp = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (holdToLassoTimerRef.current) {
+      clearTimeout(holdToLassoTimerRef.current);
+      holdToLassoTimerRef.current = null;
+    }
+    holdAnchorPointRef.current = null;
+
+    if (didTriggerHoldToLassoRef.current) {
+      didTriggerHoldToLassoRef.current = false;
+      setIsDrawing(false);
+      lastPointRef.current = null;
+      setLiveRulerHUD(null);
+      currentPointsRef.current = [];
+      return;
+    }
+
     if (isDraggingLasso) {
       setIsDraggingLasso(false);
       setLassoDragStart(null);
@@ -1013,6 +1108,7 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
         );
 
         if (capturedStrokes.length > 0) {
+          triggerHaptic('selection');
           const bounds = computeGroupBounds(capturedStrokes);
           setLassoSelection({
             pageId: page.id,
@@ -1092,6 +1188,7 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
           committedShapeType = 'line';
           committedStart = pStart;
           committedEnd = pEnd;
+          triggerHaptic('snap');
         }
       }
     }
@@ -1149,6 +1246,7 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
         finalPoints = detected.replacementPoints;
         committedStart = finalPoints[0];
         committedEnd = finalPoints[finalPoints.length - 1];
+        triggerHaptic('snap');
       }
     }
 
