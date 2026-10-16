@@ -179,6 +179,13 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
   const [eyedropperLoupe, setEyedropperLoupe] = useState<{ x: number; y: number; hex: string } | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [audioRipple, setAudioRipple] = useState<{ x: number; y: number } | null>(null);
+  // FAZ Z: Scribble-to-Erase Dissolve Puff Particles Effect
+  const [erasePuffParticles, setErasePuffParticles] = useState<{
+    id: number;
+    x: number;
+    y: number;
+    particles: Array<{ dx: number; dy: number; size: number; color: string }>;
+  } | null>(null);
 
   // FAZ M: Stylus Action Handler (Double-Tap or Barrel Button)
   const executeStylusAction = useCallback(
@@ -798,9 +805,13 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
       tiltY: e.tiltY,
     });
 
-    // 🎯 FAZ T: GoodNotes-Style Hold-to-Lasso Gesture Detection
+    // 🎯 FAZ T & FAZ Z: GoodNotes-Style Hold-to-Lasso Gesture Detection
     const penTools = ['pen', 'ballpoint', 'fountain', 'brush', 'highlighter', 'pencil', 'fineliner'];
-    if (penTools.includes(activeTool) && currentPointsRef.current.length >= 10) {
+    if (
+      toolSettings.circleToLasso !== false &&
+      penTools.includes(activeTool) &&
+      currentPointsRef.current.length >= 10
+    ) {
       const startPt = currentPointsRef.current[0];
       const distToStart = Math.hypot(x - startPt.x, y - startPt.y);
 
@@ -1357,21 +1368,77 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
       return;
     }
 
-    // Smart Gesture: Scratch-out to Erase
-    if (activeTool !== 'shape') {
+    // ✍️ FAZ Z: GoodNotes 6 Smart Gesture: Scribble-to-Erase
+    if (activeTool !== 'shape' && toolSettings.scribbleToErase !== false) {
       const scratch = detectScratchOutGesture(currentPointsRef.current);
       if (scratch.isScratch && scratch.bounds) {
         const sb = scratch.bounds;
+        // Accurate stroke filter: bounds overlap AND at least one point is inside or very close to scribble bounds
         const strokesToErase = page.strokes.filter((s) => {
-          return (
-            s.bounds.maxX >= sb.minX &&
-            s.bounds.minX <= sb.maxX &&
-            s.bounds.maxY >= sb.minY &&
-            s.bounds.minY <= sb.maxY
+          const overlaps =
+            s.bounds.maxX >= sb.minX - 6 &&
+            s.bounds.minX <= sb.maxX + 6 &&
+            s.bounds.maxY >= sb.minY - 6 &&
+            s.bounds.minY <= sb.maxY + 6;
+          if (!overlaps) return false;
+          return s.points.some(
+            (p) =>
+              p.x >= sb.minX - 8 &&
+              p.x <= sb.maxX + 8 &&
+              p.y >= sb.minY - 8 &&
+              p.y <= sb.maxY + 8
           );
         });
-        if (strokesToErase.length > 0) {
-          eraseStrokesOnCurrentPage(strokesToErase.map((s) => s.id));
+
+        // Also check if any tapes overlap with the scribble
+        const tapesToErase = (page.tapes || []).filter((t) => {
+          return t.points.some(
+            (p) =>
+              p.x >= sb.minX - 8 &&
+              p.x <= sb.maxX + 8 &&
+              p.y >= sb.minY - 8 &&
+              p.y <= sb.maxY + 8
+          );
+        });
+
+        if (strokesToErase.length > 0 || tapesToErase.length > 0) {
+          if (strokesToErase.length > 0) {
+            eraseStrokesOnCurrentPage(strokesToErase.map((s) => s.id));
+          }
+          if (tapesToErase.length > 0) {
+            tapesToErase.forEach((t) => removeTapeFromCurrentPage(t.id));
+          }
+
+          // Trigger dissolve puff smoke particles
+          const center = scratch.center || {
+            x: (sb.minX + sb.maxX) / 2,
+            y: (sb.minY + sb.maxY) / 2,
+          };
+          const count = 10;
+          const particles = Array.from({ length: count }, (_, i) => {
+            const angle = (i / count) * Math.PI * 2 + (Math.random() - 0.5) * 0.4;
+            const speed = 20 + Math.random() * 26;
+            return {
+              dx: Math.cos(angle) * speed,
+              dy: Math.sin(angle) * speed,
+              size: 5 + Math.random() * 6,
+              color: ['#818cf8', '#a78bfa', '#38bdf8', '#cbd5e1', '#ffffff'][i % 5],
+            };
+          });
+
+          setErasePuffParticles({
+            id: Date.now(),
+            x: center.x,
+            y: center.y,
+            particles,
+          });
+          setTimeout(() => setErasePuffParticles(null), 550);
+
+          triggerHaptic('medium');
+          const totalErased = strokesToErase.length + tapesToErase.length;
+          setToastMessage(`🧹 Karalayarak Silindi (${totalErased} nesne)`);
+          setTimeout(() => setToastMessage(null), 1600);
+
           currentPointsRef.current = [];
           return;
         }
@@ -2205,6 +2272,40 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
         isOpen={ocrModalOpen}
         onClose={() => setOcrModalOpen(false)}
       />
+
+      {/* 💨 FAZ Z: Scribble-to-Erase Dissolve Puff Particles Effect */}
+      {erasePuffParticles && (
+        <div
+          className="absolute pointer-events-none z-40"
+          style={{
+            left: `${erasePuffParticles.x * scale}px`,
+            top: `${erasePuffParticles.y * scale}px`,
+          }}
+        >
+          {erasePuffParticles.particles.map((p, idx) => (
+            <span
+              key={idx}
+              className="absolute -translate-x-1/2 -translate-y-1/2 rounded-full shadow-md animate-ping"
+              style={{
+                width: `${Math.max(4, p.size * scale)}px`,
+                height: `${Math.max(4, p.size * scale)}px`,
+                backgroundColor: p.color,
+                transform: `translate(${p.dx * scale}px, ${p.dy * scale}px)`,
+                animationDuration: '550ms',
+                opacity: 0.85,
+              }}
+            />
+          ))}
+          <div
+            className="absolute -translate-x-1/2 -translate-y-1/2 rounded-full bg-indigo-500/30 animate-ping pointer-events-none"
+            style={{
+              width: `${36 * scale}px`,
+              height: `${36 * scale}px`,
+              animationDuration: '400ms',
+            }}
+          />
+        </div>
+      )}
     </div>
   );
 };

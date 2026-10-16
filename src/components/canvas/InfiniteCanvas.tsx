@@ -24,6 +24,7 @@ import {
 import { collaborationService } from '../../services/collaborationService';
 import { StickyNoteOverlay } from './StickyNoteOverlay';
 import { Compass, Move, Users, Maximize2, Sparkles } from 'lucide-react';
+import { triggerHaptic } from '../../engine/hapticFeedback';
 
 export const InfiniteCanvas: React.FC = () => {
   const {
@@ -444,6 +445,36 @@ export const InfiniteCanvas: React.FC = () => {
     if (activeTool === 'eraser' || currentPointsRef.current.length === 0) {
       currentPointsRef.current = [];
       return;
+    }
+
+    // ✍️ FAZ Z: Scribble-to-Erase on Infinite Canvas
+    if (activeTool !== 'shape' && toolSettings.scribbleToErase !== false) {
+      const scratch = detectScratchOutGesture(currentPointsRef.current);
+      if (scratch.isScratch && scratch.bounds) {
+        const sb = scratch.bounds;
+        const strokesToErase = strokes.filter((s) => {
+          const overlaps =
+            s.bounds.maxX >= sb.minX - 6 &&
+            s.bounds.minX <= sb.maxX + 6 &&
+            s.bounds.maxY >= sb.minY - 6 &&
+            s.bounds.minY <= sb.maxY + 6;
+          if (!overlaps) return false;
+          return s.points.some(
+            (p) =>
+              p.x >= sb.minX - 8 &&
+              p.x <= sb.maxX + 8 &&
+              p.y >= sb.minY - 8 &&
+              p.y <= sb.maxY + 8
+          );
+        });
+
+        if (strokesToErase.length > 0) {
+          eraseStrokesOnCurrentPage(strokesToErase.map((s) => s.id));
+          triggerHaptic('medium');
+          currentPointsRef.current = [];
+          return;
+        }
+      }
     }
 
     let finalPoints = [...currentPointsRef.current];

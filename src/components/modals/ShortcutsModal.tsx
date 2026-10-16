@@ -42,6 +42,13 @@ const NAV_SHORTCUTS: ShortcutItem[] = [
   { key: '⌘ + ⇧ + Z / Ctrl + Y', label: 'İleri Al', desc: 'Geri alınan işlemi tekrar uygula' },
 ];
 
+const GESTURE_SHORTCUTS: ShortcutItem[] = [
+  { key: 'Zikzak Karalama', label: 'Karalayarak Silme (Scribble-to-Erase)', desc: 'Silgiye geçmeden yanlış kelimenin/çizimin üzerini zikzak karalayarak anında sil' },
+  { key: 'Daire Çizip Bekleme', label: 'Daireyle Kement (Circle-to-Lasso)', desc: 'Kalemle bir öbeğin etrafına çember çizip 400ms bekleyerek otomatik kement seçimine dönüştür' },
+  { key: 'Çizip Bekleme', label: 'Şekil Sabitleme (Hold-to-Snap)', desc: 'Düz çizgi, ok, daire veya dikdörtgen çizip kalemi kaldırmadan bekleyince kusursuz şekle sabitle' },
+  { key: 'Çift Dokunma (Stylus)', label: 'Apple Pencil Çift Tıklama', desc: 'Kalem gövdesine çift dokunarak hızlıca Kalem / Silgi arasında geçiş yap' },
+];
+
 export const ShortcutsModal: React.FC<ShortcutsModalProps> = ({ isOpen, onClose }) => {
   if (!isOpen) return null;
 
@@ -151,6 +158,30 @@ export const ShortcutsModal: React.FC<ShortcutsModalProps> = ({ isOpen, onClose 
                     <div className="text-[11px] text-slate-400 truncate">{item.desc}</div>
                   </div>
                   <kbd className="px-2.5 py-1 bg-slate-950 text-emerald-300 font-mono text-xs font-bold rounded-lg border border-slate-700 shadow-sm shrink-0">
+                    {item.key}
+                  </kbd>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Section 4: Smart Stylus & Handwriting Gestures */}
+          <div>
+            <h3 className="text-xs font-bold text-violet-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+              <Sparkles size={14} />
+              <span>Akıllı El Yazısı & Kalem Jestleri (GoodNotes Stili)</span>
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              {GESTURE_SHORTCUTS.map((item) => (
+                <div
+                  key={item.key}
+                  className="flex items-center justify-between p-2.5 bg-slate-800/50 hover:bg-slate-800/80 rounded-xl border border-slate-700/50 transition-colors"
+                >
+                  <div className="min-w-0 pr-2">
+                    <div className="text-xs font-semibold text-slate-100">{item.label}</div>
+                    <div className="text-[11px] text-slate-400">{item.desc}</div>
+                  </div>
+                  <kbd className="px-2.5 py-1 bg-slate-950 text-violet-300 font-mono text-xs font-bold rounded-lg border border-slate-700 shadow-sm shrink-0 whitespace-nowrap">
                     {item.key}
                   </kbd>
                 </div>

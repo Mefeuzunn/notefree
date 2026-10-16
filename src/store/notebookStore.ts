@@ -232,6 +232,8 @@ interface NotebookStoreState {
   togglePalmRejection: () => void;
   toggleTiltShading: () => void;
   setStylusDoubleTapAction: (action: StylusDoubleTapAction) => void;
+  toggleScribbleToErase: () => void;
+  toggleCircleToLasso: () => void;
   addStrokeToCurrentPage: (stroke: Stroke) => void;
   addStrokesToCurrentPage: (strokes: Stroke[]) => void;
   eraseStrokesOnCurrentPage: (strokeIds: string[]) => void;
@@ -651,6 +653,8 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
     palmRejection: true,
     tiltShading: true,
     stylusDoubleTapAction: 'switch-eraser',
+    scribbleToErase: true,
+    circleToLasso: true,
   },
 
   presentationMode: false,
@@ -3794,6 +3798,24 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
       toolSettings: {
         ...state.toolSettings,
         stylusDoubleTapAction: action,
+      },
+    }));
+  },
+
+  toggleScribbleToErase: () => {
+    set((state) => ({
+      toolSettings: {
+        ...state.toolSettings,
+        scribbleToErase: state.toolSettings.scribbleToErase !== false ? false : true,
+      },
+    }));
+  },
+
+  toggleCircleToLasso: () => {
+    set((state) => ({
+      toolSettings: {
+        ...state.toolSettings,
+        circleToLasso: state.toolSettings.circleToLasso !== false ? false : true,
       },
     }));
   },

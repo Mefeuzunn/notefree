@@ -395,6 +395,8 @@ export interface ToolSettings {
   palmRejection?: boolean; // Reject single finger touches when stylus is active
   tiltShading?: boolean; // Enable broad graphite pencil shading when stylus is tilted
   stylusDoubleTapAction?: StylusDoubleTapAction; // Hardware / touch double tap action on stylus
+  scribbleToErase?: boolean; // GoodNotes 6 scribble gesture to erase strokes automatically
+  circleToLasso?: boolean; // Hold or complete circle loop with pen to convert to lasso selection
 }
 
 export type StylusDoubleTapAction =

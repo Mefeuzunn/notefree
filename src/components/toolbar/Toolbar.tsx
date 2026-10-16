@@ -146,6 +146,8 @@ export const Toolbar: React.FC = () => {
     togglePalmRejection,
     toggleTiltShading,
     setStylusDoubleTapAction,
+    toggleScribbleToErase,
+    toggleCircleToLasso,
     collaboration,
     setCollaborationModalOpen,
     protractorVisible,
@@ -962,6 +964,37 @@ export const Toolbar: React.FC = () => {
                     }`}
                   >
                     {toolSettings.tiltShading ? 'Aktif' : 'Kapalı'}
+                  </button>
+                </div>
+
+                {/* ✍️ FAZ Z: Scribble-to-Erase & Circle-to-Lasso Smart Gestures */}
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-slate-300 font-medium">Karalayarak Silme (Scribble)</span>
+                  <button
+                    type="button"
+                    onClick={toggleScribbleToErase}
+                    className={`px-2 py-0.5 rounded text-[11px] font-semibold border transition-all ${
+                      toolSettings.scribbleToErase !== false
+                        ? 'bg-indigo-600/30 border-indigo-500 text-indigo-300'
+                        : 'bg-slate-800 border-slate-700 text-slate-400'
+                    }`}
+                  >
+                    {toolSettings.scribbleToErase !== false ? 'Aktif' : 'Kapalı'}
+                  </button>
+                </div>
+
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-slate-300 font-medium">Daireyle Kement (Circle-to-Lasso)</span>
+                  <button
+                    type="button"
+                    onClick={toggleCircleToLasso}
+                    className={`px-2 py-0.5 rounded text-[11px] font-semibold border transition-all ${
+                      toolSettings.circleToLasso !== false
+                        ? 'bg-indigo-600/30 border-indigo-500 text-indigo-300'
+                        : 'bg-slate-800 border-slate-700 text-slate-400'
+                    }`}
+                  >
+                    {toolSettings.circleToLasso !== false ? 'Aktif' : 'Kapalı'}
                   </button>
                 </div>
 

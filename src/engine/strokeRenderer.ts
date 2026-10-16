@@ -320,40 +320,92 @@ export function drawTapeOnCanvas(ctx: CanvasRenderingContext2D, tape: TapeItem) 
 }
 
 /**
- * Detects scratch-out gesture (rapid zig-zag reversals over an area)
+ * Detects GoodNotes 6 scratch-out gesture (rapid multi-directional zig-zags over a word or drawing area)
  */
 export function detectScratchOutGesture(
   points: StrokePoint[]
-): { isScratch: boolean; bounds?: StrokeBounds } {
-  if (points.length < 10) return { isScratch: false };
+): { isScratch: boolean; bounds?: StrokeBounds; center?: { x: number; y: number } } {
+  if (points.length < 8) return { isScratch: false };
 
-  const duration = (points[points.length - 1].timestamp || 0) - (points[0].timestamp || 0);
-  if (duration > 1500) return { isScratch: false };
+  const startTimestamp = points[0].timestamp || 0;
+  const endTimestamp = points[points.length - 1].timestamp || 0;
+  const duration = endTimestamp > startTimestamp ? endTimestamp - startTimestamp : 0;
+  // Scribble gesture must be reasonably quick (within 2.5s)
+  if (duration > 2500) return { isScratch: false };
 
-  // Count horizontal direction changes
-  let directionChanges = 0;
-  let lastDirection = 0;
+  // Calculate total stroke path length
+  let totalLength = 0;
+  for (let i = 1; i < points.length; i++) {
+    totalLength += Math.hypot(points[i].x - points[i - 1].x, points[i].y - points[i - 1].y);
+  }
+
+  // Calculate bounds
+  const bounds = calculateStrokeBounds(points, 12);
+  const width = bounds.maxX - bounds.minX;
+  const height = bounds.maxY - bounds.minY;
+  const diagonal = Math.hypot(width, height);
+
+  // Must be reasonably compact area (not sweeping across the entire page, but larger than a single letter dot)
+  if (diagonal < 20 || width > 480 || height > 320) {
+    return { isScratch: false };
+  }
+
+  // Count reversals along X axis (horizontal zig-zags)
+  let xReversals = 0;
+  let lastXDir = 0;
+  // Count reversals along Y axis (vertical zig-zags)
+  let yReversals = 0;
+  let lastYDir = 0;
+  // Count angular reversals (turn angle > 100 degrees)
+  let angularReversals = 0;
 
   for (let i = 2; i < points.length; i++) {
     const dx = points[i].x - points[i - 1].x;
+    const dy = points[i].y - points[i - 1].y;
+
     if (Math.abs(dx) > 3) {
-      const dir = dx > 0 ? 1 : -1;
-      if (lastDirection !== 0 && dir !== lastDirection) {
-        directionChanges++;
+      const dirX = dx > 0 ? 1 : -1;
+      if (lastXDir !== 0 && dirX !== lastXDir) {
+        xReversals++;
       }
-      lastDirection = dir;
+      lastXDir = dirX;
+    }
+
+    if (Math.abs(dy) > 3) {
+      const dirY = dy > 0 ? 1 : -1;
+      if (lastYDir !== 0 && dirY !== lastYDir) {
+        yReversals++;
+      }
+      lastYDir = dirY;
+    }
+
+    // Angular reversal: check angle between (p[i-2] -> p[i-1]) and (p[i-1] -> p[i])
+    const v1x = points[i - 1].x - points[i - 2].x;
+    const v1y = points[i - 1].y - points[i - 2].y;
+    const l1 = Math.hypot(v1x, v1y);
+    const l2 = Math.hypot(dx, dy);
+    if (l1 > 3 && l2 > 3) {
+      const cosTheta = (v1x * dx + v1y * dy) / (l1 * l2);
+      if (cosTheta < -0.2) {
+        angularReversals++;
+      }
     }
   }
 
-  // If there are at least 4 rapid zig-zags in a compact box
-  if (directionChanges >= 4) {
-    const bounds = calculateStrokeBounds(points, 15);
-    const width = bounds.maxX - bounds.minX;
-    const height = bounds.maxY - bounds.minY;
+  // Density ratio: total length traveled compared to diagonal
+  const densityRatio = totalLength / Math.max(diagonal, 20);
 
-    if (width < 320 && height < 180) {
-      return { isScratch: true, bounds };
-    }
+  // Conditions for a scribble:
+  // 1. High inking density (traversed back and forth across the box multiple times)
+  // 2. At least 3 sharp reversals (horizontal, vertical, or angular)
+  const maxReversals = Math.max(xReversals, yReversals, angularReversals);
+
+  if (maxReversals >= 3 && densityRatio >= 2.0) {
+    const center = {
+      x: (bounds.minX + bounds.maxX) / 2,
+      y: (bounds.minY + bounds.maxY) / 2,
+    };
+    return { isScratch: true, bounds, center };
   }
 
   return { isScratch: false };
