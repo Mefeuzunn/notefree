@@ -69,42 +69,60 @@ export function detectGeometricShape(
   }
 
   const directDist = Math.hypot(end.x - start.x, end.y - start.y);
-  if (totalLength < 20) return null;
+
+  // Geometric shapes must have a minimum deliberate stroke length (handwriting strokes/letters are smaller)
+  if (totalLength < 45) return null;
+
+  // Bounding box calculation
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  let sumX = 0, sumY = 0;
+  for (const p of points) {
+    if (p.x < minX) minX = p.x;
+    if (p.y < minY) minY = p.y;
+    if (p.x > maxX) maxX = p.x;
+    if (p.y > maxY) maxY = p.y;
+    sumX += p.x;
+    sumY += p.y;
+  }
+  const width = maxX - minX;
+  const height = maxY - minY;
+  const cx = sumX / points.length;
+  const cy = sumY / points.length;
 
   // 1. Straight Line Check
+  // Must be reasonably long (directDist >= 35) and straight (ratio > 0.92)
   const straightness = directDist / totalLength;
-  if (straightness > 0.88) {
-    const snapped = applyPrecisionSnapping(
-      start,
-      end,
-      options?.angleSnap ?? true,
-      options?.gridSnap ?? false,
-      options?.gridSize ?? 20
-    );
-    return {
-      type: 'line',
-      replacementPoints: interpolateLine(snapped.start, snapped.end),
-    };
+  if (straightness > 0.92 && directDist >= 35) {
+    // Check maximum perpendicular deviation to reject wavy / curved strokes (e.g. S, C, J curves)
+    const dx = end.x - start.x;
+    const dy = end.y - start.y;
+    let maxPerpDist = 0;
+    for (const p of points) {
+      const perp = Math.abs(dy * p.x - dx * p.y + end.x * start.y - end.y * start.x) / directDist;
+      if (perp > maxPerpDist) maxPerpDist = perp;
+    }
+
+    if (maxPerpDist / directDist < 0.12) {
+      const snapped = applyPrecisionSnapping(
+        start,
+        end,
+        options?.angleSnap ?? true,
+        options?.gridSnap ?? false,
+        options?.gridSize ?? 20
+      );
+      return {
+        type: 'line',
+        replacementPoints: interpolateLine(snapped.start, snapped.end),
+      };
+    }
   }
 
-  // 2. Closed Loop Check (Circle or Rectangle)
-  const isClosed = directDist / totalLength < 0.22;
+  // 2. Closed Loop Shapes (Circle/Ellipse, Triangle, Rectangle)
+  // Closed loop: start and end points meet or come close together
+  const isClosed = directDist / totalLength < 0.25;
   if (isClosed) {
-    // Calculate bounding box and centroid
-    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-    let sumX = 0, sumY = 0;
-    for (const p of points) {
-      if (p.x < minX) minX = p.x;
-      if (p.y < minY) minY = p.y;
-      if (p.x > maxX) maxX = p.x;
-      if (p.y > maxY) maxY = p.y;
-      sumX += p.x;
-      sumY += p.y;
-    }
-    const cx = sumX / points.length;
-    const cy = sumY / points.length;
-    const width = maxX - minX;
-    const height = maxY - minY;
+    // Deliberate geometric shapes must have meaningful dimensions
+    if (width < 30 || height < 30 || totalLength < 80) return null;
 
     // Check circularity (variance of distance from centroid)
     let avgDist = 0;
@@ -120,18 +138,96 @@ export function detectGeometricShape(
     }
     const relativeVariance = variance / (points.length * avgDist);
 
-    if (relativeVariance < 0.18) {
-      // Circle / Ellipse
+    // Approximate perimeter of ellipse
+    const approxPerimeter = (Math.PI * (width + height)) / 2;
+    const lengthRatio = totalLength / approxPerimeter;
+
+    // A clean circle / ellipse has low radial variance and single-loop perimeter ratio (~0.70 to 1.40)
+    if (relativeVariance < 0.18 && lengthRatio >= 0.70 && lengthRatio <= 1.40) {
+      // If width and height are within 15% of each other, snap to perfect circle
+      const isNearEqual = Math.abs(width - height) / Math.max(width, height) < 0.15;
+      const rx = isNearEqual ? (width + height) / 4 : width / 2;
+      const ry = isNearEqual ? (width + height) / 4 : height / 2;
+
       return {
         type: 'circle',
-        replacementPoints: generateEllipsePoints(cx, cy, width / 2, height / 2),
+        replacementPoints: generateEllipsePoints(cx, cy, rx, ry),
       };
-    } else {
-      // Approximate Rectangle
+    }
+
+    // Check for Triangle (3 distinct corners)
+    const cornerCandidates: { pt: StrokePoint; idx: number }[] = [];
+    const step = Math.max(2, Math.floor(points.length / 20));
+    for (let i = step; i < points.length - step; i += step) {
+      const prev = points[i - step];
+      const curr = points[i];
+      const next = points[i + step];
+      const v1 = { x: curr.x - prev.x, y: curr.y - prev.y };
+      const v2 = { x: next.x - curr.x, y: next.y - curr.y };
+      const dot = v1.x * v2.x + v1.y * v2.y;
+      const mag1 = Math.hypot(v1.x, v1.y);
+      const mag2 = Math.hypot(v2.x, v2.y);
+      if (mag1 > 0 && mag2 > 0) {
+        const cosAngle = Math.max(-1, Math.min(1, dot / (mag1 * mag2)));
+        if (cosAngle < 0.6) {
+          cornerCandidates.push({ pt: curr, idx: i });
+        }
+      }
+    }
+
+    const clusteredCorners: StrokePoint[] = [];
+    for (const c of cornerCandidates) {
+      if (clusteredCorners.length === 0) {
+        clusteredCorners.push(c.pt);
+      } else {
+        const last = clusteredCorners[clusteredCorners.length - 1];
+        if (Math.hypot(c.pt.x - last.x, c.pt.y - last.y) > 25) {
+          clusteredCorners.push(c.pt);
+        }
+      }
+    }
+
+    if (clusteredCorners.length === 3) {
       return {
-        type: 'rectangle',
-        replacementPoints: generateRectanglePoints(minX, minY, maxX, maxY),
+        type: 'triangle',
+        replacementPoints: generateFreeTrianglePoints(
+          clusteredCorners[0],
+          clusteredCorners[1],
+          clusteredCorners[2]
+        ),
       };
+    }
+
+    // Check for Rectangle
+    // 1) All 4 bounding box corners must be visited (points exist in 4 quadrants)
+    const cornerTolerance = Math.min(width, height) * 0.35;
+    const hasTL = points.some((p) => Math.hypot(p.x - minX, p.y - minY) < cornerTolerance);
+    const hasTR = points.some((p) => Math.hypot(p.x - maxX, p.y - minY) < cornerTolerance);
+    const hasBR = points.some((p) => Math.hypot(p.x - maxX, p.y - maxY) < cornerTolerance);
+    const hasBL = points.some((p) => Math.hypot(p.x - minX, p.y - maxY) < cornerTolerance);
+
+    if (hasTL && hasTR && hasBR && hasBL) {
+      // 2) Points must lie close to the 4 edges of the bounding box
+      let totalEdgeDist = 0;
+      for (const p of points) {
+        const d = Math.min(
+          Math.abs(p.x - minX),
+          Math.abs(p.x - maxX),
+          Math.abs(p.y - minY),
+          Math.abs(p.y - maxY)
+        );
+        totalEdgeDist += d;
+      }
+      const avgEdgeDist = totalEdgeDist / points.length;
+      const normalizedEdgeError = avgEdgeDist / Math.min(width, height);
+
+      // Low error means points hug the 4 perimeter edges
+      if (normalizedEdgeError < 0.16) {
+        return {
+          type: 'rectangle',
+          replacementPoints: generateRectanglePoints(minX, minY, maxX, maxY),
+        };
+      }
     }
   }
 

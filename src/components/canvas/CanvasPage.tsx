@@ -1679,19 +1679,7 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
           break;
       }
     } else if (committedShapeType) {
-      // Shape was already committed via Hold-to-Snap or Ruler, no need to re-detect
-    } else if (toolSettings.autoDetectShape) {
-      const detected = detectGeometricShape(finalPoints, {
-        angleSnap: toolSettings.angleSnap,
-        gridSnap: toolSettings.gridSnap,
-      });
-      if (detected) {
-        committedShapeType = detected.type;
-        finalPoints = detected.replacementPoints;
-        committedStart = finalPoints[0];
-        committedEnd = finalPoints[finalPoints.length - 1];
-        triggerHaptic('snap');
-      }
+      // Shape was already committed via Hold-to-Snap or Ruler
     }
 
     // Build control nodes for editable shape vertices (Faz I)

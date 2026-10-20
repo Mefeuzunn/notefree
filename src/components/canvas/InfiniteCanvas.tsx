@@ -78,6 +78,9 @@ export const InfiniteCanvas: React.FC = () => {
   const lastPointRef = useRef<{ x: number; y: number; time: number } | null>(null);
   const spacePressedRef = useRef<boolean>(false);
   const hasStylusUsedRef = useRef<boolean>(false);
+  const holdToShapeTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const holdToShapeAnchorRef = useRef<{ x: number; y: number } | null>(null);
+  const snappedShapePointsRef = useRef<StrokePoint[] | null>(null);
 
   // Track space key for click-to-pan
   useEffect(() => {
@@ -444,6 +447,38 @@ export const InfiniteCanvas: React.FC = () => {
     };
     currentPointsRef.current.push(pt);
 
+    // Hold-to-Snap gesture on infinite canvas
+    const penTools = ['ballpoint', 'fountain', 'brush', 'calligraphy', 'gel', 'highlighter'];
+    if (toolSettings.autoDetectShape && penTools.includes(activeTool as any)) {
+      if (!snappedShapePointsRef.current) {
+        if (currentPointsRef.current.length >= 8) {
+          if (!holdToShapeTimerRef.current) {
+            holdToShapeAnchorRef.current = { x, y };
+            holdToShapeTimerRef.current = setTimeout(() => {
+              if (currentPointsRef.current.length >= 8) {
+                const detected = detectGeometricShape(currentPointsRef.current, {
+                  angleSnap: toolSettings.angleSnap,
+                  gridSnap: toolSettings.gridSnap,
+                });
+                if (detected) {
+                  snappedShapePointsRef.current = detected.replacementPoints;
+                  triggerHaptic('snap');
+                }
+              }
+              holdToShapeTimerRef.current = null;
+            }, 430);
+          } else if (holdToShapeAnchorRef.current) {
+            const dist = Math.hypot(x - holdToShapeAnchorRef.current.x, y - holdToShapeAnchorRef.current.y);
+            if (dist > 18) {
+              clearTimeout(holdToShapeTimerRef.current);
+              holdToShapeTimerRef.current = null;
+              holdToShapeAnchorRef.current = { x, y };
+            }
+          }
+        }
+      }
+    }
+
     // Broadcast live stroke points to collaboration peers
     if (collaboration.isConnected) {
       collaborationService.broadcastLiveStrokePoints(
@@ -536,7 +571,19 @@ export const InfiniteCanvas: React.FC = () => {
       }
     }
 
+    if (holdToShapeTimerRef.current) {
+      clearTimeout(holdToShapeTimerRef.current);
+      holdToShapeTimerRef.current = null;
+    }
+    holdToShapeAnchorRef.current = null;
+
     let finalPoints = [...currentPointsRef.current];
+
+    if (snappedShapePointsRef.current) {
+      finalPoints = [...snappedShapePointsRef.current];
+      snappedShapePointsRef.current = null;
+      triggerHaptic('success');
+    }
 
     if (activeTool === 'shape') {
       let start = finalPoints[0];
@@ -626,14 +673,6 @@ export const InfiniteCanvas: React.FC = () => {
         case 'arc':
           finalPoints = generateArcPoints(start, end);
           break;
-      }
-    } else if (toolSettings.autoDetectShape) {
-      const detected = detectGeometricShape(finalPoints, {
-        angleSnap: toolSettings.angleSnap,
-        gridSnap: toolSettings.gridSnap,
-      });
-      if (detected) {
-        finalPoints = detected.replacementPoints;
       }
     }
 
