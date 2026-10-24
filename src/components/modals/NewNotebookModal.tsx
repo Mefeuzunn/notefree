@@ -67,7 +67,7 @@ export const NewNotebookModal: React.FC = () => {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/75 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-[70] p-4 animate-in fade-in duration-200">
       <div className="bg-[#090d16] border border-white/10 rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col max-h-[90vh] ring-1 ring-white/10">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4.5 border-b border-white/10 bg-slate-950/40">

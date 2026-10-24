@@ -1111,6 +1111,7 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
       undoStack: [],
       redoStack: [],
       newNotebookModalOpen: false,
+      libraryViewOpen: false,
     });
 
     await saveNotebookToDB(newNotebook);
