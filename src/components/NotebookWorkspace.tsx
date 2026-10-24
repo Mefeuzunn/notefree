@@ -32,6 +32,7 @@ import {
   SquarePen,
   Keyboard,
   Map as MapIcon,
+  Sun,
 } from 'lucide-react';
 import { ExportModal } from './modals/ExportModal';
 import { MarginStudyWorkspace } from './margin/MarginStudyWorkspace';
@@ -91,6 +92,10 @@ export const NotebookWorkspace: React.FC = () => {
     setPresentationMode,
     setShortcutsModalOpen,
     toggleCornellStudyMode,
+    eyeComfortMode,
+    toggleEyeComfortMode,
+    paperWarmth,
+    setPaperWarmth,
   } = useNotebookStore();
 
   const [lockModalOpen, setLockModalOpen] = useState(false);
@@ -219,20 +224,53 @@ export const NotebookWorkspace: React.FC = () => {
 
     let touchStartX = 0;
     let touchStartY = 0;
+    let initialPinchDistance = 0;
+    let initialPinchZoom = zoom;
+    let isPinching = false;
 
     const handleTouchStart = (e: TouchEvent) => {
       if (e.touches.length === 2) {
-        // Two-finger touch swipe gesture across canvas
+        // Two-finger touch: could be pinch-to-zoom or swipe gesture
         touchStartX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
         touchStartY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+        initialPinchDistance = Math.hypot(
+          e.touches[0].clientX - e.touches[1].clientX,
+          e.touches[0].clientY - e.touches[1].clientY
+        );
+        initialPinchZoom = zoom;
+        isPinching = false;
       } else if (e.touches.length === 1 && (e.target === el || !(e.target as HTMLElement).closest('canvas'))) {
         // One-finger swipe on workspace background/margin
         touchStartX = e.touches[0].clientX;
         touchStartY = e.touches[0].clientY;
+        isPinching = false;
+      }
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      if (e.touches.length === 2 && initialPinchDistance > 0) {
+        const currentDistance = Math.hypot(
+          e.touches[0].clientX - e.touches[1].clientX,
+          e.touches[0].clientY - e.touches[1].clientY
+        );
+        const distDiff = Math.abs(currentDistance - initialPinchDistance);
+        if (distDiff > 12) {
+          isPinching = true;
+          const pinchScale = currentDistance / initialPinchDistance;
+          const targetZoom = Math.min(3.0, Math.max(0.4, Number((initialPinchZoom * pinchScale).toFixed(2))));
+          setZoom(targetZoom);
+        }
       }
     };
 
     const handleTouchEnd = (e: TouchEvent) => {
+      if (isPinching) {
+        isPinching = false;
+        initialPinchDistance = 0;
+        return; // Don't trigger page flip after pinching
+      }
+      initialPinchDistance = 0;
+
       if (canvasMode !== 'paged' || (viewMode !== 'single' && !twoPageSpread)) return;
       const now = Date.now();
       if (now - lastSwipeTimeRef.current < 350) return;
@@ -243,11 +281,11 @@ export const NotebookWorkspace: React.FC = () => {
       const diffX = changedTouch.clientX - touchStartX;
       const diffY = changedTouch.clientY - touchStartY;
 
-      if (Math.abs(diffX) > 50 && Math.abs(diffX) > Math.abs(diffY) * 1.3) {
-        if (diffX < -50) {
+      if (Math.abs(diffX) > 60 && Math.abs(diffX) > Math.abs(diffY) * 1.4) {
+        if (diffX < -60) {
           flipPage('next');
           lastSwipeTimeRef.current = now;
-        } else if (diffX > 50) {
+        } else if (diffX > 60) {
           flipPage('prev');
           lastSwipeTimeRef.current = now;
         }
@@ -420,12 +458,14 @@ export const NotebookWorkspace: React.FC = () => {
 
     el.addEventListener('wheel', handleWheel, { passive: false });
     el.addEventListener('touchstart', handleTouchStart, { passive: true });
+    el.addEventListener('touchmove', handleTouchMove, { passive: true });
     el.addEventListener('touchend', handleTouchEnd, { passive: true });
     window.addEventListener('keydown', handleKeyDown);
 
     return () => {
       el.removeEventListener('wheel', handleWheel);
       el.removeEventListener('touchstart', handleTouchStart);
+      el.removeEventListener('touchmove', handleTouchMove);
       el.removeEventListener('touchend', handleTouchEnd);
       window.removeEventListener('keydown', handleKeyDown);
     };
@@ -896,6 +936,23 @@ export const NotebookWorkspace: React.FC = () => {
             {canvasMode === 'infinite' ? 'Sonsuz Tuval' : 'Sayfalı Mod'}
           </span>
         </button>
+
+        {/* 🌿 Göz Konforu (True Tone Amber Kağıt Sıcaklığı) */}
+        <button
+          onClick={() => {
+            triggerHaptic('light');
+            toggleEyeComfortMode();
+          }}
+          className={`p-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 ${
+            eyeComfortMode
+              ? 'bg-amber-500/20 text-amber-300 border border-amber-500/50 shadow-xs'
+              : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+          }`}
+          title={`Göz Konforu Filtresi (True Tone Amber) ${eyeComfortMode ? 'Açık' : 'Kapalı'}`}
+        >
+          <Sun size={14} className={eyeComfortMode ? 'text-amber-400 fill-amber-400/30' : ''} />
+          <span className="text-[10px] hidden sm:inline">Göz Konforu</span>
+        </button>
       </div>
 
       {/* Mobile / Tablet Collapsible View Controls Pill (Bottom Left - < 1024px) */}
@@ -1034,6 +1091,40 @@ export const NotebookWorkspace: React.FC = () => {
                 <span>Ajanda Fihrist Sekmeleri</span>
                 <span className="text-[10px] text-indigo-400 font-semibold">{plannerTabsVisible ? 'Açık' : 'Kapalı'}</span>
               </button>
+
+              {/* 🌿 Göz Konforu (True Tone Amber Kağıt Sıcaklığı) */}
+              <div className="pt-1.5 border-t border-slate-800 space-y-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    triggerHaptic('light');
+                    toggleEyeComfortMode();
+                  }}
+                  className="w-full flex items-center justify-between p-1.5 rounded-lg text-slate-300 hover:bg-slate-800"
+                >
+                  <span className="flex items-center gap-1.5">
+                    <Sun size={13} className={eyeComfortMode ? 'text-amber-400' : 'text-slate-400'} />
+                    <span>Göz Konforu (True Tone)</span>
+                  </span>
+                  <span className={`text-[10px] font-semibold ${eyeComfortMode ? 'text-amber-400' : 'text-slate-400'}`}>
+                    {eyeComfortMode ? 'Açık' : 'Kapalı'}
+                  </span>
+                </button>
+                {eyeComfortMode && (
+                  <div className="px-1.5 py-1 flex items-center gap-2 bg-slate-800/60 rounded-xl">
+                    <span className="text-[10px] text-slate-400 shrink-0">Sıcaklık:</span>
+                    <input
+                      type="range"
+                      min={10}
+                      max={80}
+                      value={paperWarmth}
+                      onChange={(e) => setPaperWarmth(Number(e.target.value))}
+                      className="w-full accent-amber-500 h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer"
+                    />
+                    <span className="text-[10px] font-mono text-amber-400 w-6 text-right">%{paperWarmth}</span>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         )}

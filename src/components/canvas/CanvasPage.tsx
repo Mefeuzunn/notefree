@@ -47,6 +47,7 @@ import { getSnapToRulerPoint, formatRulerMeasurement } from '../../engine/rulerH
 import { collaborationService } from '../../services/collaborationService';
 import { HandwritingOcrModal } from '../modals/HandwritingOcrModal';
 import { triggerHaptic } from '../../engine/hapticFeedback';
+import { convertPdfToPages } from '../../services/pdfService';
 import {
   Move,
   RotateCw,
@@ -162,6 +163,10 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
     remoteLiveStrokes,
     updateMyCursor,
     addStickyNoteToCurrentPage,
+    addStickerToCurrentPage,
+    addPagesToCurrentNotebook,
+    eyeComfortMode,
+    paperWarmth,
     symmetryEnabled,
     symmetryAxis,
     symmetryPosition,
@@ -240,6 +245,127 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
   } | null>(null);
   const longPressRadialTimerRef = useRef<NodeJS.Timeout | null>(null);
   const longPressStartPosRef = useRef<{ x: number; y: number } | null>(null);
+
+  // 📥 FAZ T5: Drag and Drop Support (Images, Text, Sticky Notes from Safari / Files)
+  const [isDragOver, setIsDragOver] = useState(false);
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!isDragOver) setIsDragOver(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(false);
+
+    const rect = e.currentTarget.getBoundingClientRect();
+    const dropX = Math.round((e.clientX - rect.left) / scale);
+    const dropY = Math.round((e.clientY - rect.top) / scale);
+
+    // 1. Files dropped (PDF, Image) from Safari, Files app, or desktop
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      const files = Array.from(e.dataTransfer.files);
+
+      // 1A. PDF Document Drop: Extract and append pages to active notebook
+      const pdfFile = files.find(
+        (f) => f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf')
+      );
+
+      if (pdfFile) {
+        setToastMessage(`⏳ PDF Yükleniyor: ${pdfFile.name}...`);
+        convertPdfToPages(pdfFile)
+          .then(async ({ pages, outline }) => {
+            if (pages.length > 0) {
+              await addPagesToCurrentNotebook(pages, outline);
+              triggerHaptic('medium');
+              setToastMessage(`📄 PDF Eklendi: ${pages.length} sayfa deftere katıldı`);
+              setTimeout(() => setToastMessage(null), 3000);
+            } else {
+              setToastMessage('⚠️ PDF içerisinde sayfa bulunamadı');
+              setTimeout(() => setToastMessage(null), 3000);
+            }
+          })
+          .catch((err) => {
+            console.error('PDF drop import error:', err);
+            setToastMessage('❌ PDF aktarılırken bir hata oluştu');
+            setTimeout(() => setToastMessage(null), 3000);
+          });
+        return;
+      }
+
+      // 1B. Image files dropped: Add as custom sticker at drop coordinates
+      for (const file of files) {
+        if (file.type.startsWith('image/')) {
+          const reader = new FileReader();
+          reader.onload = () => {
+            const dataUrl = reader.result as string;
+            const img = new Image();
+            img.onload = () => {
+              const maxDim = 280;
+              const ratio = img.width / img.height;
+              let w = maxDim;
+              let h = maxDim / ratio;
+              if (h > maxDim) {
+                h = maxDim;
+                w = maxDim * ratio;
+              }
+              w = Math.round(w);
+              h = Math.round(h);
+
+              addStickerToCurrentPage(
+                {
+                  id: `img_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+                  name: file.name,
+                  category: 'custom',
+                  content: dataUrl,
+                  width: w,
+                  height: h,
+                },
+                {
+                  x: Math.max(10, dropX - w / 2),
+                  y: Math.max(10, dropY - h / 2),
+                  width: w,
+                  height: h,
+                }
+              );
+              triggerHaptic('medium');
+              setToastMessage('🖼️ Görsel Başarıyla Eklendi');
+              setTimeout(() => setToastMessage(null), 2000);
+            };
+            img.src = dataUrl;
+          };
+          reader.readAsDataURL(file);
+        }
+      }
+      return;
+    }
+
+    // 2. Text dropped from web or documents
+    const droppedText = e.dataTransfer.getData('text/plain');
+    if (droppedText && droppedText.trim()) {
+      addStickyNoteToCurrentPage({
+        id: `sn_drop_${Date.now()}`,
+        x: Math.max(10, dropX - 110),
+        y: Math.max(10, dropY - 80),
+        width: 220,
+        height: 160,
+        color: 'yellow',
+        text: droppedText.trim(),
+        createdAt: Date.now(),
+      });
+      triggerHaptic('medium');
+      setToastMessage('📝 Metin Yapışkan Not Olarak Eklendi');
+      setTimeout(() => setToastMessage(null), 2000);
+    }
+  };
 
   // FAZ M: Stylus Action Handler (Double-Tap or Barrel Button)
   const executeStylusAction = useCallback(
@@ -2013,6 +2139,9 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
   return (
     <div
       id={`canvas-page-container-${page.id || 'default'}`}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
       className={`relative mx-auto my-6 shadow-2xl rounded-sm transition-all duration-100 ease-out select-none bg-white overflow-hidden ring-1 ring-slate-800/10 ${
         isCurrent ? 'ring-2 ring-indigo-500/40' : ''
       }`}
@@ -2033,6 +2162,29 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
         height={height * dpr}
         className="absolute inset-0 w-full h-full pointer-events-none"
       />
+
+      {/* 🌿 FAZ T4: Optical Eye-Comfort / True Tone Amber Warmth Layer */}
+      {eyeComfortMode && (
+        <div
+          className="absolute inset-0 pointer-events-none transition-opacity duration-300 z-5 mix-blend-multiply"
+          style={{
+            backgroundColor: `rgba(245, 158, 11, ${(paperWarmth || 30) * 0.0028})`,
+          }}
+        />
+      )}
+
+      {/* 📥 FAZ T5: Drag & Drop Dropzone Overlay */}
+      {isDragOver && (
+        <div className="absolute inset-0 z-40 bg-indigo-950/40 backdrop-blur-sm border-4 border-dashed border-indigo-400 rounded-sm flex flex-col items-center justify-center pointer-events-none animate-in fade-in duration-100">
+          <div className="bg-slate-900/95 text-white px-5 py-3 rounded-2xl border border-white/20 shadow-2xl flex items-center gap-3">
+            <span className="text-2xl">📥</span>
+            <div>
+              <p className="font-bold text-sm text-indigo-300">Görsel veya Notu Buraya Bırakın</p>
+              <p className="text-[11px] text-slate-400">Sayfaya anında yeni öğe olarak eklenecek</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Layer 0.5: Faz AC Interactive Stickers & Rubber Stamps */}
       {layers.stickers &&

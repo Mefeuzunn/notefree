@@ -564,6 +564,12 @@ interface NotebookStoreState {
   setMobileToolDockCollapsed: (collapsed: boolean) => void;
   toggleMobileToolDockCollapsed: () => void;
 
+  // Optical Comfort & True Tone Amber Paper Filter
+  eyeComfortMode: boolean;
+  toggleEyeComfortMode: () => void;
+  paperWarmth: number;
+  setPaperWarmth: (warmth: number) => void;
+
   // Faz AA: Interactive Hyperlinks & Digital Planner Tabs
   plannerTabsVisible: boolean;
   togglePlannerTabs: () => void;
@@ -620,6 +626,7 @@ interface NotebookStoreState {
   setScratchpadColor: (color: StickyNoteColor) => void;
 
   // Document & Notebook Import
+  addPagesToCurrentNotebook: (pages: Page[], outline?: PdfOutlineItem[]) => Promise<void>;
   importPagesAsNotebook: (pages: Page[], title: string, pdfOutline?: PdfOutlineItem[]) => Promise<void>;
   importNotebook: (jsonString: string) => Promise<void>;
 }
@@ -813,6 +820,8 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
   zenMode: false,
   tabletToolbarPlacement: 'top',
   mobileToolDockCollapsed: false,
+  eyeComfortMode: false,
+  paperWarmth: 30,
 
   minimapVisible: false,
   plannerTabsVisible: false,
@@ -4343,6 +4352,62 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
 
   toggleMobileToolDockCollapsed: () => {
     set((state) => ({ mobileToolDockCollapsed: !state.mobileToolDockCollapsed }));
+  },
+
+  toggleEyeComfortMode: () => {
+    set((state) => ({ eyeComfortMode: !state.eyeComfortMode }));
+  },
+
+  setPaperWarmth: (warmth: number) => {
+    set({ paperWarmth: Math.max(0, Math.min(100, warmth)) });
+  },
+
+  addPagesToCurrentNotebook: async (newPages: Page[], newOutline?: PdfOutlineItem[]) => {
+    const { activeNotebookId, notebooks } = get();
+    if (!activeNotebookId) return;
+    const currentNb = notebooks.find((n) => n.id === activeNotebookId);
+    if (!currentNb) return;
+
+    const basePageOffset = currentNb.pages.length;
+    const adjustedPages = newPages.map((p, idx) => ({
+      ...p,
+      pageNumber: basePageOffset + idx + 1,
+    }));
+
+    const mergedPages = [...currentNb.pages, ...adjustedPages];
+
+    const adjustedOutline = newOutline
+      ? newOutline.map((item) => ({
+          ...item,
+          pageIndex: item.pageIndex + basePageOffset,
+        }))
+      : [];
+
+    const mergedOutline = [
+      ...(currentNb.pdfOutline || []),
+      ...adjustedOutline,
+    ];
+
+    const updatedNotebook: Notebook = {
+      ...currentNb,
+      pages: mergedPages,
+      pdfOutline: mergedOutline.length > 0 ? mergedOutline : undefined,
+      activePageIndex: basePageOffset,
+      updatedAt: Date.now(),
+    };
+
+    const updatedNotebooks = notebooks.map((n) =>
+      n.id === activeNotebookId ? updatedNotebook : n
+    );
+
+    set({
+      notebooks: updatedNotebooks,
+      activePageIndex: basePageOffset,
+      undoStack: [],
+      redoStack: [],
+    });
+
+    await saveNotebookToDB(updatedNotebook);
   },
 
   importPagesAsNotebook: async (pages: Page[], title: string, pdfOutline?: PdfOutlineItem[]) => {

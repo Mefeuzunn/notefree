@@ -84,6 +84,7 @@ import {
   Palette,
   Mic,
   MicOff,
+  Camera,
 } from 'lucide-react';
 import { ShapeType, StylusDoubleTapAction } from '../../types/notebook';
 import { AudioPlayerBar } from '../audio/AudioPlayerBar';
@@ -216,6 +217,9 @@ export const Toolbar: React.FC = () => {
     tabletToolbarPlacement,
     setTabletToolbarPlacement,
     addPage,
+    addStickerToCurrentPage,
+    eyeComfortMode,
+    toggleEyeComfortMode,
   } = useNotebookStore();
 
   // Active Dropdown state
@@ -229,6 +233,46 @@ export const Toolbar: React.FC = () => {
   // Live Speech Dictation State
   const [isDictating, setIsDictating] = useState(false);
   const [liveTranscript, setLiveTranscript] = useState('');
+
+  // Mobile Camera / Photo Quick Insert
+  const mobileCameraInputRef = useRef<HTMLInputElement | null>(null);
+
+  const handleMobileCameraCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result as string;
+      const img = new Image();
+      img.onload = () => {
+        const maxDim = 260;
+        const ratio = img.width / img.height;
+        let w = maxDim;
+        let h = maxDim / ratio;
+        if (h > maxDim) {
+          h = maxDim;
+          w = maxDim * ratio;
+        }
+        w = Math.round(w);
+        h = Math.round(h);
+        addStickerToCurrentPage(
+          {
+            id: `cam_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+            name: file.name,
+            category: 'custom',
+            content: dataUrl,
+            width: w,
+            height: h,
+          },
+          { x: 100, y: 150, width: w, height: h }
+        );
+        triggerHaptic('medium');
+      };
+      img.src = dataUrl;
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
 
   const toolbarRef = useRef<HTMLDivElement | null>(null);
 
@@ -1637,6 +1681,23 @@ export const Toolbar: React.FC = () => {
               <Youtube size={15} className={youtube.isOpen ? 'fill-white' : 'text-red-500'} />
               <span>YouTube</span>
             </button>
+
+            {/* 🌿 Göz Konforu (True Tone Amber Kağıt Sıcaklığı) */}
+            <button
+              type="button"
+              onClick={() => {
+                triggerHaptic('light');
+                toggleEyeComfortMode();
+              }}
+              className={`p-2 rounded-xl transition-all ${
+                eyeComfortMode
+                  ? 'bg-amber-500/20 text-amber-300 ring-1 ring-amber-500/50 shadow-sm'
+                  : 'text-slate-400 hover:text-amber-400 hover:bg-slate-800'
+              }`}
+              title={`Göz Konforu Filtresi (True Tone Amber) ${eyeComfortMode ? 'Açık' : 'Kapalı'}`}
+            >
+              <Sun size={17} className={eyeComfortMode ? 'fill-amber-400/30' : ''} />
+            </button>
           </div>
 
           {/* OVERFLOW ACTIONS DROPDOWN (< 1280px / Tablets & Mobile) */}
@@ -1843,6 +1904,23 @@ export const Toolbar: React.FC = () => {
                     >
                       <Presentation size={15} className="text-rose-400 shrink-0" />
                       <span className="truncate">Sunum Modu</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        toggleEyeComfortMode();
+                        triggerHaptic('light');
+                        closeDropdown();
+                      }}
+                      className={`p-2 bg-slate-800/60 hover:bg-slate-800 border border-slate-750 rounded-xl flex items-center gap-2 text-left ${
+                        eyeComfortMode
+                          ? 'text-amber-400 border-amber-500/40 bg-amber-500/10'
+                          : 'text-slate-300 hover:text-white'
+                      }`}
+                    >
+                      <Sun size={15} className="text-amber-400 shrink-0" />
+                      <span className="truncate">Göz Konforu ({eyeComfortMode ? 'Açık' : 'Kapalı'})</span>
                     </button>
 
                     <button
@@ -2187,6 +2265,27 @@ export const Toolbar: React.FC = () => {
               title="Sesli Dikte"
             >
               {isDictating ? <MicOff size={15} /> : <Mic size={15} />}
+            </button>
+
+            {/* Quick Camera Capture for Mobile */}
+            <input
+              type="file"
+              ref={mobileCameraInputRef}
+              accept="image/*"
+              capture="environment"
+              onChange={handleMobileCameraCapture}
+              className="hidden"
+            />
+            <button
+              type="button"
+              onClick={() => {
+                triggerHaptic('light');
+                mobileCameraInputRef.current?.click();
+              }}
+              className="p-1.5 rounded-xl text-slate-400 hover:text-indigo-400 hover:bg-slate-800 transition-colors shrink-0"
+              title="Fotoğraf Çek / Ekle"
+            >
+              <Camera size={15} />
             </button>
 
             {/* Collapse button */}
