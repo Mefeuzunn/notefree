@@ -67,25 +67,25 @@ export const NewNotebookModal: React.FC = () => {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
-      <div className="bg-slate-900 border border-slate-700/80 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+    <div className="fixed inset-0 bg-black/75 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
+      <div className="bg-[#090d16] border border-white/10 rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col max-h-[90vh] ring-1 ring-white/10">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800">
-          <div className="flex items-center gap-2.5">
+        <div className="flex items-center justify-between px-6 py-4.5 border-b border-white/10 bg-slate-950/40">
+          <div className="flex items-center gap-3">
             <div
-              className="w-8 h-8 rounded-xl flex items-center justify-center text-white shadow-md transition-colors"
+              className="w-10 h-10 rounded-2xl flex items-center justify-center text-white shadow-lg transition-colors ring-1 ring-white/20"
               style={{ backgroundColor: coverColor }}
             >
-              <Book size={16} />
+              <Book size={18} />
             </div>
             <div>
-              <h2 className="text-base font-semibold text-slate-100">Yeni Defter Oluştur</h2>
+              <h2 className="font-display text-base font-bold text-white tracking-tight">Yeni Defter Oluştur</h2>
               <p className="text-xs text-slate-400">Şablon, kapak ve kağıt rengini belirleyin.</p>
             </div>
           </div>
           <button
             onClick={() => setNewNotebookModalOpen(false)}
-            className="p-1.5 text-slate-400 hover:text-slate-200 rounded-lg hover:bg-slate-800 transition-colors"
+            className="p-2 text-slate-400 hover:text-white rounded-xl hover:bg-slate-850 transition-colors"
           >
             <X size={18} />
           </button>
@@ -105,7 +105,7 @@ export const NewNotebookModal: React.FC = () => {
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Örn: Fizik 101, Biyoloji Ders Notları, Günlük, Proje Taslağı..."
-              className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30"
+              className="w-full bg-slate-900/90 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500/80 focus:ring-2 focus:ring-indigo-500/20 transition-all"
             />
           </div>
 
@@ -121,7 +121,7 @@ export const NewNotebookModal: React.FC = () => {
                   type="button"
                   onClick={() => setCoverColor(col)}
                   className={`w-8 h-8 rounded-full transition-transform hover:scale-110 shadow-sm flex items-center justify-center ${
-                    coverColor === col ? 'ring-2 ring-white ring-offset-2 ring-offset-slate-900 scale-105' : ''
+                    coverColor === col ? 'ring-2 ring-white ring-offset-2 ring-offset-slate-950 scale-105' : 'ring-1 ring-white/10'
                   }`}
                   style={{ backgroundColor: col }}
                 >
@@ -144,8 +144,8 @@ export const NewNotebookModal: React.FC = () => {
                   onClick={() => setPaperColor(col.id)}
                   className={`py-2 px-2 rounded-xl border flex flex-col items-center gap-1.5 transition-all ${
                     paperColor === col.id
-                      ? 'border-indigo-500 bg-indigo-500/10 ring-2 ring-indigo-500/30'
-                      : 'border-slate-800 bg-slate-950/60 hover:bg-slate-800'
+                      ? 'border-indigo-500 bg-indigo-500/15 ring-2 ring-indigo-500/30'
+                      : 'border-white/10 bg-slate-900/60 hover:bg-slate-800'
                   }`}
                 >
                   <span
@@ -168,7 +168,7 @@ export const NewNotebookModal: React.FC = () => {
               <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider block">
                 Başlangıç Şablonu
               </label>
-              <div className="flex items-center gap-1 bg-slate-800 p-0.5 rounded-lg text-xs">
+              <div className="flex items-center gap-1 bg-slate-900 p-0.5 rounded-lg border border-white/10 text-xs">
                 <button
                   type="button"
                   onClick={() => setTemplateTab('builtin')}
@@ -199,7 +199,7 @@ export const NewNotebookModal: React.FC = () => {
               <select
                 value={template}
                 onChange={(e) => setTemplate(e.target.value as PageTemplate)}
-                className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500"
+                className="w-full bg-slate-900 border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500"
               >
                 <option value="lined">📝 Çizgili Notluk (Klasik)</option>
                 <option value="lined-margin">📖 Çizgili & Sol Kenar Çizgili</option>
@@ -220,7 +220,7 @@ export const NewNotebookModal: React.FC = () => {
             ) : (
               <div>
                 {customTemplates.length === 0 ? (
-                  <div className="p-4 rounded-xl border border-slate-800 bg-slate-950/60 text-center text-xs text-slate-500">
+                  <div className="p-4 rounded-xl border border-white/10 bg-slate-900/60 text-center text-xs text-slate-500">
                     <FileText size={20} className="mx-auto mb-1 text-slate-600" />
                     <p>Henüz kayıtlı özel şablonunuz bulunmuyor.</p>
                     <p className="text-[11px] text-slate-600 mt-0.5">
@@ -236,7 +236,7 @@ export const NewNotebookModal: React.FC = () => {
                         className={`p-2 rounded-xl border cursor-pointer flex items-center gap-2.5 transition-all ${
                           selectedCustomTemplateId === ct.id
                             ? 'border-indigo-500 bg-indigo-500/15 ring-1 ring-indigo-500'
-                            : 'border-slate-800 bg-slate-950/50 hover:bg-slate-800'
+                            : 'border-white/10 bg-slate-900/50 hover:bg-slate-800'
                         }`}
                       >
                         <div className="w-8 h-10 rounded bg-white overflow-hidden border border-slate-700 shrink-0">
@@ -259,19 +259,19 @@ export const NewNotebookModal: React.FC = () => {
           </div>
 
           {/* Footer Buttons */}
-          <div className="pt-2 flex justify-end gap-2.5 border-t border-slate-800">
+          <div className="pt-3 flex justify-end gap-2.5 border-t border-white/10">
             <button
               type="button"
               onClick={() => setNewNotebookModalOpen(false)}
-              className="px-4 py-2 text-xs font-medium text-slate-400 hover:text-white rounded-xl hover:bg-slate-800 transition-colors"
+              className="px-4 py-2.5 text-xs font-semibold text-slate-400 hover:text-white rounded-xl hover:bg-slate-800 transition-colors"
             >
               İptal
             </button>
             <button
               type="submit"
-              className="px-5 py-2 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-500 rounded-xl shadow-md transition-colors flex items-center gap-1.5"
+              className="px-5 py-2.5 text-xs font-bold text-white bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 rounded-xl shadow-lg shadow-indigo-600/30 transition-all flex items-center gap-2 border border-indigo-400/30 active:scale-95"
             >
-              <Plus size={14} />
+              <Plus size={15} />
               <span>Defteri Başlat</span>
             </button>
           </div>

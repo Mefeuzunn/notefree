@@ -257,11 +257,11 @@ export const Toolbar: React.FC = () => {
   const isActivityActive = collaboration.isConnected || youtube.isOpen;
 
   return (
-    <div ref={toolbarRef} className="flex flex-col z-30 select-none shadow-lg">
+    <div ref={toolbarRef} className="flex flex-col z-30 select-none shadow-xl">
       {/* 1. MAIN TOP BAR */}
-      <header className="h-14 bg-slate-900 border-b border-slate-800 flex items-center justify-between px-2 sm:px-3 gap-1 sm:gap-2">
+      <header className="h-15 bg-[#090d16]/95 backdrop-blur-2xl border-b border-white/10 flex items-center justify-between px-3 sm:px-4 gap-1.5 sm:gap-2.5 shadow-md">
         {/* LEFT SECTION: Sidebar, Notebook Title & Page Stepper */}
-        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+        <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
           {/* Sidebar Menu Toggle */}
           <button
             type="button"
@@ -269,10 +269,10 @@ export const Toolbar: React.FC = () => {
               triggerHaptic('light');
               setSidebarOpen(!sidebarOpen);
             }}
-            className={`p-2 rounded-xl transition-colors ${
+            className={`p-2.5 rounded-xl transition-all ${
               sidebarOpen
-                ? 'bg-indigo-600/30 text-indigo-400 border border-indigo-500/30'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+                ? 'bg-indigo-600/30 text-indigo-400 border border-indigo-500/40 ring-1 ring-indigo-400/30'
+                : 'text-slate-400 hover:text-white hover:bg-slate-800/80 border border-transparent'
             }`}
             title="Defterler ve Sayfalar Menüsü"
           >
@@ -280,28 +280,28 @@ export const Toolbar: React.FC = () => {
           </button>
 
           {/* Notebook Title Badge with Cover Color Dot */}
-          <div className="flex items-center gap-1.5 px-1.5 py-1 rounded-xl bg-slate-800/40 border border-slate-750/60 max-w-[110px] xs:max-w-[150px] sm:max-w-[200px] md:max-w-[220px]">
+          <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-slate-900/90 border border-white/10 max-w-[120px] xs:max-w-[160px] sm:max-w-[210px] md:max-w-[230px] shadow-xs">
             <span
-              className="w-2.5 h-2.5 rounded-full shrink-0 shadow-sm"
+              className="w-2.5 h-2.5 rounded-full shrink-0 shadow-sm ring-1 ring-white/20"
               style={{ backgroundColor: activeNotebook?.coverColor || '#3b82f6' }}
             />
-            <span className="font-semibold text-xs text-slate-200 truncate">
+            <span className="font-display font-semibold text-xs text-slate-100 truncate tracking-tight">
               {activeNotebook?.title || 'Notefree'}
             </span>
           </div>
 
           {/* Page Stepper & Bookmark Star */}
-          <div className="flex items-center gap-1 pl-1 border-l border-slate-800/80">
+          <div className="flex items-center gap-1.5 pl-1.5 border-l border-white/10">
             <button
               type="button"
               onClick={() => {
                 triggerHaptic('light');
                 togglePageBookmark(activePageIndex);
               }}
-              className={`p-1.5 rounded-lg transition-all ${
+              className={`p-2 rounded-xl transition-all ${
                 activeNotebook?.pages[activePageIndex]?.isBookmarked
-                  ? 'text-amber-400 fill-amber-400 bg-amber-400/10'
-                  : 'text-slate-500 hover:text-amber-300 hover:bg-slate-800'
+                  ? 'text-amber-400 fill-amber-400 bg-amber-400/15 border border-amber-400/30 shadow-xs'
+                  : 'text-slate-500 hover:text-amber-300 hover:bg-slate-800/60'
               }`}
               title="Bu Sayfayı Yer İmlerine Ekle/Kaldır"
             >
@@ -315,7 +315,7 @@ export const Toolbar: React.FC = () => {
               />
             </button>
 
-            <div className="flex items-center bg-slate-800/80 rounded-lg p-0.5 border border-slate-750">
+            <div className="flex items-center bg-slate-900/90 rounded-xl p-0.5 border border-white/10 shadow-xs">
               <button
                 type="button"
                 onClick={() => {
@@ -323,16 +323,16 @@ export const Toolbar: React.FC = () => {
                   setActivePageIndex(Math.max(0, activePageIndex - 1));
                 }}
                 disabled={activePageIndex === 0}
-                className={`p-1 rounded transition-colors ${
+                className={`p-1.5 rounded-lg transition-colors ${
                   activePageIndex > 0
-                    ? 'text-slate-300 hover:text-white hover:bg-slate-700'
+                    ? 'text-slate-300 hover:text-white hover:bg-slate-800'
                     : 'text-slate-600 cursor-not-allowed'
                 }`}
                 title="Önceki Sayfa"
               >
                 <ChevronLeft size={13} />
               </button>
-              <span className="text-[11px] font-mono font-semibold px-1 text-slate-300">
+              <span className="text-[11px] font-mono font-semibold px-2 text-slate-200">
                 {activePageIndex + 1}/{totalPages}
               </span>
               <button
@@ -342,9 +342,9 @@ export const Toolbar: React.FC = () => {
                   setActivePageIndex(Math.min(totalPages - 1, activePageIndex + 1));
                 }}
                 disabled={activePageIndex >= totalPages - 1}
-                className={`p-1 rounded transition-colors ${
+                className={`p-1.5 rounded-lg transition-colors ${
                   activePageIndex < totalPages - 1
-                    ? 'text-slate-300 hover:text-white hover:bg-slate-700'
+                    ? 'text-slate-300 hover:text-white hover:bg-slate-800'
                     : 'text-slate-600 cursor-not-allowed'
                 }`}
                 title="Sonraki Sayfa"
@@ -355,14 +355,14 @@ export const Toolbar: React.FC = () => {
           </div>
 
           {/* Quick Library & Search (Tablets & Desktop) */}
-          <div className="hidden md:flex items-center gap-0.5">
+          <div className="hidden md:flex items-center gap-1">
             <button
               type="button"
               onClick={() => {
                 triggerHaptic('light');
                 setLibraryViewOpen(true);
               }}
-              className="p-1.5 rounded-xl text-slate-400 hover:text-indigo-400 hover:bg-slate-800 transition-colors"
+              className="p-2 rounded-xl text-slate-400 hover:text-indigo-400 hover:bg-slate-800/80 transition-colors"
               title="Kütüphane"
             >
               <Library size={16} />
@@ -373,7 +373,7 @@ export const Toolbar: React.FC = () => {
                 triggerHaptic('light');
                 setSearchModalOpen(true);
               }}
-              className="p-1.5 rounded-xl text-slate-400 hover:text-indigo-400 hover:bg-slate-800 transition-colors"
+              className="p-2 rounded-xl text-slate-400 hover:text-indigo-400 hover:bg-slate-800/80 transition-colors"
               title="Arama (Cmd+K)"
             >
               <Search size={16} />
@@ -382,7 +382,7 @@ export const Toolbar: React.FC = () => {
         </div>
 
         {/* CENTER SECTION: GoodNotes Professional Tool Dock (Visible on Tablets & Desktop >= 768px) */}
-        <div className="hidden md:flex items-center bg-slate-800/90 p-1 rounded-2xl border border-slate-750 shadow-inner gap-0.5 overflow-x-auto scrollbar-none max-w-[52vw] lg:max-w-none shrink">
+        <div className="hidden md:flex items-center bg-slate-900/90 backdrop-blur-xl p-1.5 rounded-2xl border border-white/10 shadow-lg shadow-black/40 gap-1 overflow-x-auto scrollbar-none max-w-[54vw] lg:max-w-none shrink">
           {/* 1. Fountain Pen */}
           <button
             type="button"
@@ -390,10 +390,10 @@ export const Toolbar: React.FC = () => {
               triggerHaptic('light');
               setActiveTool('fountain');
             }}
-            className={`p-2 rounded-xl transition-all flex items-center justify-center shrink-0 ${
+            className={`p-2.5 rounded-xl transition-all duration-150 flex items-center justify-center shrink-0 ${
               activeTool === 'fountain'
-                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30 scale-105'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
+                ? 'bg-gradient-to-b from-indigo-500 to-indigo-600 text-white shadow-lg shadow-indigo-500/30 scale-105 ring-1 ring-white/20'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
             }`}
             title="Dolma Kalem"
           >
@@ -407,10 +407,10 @@ export const Toolbar: React.FC = () => {
               triggerHaptic('light');
               setActiveTool('ballpoint');
             }}
-            className={`p-2 rounded-xl transition-all flex items-center justify-center shrink-0 ${
+            className={`p-2.5 rounded-xl transition-all duration-150 flex items-center justify-center shrink-0 ${
               activeTool === 'ballpoint'
-                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30 scale-105'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
+                ? 'bg-gradient-to-b from-indigo-500 to-indigo-600 text-white shadow-lg shadow-indigo-500/30 scale-105 ring-1 ring-white/20'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
             }`}
             title="Tükenmez Kalem"
           >
@@ -424,10 +424,10 @@ export const Toolbar: React.FC = () => {
               triggerHaptic('light');
               setActiveTool('pencil');
             }}
-            className={`p-2 rounded-xl transition-all flex items-center justify-center shrink-0 ${
+            className={`p-2.5 rounded-xl transition-all duration-150 flex items-center justify-center shrink-0 ${
               activeTool === 'pencil'
-                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30 scale-105'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
+                ? 'bg-gradient-to-b from-indigo-500 to-indigo-600 text-white shadow-lg shadow-indigo-500/30 scale-105 ring-1 ring-white/20'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
             }`}
             title="Kurşun Kalem"
           >
@@ -441,10 +441,10 @@ export const Toolbar: React.FC = () => {
               triggerHaptic('light');
               setActiveTool('fineliner');
             }}
-            className={`p-2 rounded-xl transition-all flex items-center justify-center shrink-0 ${
+            className={`p-2.5 rounded-xl transition-all duration-150 flex items-center justify-center shrink-0 ${
               activeTool === 'fineliner'
-                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30 scale-105'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
+                ? 'bg-gradient-to-b from-indigo-500 to-indigo-600 text-white shadow-lg shadow-indigo-500/30 scale-105 ring-1 ring-white/20'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
             }`}
             title="Teknik Fineliner Kalemi"
           >
@@ -458,10 +458,10 @@ export const Toolbar: React.FC = () => {
               triggerHaptic('light');
               setActiveTool('brush');
             }}
-            className={`p-2 rounded-xl transition-all flex items-center justify-center shrink-0 ${
+            className={`p-2.5 rounded-xl transition-all duration-150 flex items-center justify-center shrink-0 ${
               activeTool === 'brush'
-                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30 scale-105'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
+                ? 'bg-gradient-to-b from-indigo-500 to-indigo-600 text-white shadow-lg shadow-indigo-500/30 scale-105 ring-1 ring-white/20'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
             }`}
             title="Fırça / Kaligrafi"
           >
@@ -475,10 +475,10 @@ export const Toolbar: React.FC = () => {
               triggerHaptic('light');
               setActiveTool('highlighter');
             }}
-            className={`p-2 rounded-xl transition-all flex items-center justify-center shrink-0 ${
+            className={`p-2.5 rounded-xl transition-all duration-150 flex items-center justify-center shrink-0 ${
               activeTool === 'highlighter'
-                ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/30 scale-105 font-bold'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
+                ? 'bg-gradient-to-b from-amber-400 to-amber-500 text-slate-950 font-bold shadow-lg shadow-amber-500/30 scale-105 ring-1 ring-white/20'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
             }`}
             title="Fosforlu Kalem"
           >
@@ -497,10 +497,10 @@ export const Toolbar: React.FC = () => {
                   setActiveTool('eraser');
                 }
               }}
-              className={`p-2 rounded-xl transition-all flex items-center justify-center ${
+              className={`p-2.5 rounded-xl transition-all duration-150 flex items-center justify-center ${
                 activeTool === 'eraser'
-                  ? 'bg-rose-600 text-white shadow-md shadow-rose-600/30 scale-105'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
+                  ? 'bg-gradient-to-b from-rose-500 to-rose-600 text-white shadow-lg shadow-rose-500/30 scale-105 ring-1 ring-white/20'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
               }`}
               title="Silgi (Tekrar tıklayarak ayarları açın)"
             >
@@ -574,10 +574,10 @@ export const Toolbar: React.FC = () => {
               triggerHaptic('light');
               setActiveTool('lasso');
             }}
-            className={`p-2 rounded-xl transition-all flex items-center justify-center shrink-0 ${
+            className={`p-2.5 rounded-xl transition-all duration-150 flex items-center justify-center shrink-0 ${
               activeTool === 'lasso'
-                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30 scale-105'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
+                ? 'bg-gradient-to-b from-indigo-500 to-indigo-600 text-white shadow-lg shadow-indigo-500/30 scale-105 ring-1 ring-white/20'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
             }`}
             title="Kement Seçim Aracı (Lasso)"
           >
@@ -592,10 +592,10 @@ export const Toolbar: React.FC = () => {
                 setActiveTool('shape');
                 toggleDropdown('shape');
               }}
-              className={`p-2 rounded-xl transition-all flex items-center justify-center ${
+              className={`p-2.5 rounded-xl transition-all duration-150 flex items-center justify-center ${
                 activeTool === 'shape'
-                  ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
+                  ? 'bg-gradient-to-b from-indigo-500 to-indigo-600 text-white shadow-lg shadow-indigo-500/30 ring-1 ring-white/20'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
               }`}
               title="Geometrik Şekiller"
             >
@@ -760,10 +760,10 @@ export const Toolbar: React.FC = () => {
               triggerHaptic('light');
               setActiveTool('text');
             }}
-            className={`p-2 rounded-xl transition-all flex items-center justify-center shrink-0 ${
+            className={`p-2.5 rounded-xl transition-all duration-150 flex items-center justify-center shrink-0 ${
               activeTool === 'text'
-                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30 scale-105'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
+                ? 'bg-gradient-to-b from-indigo-500 to-indigo-600 text-white shadow-lg shadow-indigo-500/30 scale-105 ring-1 ring-white/20'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
             }`}
             title="Metin Kutusu ('T')"
           >
@@ -775,10 +775,10 @@ export const Toolbar: React.FC = () => {
             <button
               type="button"
               onClick={() => toggleDropdown('moreTools')}
-              className={`p-2 rounded-xl transition-all flex items-center justify-center gap-0.5 relative ${
+              className={`p-2.5 rounded-xl transition-all duration-150 flex items-center justify-center gap-0.5 relative ${
                 isSecondaryToolActive
-                  ? 'bg-indigo-600/30 text-indigo-300 border border-indigo-500/40 ring-1 ring-indigo-400'
-                  : 'text-slate-400 hover:text-indigo-300 hover:bg-slate-700/50'
+                  ? 'bg-indigo-600/30 text-indigo-300 border border-indigo-500/40 ring-1 ring-indigo-400/40'
+                  : 'text-slate-400 hover:text-indigo-300 hover:bg-slate-800/60'
               }`}
               title="Geometri, STEM & İleri Çizim Araçları (Cetvel, Açıölçer, Pergel, Kaşe, vb.)"
             >
@@ -1298,9 +1298,9 @@ export const Toolbar: React.FC = () => {
         </div>
 
         {/* RIGHT SECTION: Undo/Redo & Actions */}
-        <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
           {/* Undo & Redo (Always visible) */}
-          <div className="flex items-center bg-slate-800/80 rounded-xl p-0.5 border border-slate-750">
+          <div className="flex items-center bg-slate-900/90 rounded-xl p-0.5 border border-white/10 shadow-xs">
             <button
               type="button"
               onClick={() => {
@@ -1310,7 +1310,7 @@ export const Toolbar: React.FC = () => {
               disabled={undoStack.length === 0}
               className={`p-1.5 rounded-lg transition-colors ${
                 undoStack.length > 0
-                  ? 'text-slate-300 hover:text-white hover:bg-slate-700'
+                  ? 'text-slate-200 hover:text-white hover:bg-slate-800'
                   : 'text-slate-600 cursor-not-allowed'
               }`}
               title="Geri Al (Cmd+Z)"
@@ -1326,7 +1326,7 @@ export const Toolbar: React.FC = () => {
               disabled={redoStack.length === 0}
               className={`p-1.5 rounded-lg transition-colors ${
                 redoStack.length > 0
-                  ? 'text-slate-300 hover:text-white hover:bg-slate-700'
+                  ? 'text-slate-200 hover:text-white hover:bg-slate-800'
                   : 'text-slate-600 cursor-not-allowed'
               }`}
               title="Yinele (Cmd+Shift+Z)"
@@ -1342,7 +1342,7 @@ export const Toolbar: React.FC = () => {
               triggerHaptic('light');
               setPageManagerModalOpen(true);
             }}
-            className="p-2 text-slate-400 hover:text-indigo-400 hover:bg-slate-800 rounded-xl transition-colors"
+            className="p-2 text-slate-400 hover:text-indigo-400 hover:bg-slate-800/80 rounded-xl transition-colors"
             title="Tüm Sayfaları Gör (Küçük Resim Izgarası)"
           >
             <Grid size={17} />
@@ -1355,7 +1355,7 @@ export const Toolbar: React.FC = () => {
               triggerHaptic('light');
               setExportModalOpen(true);
             }}
-            className="p-2 text-slate-400 hover:text-emerald-400 hover:bg-slate-800 rounded-xl transition-colors"
+            className="p-2 text-slate-400 hover:text-emerald-400 hover:bg-slate-800/80 rounded-xl transition-colors"
             title="Dışa Aktarma Stüdyosu (PDF, PNG, JPEG)"
           >
             <FileDown size={17} />

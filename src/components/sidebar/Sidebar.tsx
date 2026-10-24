@@ -81,80 +81,82 @@ export const Sidebar: React.FC = () => {
     <>
       {/* Mobile & iPad Backdrop Overlay */}
       <div
-        className="fixed inset-0 bg-black/60 backdrop-blur-xs z-35 transition-opacity"
+        className="fixed inset-0 bg-black/70 backdrop-blur-xs z-35 transition-opacity"
         onClick={() => setSidebarOpen(false)}
       />
 
-      <aside className="fixed inset-y-0 left-0 w-84 sm:w-96 bg-slate-900/95 backdrop-blur-xl border-r border-slate-800 z-40 flex flex-col shadow-2xl animate-in slide-in-from-left duration-200">
+      <aside className="fixed inset-y-0 left-0 w-84 sm:w-96 bg-[#090d16]/95 backdrop-blur-2xl border-r border-white/10 z-40 flex flex-col shadow-2xl animate-in slide-in-from-left duration-200">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3.5 border-b border-slate-800">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center text-white shadow-md shadow-indigo-600/30">
-            <BookOpen size={16} />
+      <div className="flex items-center justify-between px-5 py-4 border-b border-white/10">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center text-white shadow-lg shadow-indigo-600/30 ring-1 ring-white/20">
+            <BookOpen size={18} />
           </div>
           <div>
-            <h2 className="text-sm font-bold text-slate-100 tracking-tight">NotFree</h2>
-            <p className="text-[10px] text-indigo-400 font-medium">Navigasyon & İçerik</p>
+            <h2 className="font-display text-sm font-bold text-white tracking-tight">Notefree Stüdyo</h2>
+            <p className="text-[10px] text-indigo-400 font-semibold tracking-wide uppercase">Navigasyon & Fihrist</p>
           </div>
         </div>
 
         <button
           onClick={() => setSidebarOpen(false)}
-          className="p-1.5 text-slate-400 hover:text-slate-200 rounded-lg hover:bg-slate-800 transition-colors"
+          className="p-2 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800/80 transition-colors"
         >
           <X size={16} />
         </button>
       </div>
 
-      {/* Navigation Tabs (GoodNotes / Notability 4-way Drawer) */}
-      <div className="grid grid-cols-4 border-b border-slate-800 px-2 pt-2 text-[11px] font-semibold text-center">
-        <button
-          onClick={() => setActiveTab('notebooks')}
-          className={`pb-2.5 border-b-2 transition-all flex flex-col items-center gap-1 ${
-            activeTab === 'notebooks'
-              ? 'border-indigo-500 text-indigo-400'
-              : 'border-transparent text-slate-400 hover:text-slate-300'
-          }`}
-        >
-          <Book size={14} />
-          <span>Defterler</span>
-        </button>
+      {/* Navigation Tabs (Segmented Control Pill) */}
+      <div className="p-2.5 border-b border-white/10">
+        <div className="grid grid-cols-4 p-1 bg-slate-900/90 rounded-xl border border-white/10 text-[11px] font-semibold text-center gap-1">
+          <button
+            onClick={() => setActiveTab('notebooks')}
+            className={`py-1.5 rounded-lg transition-all flex flex-col items-center gap-1 ${
+              activeTab === 'notebooks'
+                ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-600/30'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+            }`}
+          >
+            <Book size={14} />
+            <span>Defterler</span>
+          </button>
 
-        <button
-          onClick={() => setActiveTab('pages')}
-          className={`pb-2.5 border-b-2 transition-all flex flex-col items-center gap-1 ${
-            activeTab === 'pages'
-              ? 'border-indigo-500 text-indigo-400'
-              : 'border-transparent text-slate-400 hover:text-slate-300'
-          }`}
-        >
-          <Layers size={14} />
-          <span>Sayfalar</span>
-        </button>
+          <button
+            onClick={() => setActiveTab('pages')}
+            className={`py-1.5 rounded-lg transition-all flex flex-col items-center gap-1 ${
+              activeTab === 'pages'
+                ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-600/30'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+            }`}
+          >
+            <Layers size={14} />
+            <span>Sayfalar</span>
+          </button>
 
-        <button
-          onClick={() => setActiveTab('bookmarks')}
-          className={`pb-2.5 border-b-2 transition-all flex flex-col items-center gap-1 ${
-            activeTab === 'bookmarks'
-              ? 'border-indigo-500 text-indigo-400'
-              : 'border-transparent text-slate-400 hover:text-slate-300'
-          }`}
-        >
-          <Star size={14} className={bookmarkedPages.length > 0 ? 'text-amber-400 fill-amber-400' : ''} />
-          <span>Yer İmleri</span>
-        </button>
+          <button
+            onClick={() => setActiveTab('bookmarks')}
+            className={`py-1.5 rounded-lg transition-all flex flex-col items-center gap-1 ${
+              activeTab === 'bookmarks'
+                ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-600/30'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+            }`}
+          >
+            <Star size={14} className={bookmarkedPages.length > 0 ? 'text-amber-400 fill-amber-400' : ''} />
+            <span>Yer İmleri</span>
+          </button>
 
-        <button
-          onClick={() => setActiveTab('outline')}
-          className={`pb-2.5 border-b-2 transition-all flex flex-col items-center gap-1 ${
-            activeTab === 'outline'
-              ? 'border-indigo-500 text-indigo-400'
-              : 'border-transparent text-slate-400 hover:text-slate-300'
-          }`}
-        >
-          <ListTree size={14} />
-          <span>İçindekiler</span>
-        </button>
+          <button
+            onClick={() => setActiveTab('outline')}
+            className={`py-1.5 rounded-lg transition-all flex flex-col items-center gap-1 ${
+              activeTab === 'outline'
+                ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-600/30'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+            }`}
+          >
+            <ListTree size={14} />
+            <span>İçindekiler</span>
+          </button>
+        </div>
       </div>
 
       {/* Search Input for Pages/Bookmarks */}

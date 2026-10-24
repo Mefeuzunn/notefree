@@ -268,6 +268,8 @@ export interface Page {
   customLineColor?: string; // Optional custom line hex color
   lineOpacity?: number; // Line opacity (0.1 - 1.0)
   speakerNotes?: string; // FAZ AL: Secret presenter teleprompter notes for this slide
+  isLocked?: boolean;    // FAZ AN: Per-page PIN lock
+  pagePinCode?: string;  // FAZ AN: Stored page PIN (plain text, same as notebook-level approach)
 }
 
 export interface TableCell {

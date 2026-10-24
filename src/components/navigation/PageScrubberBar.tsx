@@ -178,35 +178,35 @@ export const PageScrubberBar: React.FC = () => {
     >
       {/* Floating Thumbnail Preview Popover */}
       {(isScrubbing || (isExpanded && hoverIndex !== null)) && targetHoverPage && (
-        <div className="mb-2.5 flex flex-col items-center animate-in fade-in zoom-in-95 duration-100 drop-shadow-2xl pointer-events-none">
-          <div className="bg-slate-900/95 text-white p-2 rounded-2xl border border-slate-700/80 shadow-2xl backdrop-blur-md flex flex-col items-center gap-1.5">
-            <MiniPagePreview page={targetHoverPage} width={92} height={122} />
-            <div className="flex items-center gap-1 text-[11px] font-mono font-bold text-slate-200">
+        <div className="mb-3 flex flex-col items-center animate-in fade-in zoom-in-95 duration-100 drop-shadow-2xl pointer-events-none">
+          <div className="bg-[#090d16]/95 text-white p-2.5 rounded-2xl border border-white/10 shadow-2xl backdrop-blur-2xl flex flex-col items-center gap-1.5 ring-1 ring-white/10">
+            <MiniPagePreview page={targetHoverPage} width={96} height={128} />
+            <div className="flex items-center gap-1.5 text-xs font-mono font-bold text-slate-100">
               <span className="text-indigo-400">Sayfa {targetHoverPage.pageNumber}</span>
               <span className="text-slate-500">/</span>
               <span>{totalPages}</span>
               {targetHoverPage.isBookmarked && (
-                <Star size={11} className="fill-amber-400 text-amber-400 ml-0.5" />
+                <Star size={12} className="fill-amber-400 text-amber-400 ml-0.5" />
               )}
             </div>
             {targetHoverPage.title && (
-              <span className="text-[10px] text-slate-400 max-w-[100px] truncate">
+              <span className="text-[10px] text-slate-400 max-w-[110px] truncate">
                 {targetHoverPage.title}
               </span>
             )}
           </div>
           {/* Arrow pointing to scrubber track */}
-          <div className="w-2.5 h-2.5 bg-slate-900 border-r border-b border-slate-700/80 rotate-45 -mt-1.5" />
+          <div className="w-2.5 h-2.5 bg-[#090d16] border-r border-b border-white/10 rotate-45 -mt-1.5" />
         </div>
       )}
 
       {/* Main Scrubber Pill Bar */}
-      <div className="bg-slate-900/95 text-white px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-2xl border border-slate-700/80 shadow-2xl backdrop-blur-md flex items-center gap-1 sm:gap-2 ring-1 ring-black/10 max-w-[94vw]">
+      <div className="bg-[#090d16]/90 text-white px-3 sm:px-4 py-2 rounded-2xl border border-white/10 shadow-2xl backdrop-blur-2xl flex items-center gap-1.5 sm:gap-2.5 ring-1 ring-white/10 max-w-[94vw]">
         {/* Quick Jump: First Page */}
         <button
           onClick={() => jumpTo(0)}
           disabled={activePageIndex === 0}
-          className={`p-1.5 rounded-lg transition-colors hidden sm:flex ${
+          className={`p-1.5 rounded-xl transition-colors hidden sm:flex ${
             activePageIndex > 0
               ? 'text-slate-300 hover:text-white hover:bg-slate-800'
               : 'text-slate-600 cursor-not-allowed'
@@ -220,7 +220,7 @@ export const PageScrubberBar: React.FC = () => {
         <button
           onClick={() => jumpTo(activePageIndex - 1)}
           disabled={activePageIndex === 0}
-          className={`p-1.5 rounded-lg transition-colors ${
+          className={`p-1.5 rounded-xl transition-colors ${
             activePageIndex > 0
               ? 'text-slate-300 hover:text-white hover:bg-slate-800'
               : 'text-slate-600 cursor-not-allowed'
@@ -237,14 +237,14 @@ export const PageScrubberBar: React.FC = () => {
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
           onPointerLeave={handleTrackLeave}
-          className="relative w-20 xs:w-28 sm:w-56 h-6 flex items-center cursor-pointer group px-1"
+          className="relative w-24 xs:w-32 sm:w-60 h-6 flex items-center cursor-pointer group px-1"
           title="Kaydırarak sayfalar arasında hızla gezin"
         >
           {/* Track Line */}
-          <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden border border-slate-750">
+          <div className="w-full h-2 bg-slate-900 rounded-full overflow-hidden border border-white/10">
             {/* Active progress bar */}
             <div
-              className="h-full bg-gradient-to-r from-indigo-500 to-indigo-400 transition-all duration-75"
+              className="h-full bg-gradient-to-r from-indigo-500 via-indigo-400 to-violet-400 transition-all duration-75 shadow-sm"
               style={{
                 width: `${((activePageIndex + 1) / totalPages) * 100}%`,
               }}
@@ -258,7 +258,7 @@ export const PageScrubberBar: React.FC = () => {
             return (
               <div
                 key={`bm_dot_${p.id}`}
-                className="absolute top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-amber-400 pointer-events-none shadow"
+                className="absolute top-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-amber-400 pointer-events-none shadow-md shadow-amber-500/50"
                 style={{ left: `${leftPct}%` }}
                 title={`Sayfa ${p.pageNumber} Yer İmi`}
               />
@@ -267,7 +267,7 @@ export const PageScrubberBar: React.FC = () => {
 
           {/* Draggable Scrubber Thumb */}
           <div
-            className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-4 h-4 rounded-full bg-white border-2 border-indigo-600 shadow-lg group-hover:scale-125 transition-transform"
+            className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-4.5 h-4.5 rounded-full bg-white border-2 border-indigo-600 shadow-xl group-hover:scale-125 transition-transform"
             style={{
               left: `${(activePageIndex / (totalPages - 1 || 1)) * 100}%`,
             }}
@@ -278,7 +278,7 @@ export const PageScrubberBar: React.FC = () => {
         <button
           onClick={() => jumpTo(activePageIndex + 1)}
           disabled={activePageIndex >= totalPages - 1}
-          className={`p-1.5 rounded-lg transition-colors ${
+          className={`p-1.5 rounded-xl transition-colors ${
             activePageIndex < totalPages - 1
               ? 'text-slate-300 hover:text-white hover:bg-slate-800'
               : 'text-slate-600 cursor-not-allowed'
@@ -292,7 +292,7 @@ export const PageScrubberBar: React.FC = () => {
         <button
           onClick={() => jumpTo(totalPages - 1)}
           disabled={activePageIndex >= totalPages - 1}
-          className={`p-1.5 rounded-lg transition-colors hidden sm:flex ${
+          className={`p-1.5 rounded-xl transition-colors hidden sm:flex ${
             activePageIndex < totalPages - 1
               ? 'text-slate-300 hover:text-white hover:bg-slate-800'
               : 'text-slate-600 cursor-not-allowed'
@@ -302,10 +302,10 @@ export const PageScrubberBar: React.FC = () => {
           <ChevronsRight size={15} />
         </button>
 
-        <div className="w-px h-4 bg-slate-750 mx-0.5" />
+        <div className="w-px h-5 bg-white/10 mx-1" />
 
         {/* Page Counter Badge */}
-        <span className="text-xs font-mono font-bold text-indigo-300 min-w-[42px] text-center">
+        <span className="text-xs font-mono font-bold text-indigo-300 min-w-[44px] text-center">
           {activePageIndex + 1}/{totalPages}
         </span>
 
@@ -315,9 +315,9 @@ export const PageScrubberBar: React.FC = () => {
             triggerHaptic('light');
             togglePageBookmark(activePageIndex);
           }}
-          className={`p-1.5 rounded-lg transition-colors ${
+          className={`p-1.5 rounded-xl transition-colors ${
             currentPage?.isBookmarked
-              ? 'text-amber-400 hover:bg-slate-800'
+              ? 'text-amber-400 bg-amber-400/15'
               : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
           }`}
           title={currentPage?.isBookmarked ? 'Yer İmini Kaldır' : 'Bu Sayfayı Yer İmlerine Ekle'}
@@ -328,19 +328,19 @@ export const PageScrubberBar: React.FC = () => {
         {/* Add Page Button */}
         <button
           onClick={() => addPage()}
-          className="p-1.5 text-slate-400 hover:text-indigo-400 hover:bg-slate-800 rounded-lg transition-colors"
+          className="p-1.5 text-slate-400 hover:text-indigo-400 hover:bg-slate-800 rounded-xl transition-colors"
           title="Sonrasına Yeni Sayfa Ekle"
         >
-          <Plus size={15} />
+          <Plus size={16} />
         </button>
 
         {/* Open Page Grid Manager */}
         <button
           onClick={() => setPageManagerModalOpen(true)}
-          className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
+          className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition-colors"
           title="Tüm Sayfaları Gör (Sayfa Yöneticisi)"
         >
-          <LayoutGrid size={14} />
+          <LayoutGrid size={15} />
         </button>
       </div>
     </div>

@@ -414,6 +414,15 @@ interface NotebookStoreState {
   unlockNotebookSession: (notebookId: string) => void;
   isNotebookSessionUnlocked: (notebookId: string) => boolean;
 
+  // FAZ AN: Page-level PIN lock & auto-lock
+  unlockedPageIds: string[];
+  autoLockMinutes: number;
+  setPagePin: (notebookId: string, pageId: string, pin: string | null) => Promise<void>;
+  unlockPageSession: (pageId: string) => void;
+  isPageSessionUnlocked: (pageId: string) => boolean;
+  lockAllNotebooks: () => void;
+  setAutoLockMinutes: (minutes: number) => void;
+
   // Faz C: Full Library Backup & Restore
   exportVaultBackup: () => void;
   importVaultBackup: (file: File) => Promise<{ success: boolean; importedCount: number; error?: string }>;
@@ -825,6 +834,10 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
   liveTranscript: '',
   isTranscribing: false,
   unlockedNotebookIds: [],
+
+  // FAZ AN Initial State
+  unlockedPageIds: [],
+  autoLockMinutes: 0,
 
   // Faz D Initial State
   compassVisible: false,
@@ -3003,6 +3016,46 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
     const nb = notebooks.find((n) => n.id === notebookId);
     if (!nb || !nb.isLocked) return true;
     return unlockedNotebookIds.includes(notebookId);
+  },
+
+  // FAZ AN: Page-level PIN lock & auto-lock
+  setPagePin: async (notebookId: string, pageId: string, pin: string | null) => {
+    const { notebooks } = get();
+    const updatedNotebooks = notebooks.map((nb) =>
+      nb.id === notebookId
+        ? {
+            ...nb,
+            pages: nb.pages.map((p) =>
+              p.id === pageId
+                ? { ...p, isLocked: !!pin, pagePinCode: pin || undefined }
+                : p
+            ),
+            updatedAt: Date.now(),
+          }
+        : nb
+    );
+    set({ notebooks: updatedNotebooks });
+    const target = updatedNotebooks.find((n) => n.id === notebookId);
+    if (target) await saveNotebookToDB(target);
+  },
+
+  unlockPageSession: (pageId: string) => {
+    set((state) => ({
+      unlockedPageIds: Array.from(new Set([...state.unlockedPageIds, pageId])),
+    }));
+  },
+
+  isPageSessionUnlocked: (pageId: string) => {
+    const { unlockedPageIds } = get();
+    return unlockedPageIds.includes(pageId);
+  },
+
+  lockAllNotebooks: () => {
+    set({ unlockedNotebookIds: [], unlockedPageIds: [] });
+  },
+
+  setAutoLockMinutes: (minutes: number) => {
+    set({ autoLockMinutes: minutes });
   },
 
   // FAZ C: FULL LIBRARY VAULT BACKUP & RESTORE ACTIONS

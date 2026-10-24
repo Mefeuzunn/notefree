@@ -72,21 +72,21 @@ export const App: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="h-screen w-screen bg-slate-950 flex flex-col items-center justify-center text-slate-100">
-        <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center text-white shadow-xl shadow-indigo-600/30 mb-4 animate-pulse">
-          <BookOpen size={28} />
+      <div className="h-screen w-screen bg-[#090d16] flex flex-col items-center justify-center text-slate-100">
+        <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-violet-500 flex items-center justify-center text-white shadow-2xl shadow-indigo-600/40 mb-4 animate-pulse ring-1 ring-white/20">
+          <BookOpen size={30} />
         </div>
-        <h1 className="text-xl font-bold tracking-tight mb-2">NotFree</h1>
+        <h1 className="font-display text-2xl font-bold tracking-tight mb-2 text-white">Notefree</h1>
         <p className="text-xs text-slate-400 flex items-center gap-2">
           <Loader2 size={14} className="animate-spin text-indigo-400" />
-          Defterler ve çizim motoru hazırlanıyor...
+          Dijital stüdyo ve çizim motoru hazırlanıyor...
         </p>
       </div>
     );
   }
 
   return (
-    <div className="h-screen w-screen flex flex-col overflow-hidden bg-slate-950 text-slate-100 font-sans select-none">
+    <div className="h-screen w-screen flex flex-col overflow-hidden bg-[#090d16] text-slate-100 font-sans select-none">
       {/* 1. Document Tabs Bar (GoodNotes Multi-Document Tabs) */}
       {!presentationMode && <DocumentTabsBar />}
 

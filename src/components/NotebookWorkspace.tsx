@@ -746,11 +746,11 @@ export const NotebookWorkspace: React.FC = () => {
       <TapeQuizToolbar />
 
       {/* Desktop Floating Zoom & View Controls Dock (Bottom Left - >= 1024px) */}
-      <div className="fixed bottom-5 left-5 z-30 hidden lg:flex items-center bg-slate-900/90 backdrop-blur-md border border-slate-800/80 rounded-2xl px-2 py-1.5 shadow-2xl gap-1">
+      <div className="fixed bottom-5 left-5 z-30 hidden lg:flex items-center bg-[#090d16]/90 backdrop-blur-2xl border border-white/10 rounded-2xl px-2.5 py-1.5 shadow-2xl gap-1.5 ring-1 ring-white/10">
         <button
           onClick={() => setZoom(zoom - 0.1)}
           disabled={zoom <= 0.4}
-          className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 disabled:opacity-40"
+          className="p-1.5 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800/80 disabled:opacity-40 transition-colors"
           title="Uzaklaş"
         >
           <ZoomOut size={15} />
@@ -758,7 +758,7 @@ export const NotebookWorkspace: React.FC = () => {
 
         <span
           onClick={resetView}
-          className="text-xs font-mono font-medium text-slate-300 px-2 cursor-pointer hover:text-indigo-400"
+          className="text-xs font-mono font-semibold text-slate-200 px-2 cursor-pointer hover:text-indigo-400 transition-colors"
           title="Yakınlaştırmayı Sıfırla (%100)"
         >
           {Math.round(zoom * 100)}%
@@ -767,13 +767,13 @@ export const NotebookWorkspace: React.FC = () => {
         <button
           onClick={() => setZoom(zoom + 0.1)}
           disabled={zoom >= 3.0}
-          className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 disabled:opacity-40"
+          className="p-1.5 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800/80 disabled:opacity-40 transition-colors"
           title="Yakınlaş"
         >
           <ZoomIn size={15} />
         </button>
 
-        <div className="w-px h-4 bg-slate-800 mx-1" />
+        <div className="w-px h-4 bg-white/10 mx-1" />
 
         {/* Continuous Scroll vs Single Page Toggle (only in paged mode) */}
         {canvasMode === 'paged' && (
@@ -781,10 +781,10 @@ export const NotebookWorkspace: React.FC = () => {
             onClick={() =>
               setViewMode(viewMode === 'continuous' ? 'single' : 'continuous')
             }
-            className={`p-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1 ${
+            className={`p-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 ${
               viewMode === 'continuous'
-                ? 'bg-indigo-600/30 text-indigo-300 border border-indigo-500/30'
-                : 'text-slate-400 hover:text-white'
+                ? 'bg-indigo-600/30 text-indigo-300 border border-indigo-500/40 ring-1 ring-indigo-400/30'
+                : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
             }`}
             title={
               viewMode === 'continuous'
@@ -803,10 +803,10 @@ export const NotebookWorkspace: React.FC = () => {
         {canvasMode === 'paged' && (
           <button
             onClick={toggleTwoPageSpread}
-            className={`p-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5 ${
+            className={`p-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 ${
               twoPageSpread
-                ? 'bg-indigo-600/30 text-indigo-300 border border-indigo-500/50 font-semibold shadow-sm'
-                : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                ? 'bg-indigo-600/30 text-indigo-300 border border-indigo-500/50 shadow-xs'
+                : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
             }`}
             title="Çift Sayfa Kitap / Defter Görünümü (Book Spread Mode)"
           >
@@ -818,10 +818,10 @@ export const NotebookWorkspace: React.FC = () => {
         {/* 📑 Faz F: LiquidText Style Margin Workspace Toggle */}
         <button
           onClick={toggleMarginWorkspace}
-          className={`p-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5 ${
+          className={`p-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 ${
             marginWorkspaceOpen
-              ? 'bg-indigo-600/30 text-indigo-300 border border-indigo-500/50 font-semibold shadow-sm'
-              : 'text-slate-400 hover:text-white hover:bg-slate-800'
+              ? 'bg-indigo-600/30 text-indigo-300 border border-indigo-500/50 shadow-xs'
+              : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
           }`}
           title="LiquidText Stili Sayfa Kenarı Not & Alıntı Alanı (Study Margin)"
         >
@@ -832,10 +832,10 @@ export const NotebookWorkspace: React.FC = () => {
         {/* 📑 Faz AA: Digital Planner Edge Tabs Toggle */}
         <button
           onClick={togglePlannerTabs}
-          className={`p-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5 ${
+          className={`p-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 ${
             plannerTabsVisible
-              ? 'bg-indigo-600/30 text-indigo-300 border border-indigo-500/50 font-semibold shadow-sm'
-              : 'text-slate-400 hover:text-white hover:bg-slate-800'
+              ? 'bg-indigo-600/30 text-indigo-300 border border-indigo-500/50 shadow-xs'
+              : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
           }`}
           title="Dijital Ajanda Sekmeleri (Planner Tabs - J)"
         >
@@ -846,10 +846,10 @@ export const NotebookWorkspace: React.FC = () => {
         {/* 🧠 Faz H: Active Recall Tape Quiz Mode Toggle */}
         <button
           onClick={() => setTapeQuizMode(!tapeQuizMode)}
-          className={`p-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5 ${
+          className={`p-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 ${
             tapeQuizMode
-              ? 'bg-amber-500/20 text-amber-300 border border-amber-500/50 font-semibold shadow-sm'
-              : 'text-slate-400 hover:text-white hover:bg-slate-800'
+              ? 'bg-amber-500/20 text-amber-300 border border-amber-500/50 shadow-xs'
+              : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
           }`}
           title="Ezber Bantları Aktif Hatırlama Sınav Modu"
         >

@@ -161,25 +161,25 @@ export const PageManagerModal: React.FC<PageManagerModalProps> = ({ isOpen, onCl
   };
 
   return (
-    <div className="fixed inset-0 bg-black/75 backdrop-blur-md z-50 flex flex-col select-none animate-in fade-in duration-200">
+    <div className="fixed inset-0 bg-[#090d16]/95 backdrop-blur-3xl z-50 flex flex-col select-none animate-in fade-in duration-200">
       {/* Toast notification */}
       {toastMsg && (
-        <div className="absolute top-18 left-1/2 -translate-x-1/2 z-60 bg-indigo-600/95 text-white text-xs font-semibold px-4 py-2 rounded-2xl shadow-2xl border border-indigo-400/50 flex items-center gap-2 animate-in fade-in zoom-in-95">
+        <div className="absolute top-20 left-1/2 -translate-x-1/2 z-60 bg-indigo-600/95 text-white text-xs font-semibold px-4 py-2 rounded-2xl shadow-2xl border border-white/20 flex items-center gap-2 animate-in fade-in zoom-in-95">
           <Sparkles size={14} className="text-amber-300" />
           <span>{toastMsg}</span>
         </div>
       )}
 
       {/* Header */}
-      <div className="h-14 bg-slate-900 border-b border-slate-800 px-6 flex items-center justify-between shadow-sm shrink-0">
-        <div className="flex items-center gap-2.5">
-          <div className="p-1.5 rounded-lg bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+      <div className="h-16 bg-slate-950/60 backdrop-blur-2xl border-b border-white/10 px-6 sm:px-8 flex items-center justify-between shadow-sm shrink-0">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center text-white shadow-lg shadow-indigo-600/30 ring-1 ring-white/20">
             <Grid size={18} />
           </div>
           <div>
-            <h2 className="text-sm font-bold text-slate-100 flex items-center gap-2">
+            <h2 className="font-display text-sm font-bold text-white flex items-center gap-2 tracking-tight">
               Sayfa Düzenleyici & Sıralayıcı
-              <span className="text-xs px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 font-normal">
+              <span className="text-[11px] px-2 py-0.5 rounded-full bg-indigo-500/10 border border-indigo-500/30 text-indigo-400 font-semibold">
                 {pages.length} Sayfa
               </span>
             </h2>
@@ -199,10 +199,10 @@ export const PageManagerModal: React.FC<PageManagerModalProps> = ({ isOpen, onCl
               setIsSelectionMode(!isSelectionMode);
               if (isSelectionMode) setSelectedIndices(new Set());
             }}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all shadow-sm ${
+            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all shadow-sm ${
               isSelectionMode
                 ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
-                : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700'
+                : 'bg-slate-900/80 hover:bg-slate-800 text-slate-300 border border-white/10'
             }`}
           >
             <CheckSquare size={14} />
@@ -212,7 +212,7 @@ export const PageManagerModal: React.FC<PageManagerModalProps> = ({ isOpen, onCl
           {isSelectionMode && (
             <button
               onClick={handleSelectAll}
-              className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-medium transition-colors"
+              className="px-3 py-2 bg-slate-900/80 hover:bg-slate-800 text-slate-300 rounded-xl text-xs font-medium border border-white/10 transition-colors"
             >
               {selectedIndices.size === pages.length ? 'Tümünü Bırak' : 'Tümünü Seç'}
             </button>
@@ -223,7 +223,7 @@ export const PageManagerModal: React.FC<PageManagerModalProps> = ({ isOpen, onCl
               triggerHaptic('light');
               addPage();
             }}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold shadow-md transition-all active:scale-95"
+            className="flex items-center gap-1.5 px-3.5 py-2 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-indigo-600/30 transition-all active:scale-95 border border-indigo-400/30"
           >
             <Plus size={14} />
             <span>Sona Sayfa Ekle</span>
@@ -231,7 +231,7 @@ export const PageManagerModal: React.FC<PageManagerModalProps> = ({ isOpen, onCl
 
           <button
             onClick={onClose}
-            className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors"
+            className="p-2 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800/80 transition-colors ml-1"
           >
             <X size={18} />
           </button>
