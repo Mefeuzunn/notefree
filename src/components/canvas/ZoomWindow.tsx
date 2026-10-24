@@ -80,11 +80,13 @@ export const ZoomWindow: React.FC = () => {
     // Paper color background fill
     const paperColorHex =
       currentPage.paperColor === 'dark'
-        ? '#181b26'
+        ? '#141923'
         : currentPage.paperColor === 'cream'
-        ? '#fcfaf2'
+        ? '#faf7ee'
         : currentPage.paperColor === 'yellow-pad'
         ? '#fefce8'
+        : currentPage.paperColor === 'sage'
+        ? '#f2f5f0'
         : currentPage.paperColor === 'kraft'
         ? '#e7d8be'
         : '#ffffff';

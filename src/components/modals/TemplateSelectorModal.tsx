@@ -66,10 +66,11 @@ const TEMPLATES: TemplateItem[] = [
 
 const COLORS: Array<{ id: PaperColor; name: string; bg: string }> = [
   { id: 'white', name: 'Saf Beyaz', bg: '#ffffff' },
-  { id: 'cream', name: 'Krem / Fildişi', bg: '#fcfaf2' },
+  { id: 'cream', name: 'Doğal Krem', bg: '#faf7ee' },
   { id: 'yellow-pad', name: 'Sarı Bloknot', bg: '#fefce8' },
+  { id: 'sage', name: 'Adaçayı Yeşili', bg: '#f2f5f0' },
   { id: 'kraft', name: 'Kraft Kağıt', bg: '#e7d8be' },
-  { id: 'dark', name: 'Koyu Mod', bg: '#181b26' },
+  { id: 'dark', name: 'Koyu Mod', bg: '#141923' },
 ];
 
 const PRESET_LINE_COLORS = [
@@ -567,7 +568,7 @@ export const TemplateSelectorModal: React.FC = () => {
               <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider block mb-3">
                 Kağıt Rengi & Dokusu
               </label>
-              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
                 {COLORS.map((col) => (
                   <button
                     key={col.id}

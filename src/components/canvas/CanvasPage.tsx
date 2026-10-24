@@ -215,6 +215,16 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
     particles: Array<{ dx: number; dy: number; size: number; color: string }>;
   } | null>(null);
 
+  // Apple Pencil Hover & Brush Halo Preview
+  const [hoverIndicator, setHoverIndicator] = useState<{
+    x: number;
+    y: number;
+    size: number;
+    color: string;
+    isPen: boolean;
+    isEraser: boolean;
+  } | null>(null);
+
   // FAZ M: Stylus Action Handler (Double-Tap or Barrel Button)
   const executeStylusAction = useCallback(
     (action?: StylusDoubleTapAction) => {
@@ -455,13 +465,15 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
 
     switch (page.paperColor) {
       case 'cream':
-        return '#fdfbf7';
+        return '#faf7ee';
       case 'yellow-pad':
-        return '#fef9c3';
+        return '#fefce8';
+      case 'sage':
+        return '#f2f5f0';
       case 'dark':
-        return '#0f172a';
+        return '#141923';
       case 'kraft':
-        return '#e7d8c9';
+        return '#e7d8be';
       default:
         return '#ffffff';
     }
@@ -529,6 +541,7 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
 
   // Pointer Down
   const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    setHoverIndicator(null);
     if (activeTool === 'pan') return;
 
     if (e.pointerType === 'pen') {
@@ -816,7 +829,46 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
     }
 
     if (didTriggerHoldToLassoRef.current) return;
-    if (!isDrawing) return;
+
+    // Apple Pencil Hover Indicator (Stylus or Mouse hovering without drawing)
+    if (!isDrawing) {
+      if (e.pointerType === 'pen' || e.pointerType === 'mouse') {
+        const isDrawingTool = [
+          'ballpoint',
+          'fountain',
+          'brush',
+          'highlighter',
+          'pencil',
+          'fineliner',
+          'neon',
+          'dashed',
+          'eraser',
+        ].includes(activeTool);
+
+        if (isDrawingTool) {
+          const sz =
+            activeTool === 'eraser'
+              ? toolSettings.eraserSize || 25
+              : activeTool === 'highlighter'
+              ? (toolSettings.size || 3.5) * 4
+              : toolSettings.size || 3.5;
+
+          setHoverIndicator({
+            x,
+            y,
+            size: sz,
+            color: activeTool === 'eraser' ? '#ef4444' : toolSettings.color,
+            isPen: e.pointerType === 'pen',
+            isEraser: activeTool === 'eraser',
+          });
+        } else if (hoverIndicator) {
+          setHoverIndicator(null);
+        }
+      } else if (hoverIndicator) {
+        setHoverIndicator(null);
+      }
+      return;
+    }
 
     if (activeTool === 'eraser') {
       handleEraser(x, y);
@@ -2030,8 +2082,37 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerUp}
+        onPointerLeave={() => setHoverIndicator(null)}
         onContextMenu={(e) => e.preventDefault()}
       />
+
+      {/* Apple Pencil Hover & Brush Halo Preview */}
+      {hoverIndicator && (
+        <div
+          className="pointer-events-none absolute -translate-x-1/2 -translate-y-1/2 rounded-full transition-transform duration-75 z-20"
+          style={{
+            left: `${hoverIndicator.x * scale}px`,
+            top: `${hoverIndicator.y * scale}px`,
+            width: `${Math.max(6, hoverIndicator.size * scale)}px`,
+            height: `${Math.max(6, hoverIndicator.size * scale)}px`,
+            borderColor: hoverIndicator.isEraser ? 'rgba(239, 68, 68, 0.85)' : hoverIndicator.color,
+            backgroundColor: hoverIndicator.isEraser
+              ? 'rgba(239, 68, 68, 0.12)'
+              : `${hoverIndicator.color}22`,
+            borderWidth: '1.5px',
+            borderStyle: hoverIndicator.isEraser ? 'dashed' : 'solid',
+            boxShadow: `0 0 10px ${hoverIndicator.isEraser ? 'rgba(239, 68, 68, 0.4)' : `${hoverIndicator.color}55`}`,
+          }}
+        >
+          {/* Micro Precision Target Dot */}
+          <div
+            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full ring-1 ring-white/60"
+            style={{
+              backgroundColor: hoverIndicator.isEraser ? '#ef4444' : hoverIndicator.color,
+            }}
+          />
+        </div>
+      )}
 
       {/* Layer 3: Lasso Active Transform Box & Popup Menu */}
       {isLassoOnThisPage && lassoSelection && (

@@ -167,6 +167,26 @@ export const NotebookWorkspace: React.FC = () => {
     }, 1200);
   }, []);
 
+  // Mobile / Screen Fit-to-Width Helper
+  const fitToWidth = useCallback(() => {
+    const containerW = containerRef.current?.clientWidth || window.innerWidth;
+    const pageW = pages[0]?.width || 800;
+    const newScale = Math.max(0.35, Math.min(2.0, (containerW - 16) / pageW));
+    setZoom(Number(newScale.toFixed(2)));
+    showShortcutHud('Genişliğe Sığdırıldı', `${Math.round(newScale * 100)}%`);
+  }, [pages, setZoom, showShortcutHud]);
+
+  // Auto-fit on initial mobile load
+  const mobileAutoFitDoneRef = useRef(false);
+  useEffect(() => {
+    if (!mobileAutoFitDoneRef.current && pages.length > 0) {
+      mobileAutoFitDoneRef.current = true;
+      if (window.innerWidth < 768) {
+        fitToWidth();
+      }
+    }
+  }, [pages.length, fitToWidth]);
+
   // Navigation & Gestures: Trackpad horizontal swipe, touch swipe, zoom & power user keyboard shortcuts
   useEffect(() => {
     const el = containerRef.current;
@@ -879,7 +899,7 @@ export const NotebookWorkspace: React.FC = () => {
       </div>
 
       {/* Mobile / Tablet Collapsible View Controls Pill (Bottom Left - < 1024px) */}
-      <div className="fixed bottom-4 left-4 z-30 flex lg:hidden items-center select-none">
+      <div className="fixed bottom-18 md:bottom-4 left-4 z-30 flex lg:hidden items-center select-none">
         <button
           type="button"
           onClick={() => {
@@ -914,7 +934,7 @@ export const NotebookWorkspace: React.FC = () => {
                 onClick={resetView}
                 className="px-2 py-1 text-slate-300 hover:text-indigo-300 font-mono text-[11px]"
               >
-                Sıfırla (%100)
+                %100
               </button>
               <button
                 type="button"
@@ -922,6 +942,30 @@ export const NotebookWorkspace: React.FC = () => {
                 className="p-1.5 text-slate-300 hover:text-white rounded-lg bg-slate-700/50"
               >
                 <ZoomIn size={14} />
+              </button>
+            </div>
+
+            {/* Quick Sığdır & %100 presets */}
+            <div className="grid grid-cols-2 gap-1.5">
+              <button
+                type="button"
+                onClick={() => {
+                  resetView();
+                  setViewMenuOpen(false);
+                }}
+                className="py-1 px-2 text-center rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-[11px] font-medium"
+              >
+                Varsayılan (%100)
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  fitToWidth();
+                  setViewMenuOpen(false);
+                }}
+                className="py-1 px-2 text-center rounded-lg bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-300 hover:text-white border border-indigo-500/40 text-[11px] font-semibold"
+              >
+                Genişliğe Sığdır
               </button>
             </div>
 
@@ -999,7 +1043,7 @@ export const NotebookWorkspace: React.FC = () => {
       <button
         type="button"
         onClick={() => setStickersDrawerOpen(true)}
-        className="fixed bottom-4 right-4 z-30 flex items-center gap-1.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-bold text-xs px-3 py-2 rounded-2xl shadow-xl shadow-amber-500/20 hover:scale-105 transition-all"
+        className="fixed bottom-18 md:bottom-4 right-4 z-30 flex items-center gap-1.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-bold text-xs px-3 py-2 rounded-2xl shadow-xl shadow-amber-500/20 hover:scale-105 transition-all"
         title="Çıkartmalar ve Notlar Çekmecesi (Elements)"
       >
         <Sparkles size={16} />

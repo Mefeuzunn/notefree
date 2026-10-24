@@ -67,7 +67,7 @@ export type PageTemplate =
   | 'planner-habit'
   | 'tianzige-kanji';
 
-export type PaperColor = 'white' | 'cream' | 'yellow-pad' | 'dark' | 'kraft';
+export type PaperColor = 'white' | 'cream' | 'yellow-pad' | 'dark' | 'kraft' | 'sage';
 
 export type CoverStyle = 'classic' | 'leather' | 'pastel' | 'spiral' | 'modern';
 

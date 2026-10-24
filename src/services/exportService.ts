@@ -322,16 +322,19 @@ export async function renderPageToCanvas(
     let bgColor = '#ffffff';
     switch (page.paperColor) {
       case 'cream':
-        bgColor = '#fdfbf7';
+        bgColor = '#faf7ee';
         break;
       case 'yellow-pad':
         bgColor = '#fefce8';
         break;
+      case 'sage':
+        bgColor = '#f2f5f0';
+        break;
       case 'dark':
-        bgColor = '#0f172a';
+        bgColor = '#141923';
         break;
       case 'kraft':
-        bgColor = '#f5ede4';
+        bgColor = '#e7d8be';
         break;
       default:
         bgColor = '#ffffff';
@@ -636,10 +639,11 @@ export async function renderTableOfContentsPage(
   // Background
   const paperColors: Record<string, string> = {
     white: '#ffffff',
-    cream: '#fdfbf7',
-    'yellow-pad': '#fef9c3',
-    dark: '#1e293b',
-    kraft: '#f5ebe0',
+    cream: '#faf7ee',
+    'yellow-pad': '#fefce8',
+    sage: '#f2f5f0',
+    dark: '#141923',
+    kraft: '#e7d8be',
   };
   const baseBg = paperColors[notebook.pages[0]?.paperColor || 'cream'] || '#ffffff';
   ctx.fillStyle = baseBg;

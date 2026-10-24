@@ -554,6 +554,16 @@ interface NotebookStoreState {
   setNewNotebookModalOpen: (open: boolean) => void;
   setPageManagerModalOpen: (open: boolean) => void;
 
+  // Ergonomics & Distraction-Free View Modes
+  zenMode: boolean;
+  setZenMode: (zen: boolean) => void;
+  toggleZenMode: () => void;
+  tabletToolbarPlacement: 'top' | 'left' | 'right';
+  setTabletToolbarPlacement: (pos: 'top' | 'left' | 'right') => void;
+  mobileToolDockCollapsed: boolean;
+  setMobileToolDockCollapsed: (collapsed: boolean) => void;
+  toggleMobileToolDockCollapsed: () => void;
+
   // Faz AA: Interactive Hyperlinks & Digital Planner Tabs
   plannerTabsVisible: boolean;
   togglePlannerTabs: () => void;
@@ -799,6 +809,10 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
   presentationTimer: 0,
   isPresentationTimerRunning: false,
   lassoSelection: null,
+
+  zenMode: false,
+  tabletToolbarPlacement: 'top',
+  mobileToolDockCollapsed: false,
 
   minimapVisible: false,
   plannerTabsVisible: false,
@@ -4309,6 +4323,26 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
 
   setShortcutsModalOpen: (open: boolean) => {
     set({ shortcutsModalOpen: open });
+  },
+
+  setZenMode: (zen: boolean) => {
+    set({ zenMode: zen });
+  },
+
+  toggleZenMode: () => {
+    set((state) => ({ zenMode: !state.zenMode }));
+  },
+
+  setTabletToolbarPlacement: (pos: 'top' | 'left' | 'right') => {
+    set({ tabletToolbarPlacement: pos });
+  },
+
+  setMobileToolDockCollapsed: (collapsed: boolean) => {
+    set({ mobileToolDockCollapsed: collapsed });
+  },
+
+  toggleMobileToolDockCollapsed: () => {
+    set((state) => ({ mobileToolDockCollapsed: !state.mobileToolDockCollapsed }));
   },
 
   importPagesAsNotebook: async (pages: Page[], title: string, pdfOutline?: PdfOutlineItem[]) => {

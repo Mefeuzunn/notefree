@@ -277,11 +277,14 @@ export const Minimap: React.FC<MinimapProps> = ({
       ctx.save();
       const paperBgMap: Record<string, string> = {
         white: '#ffffff',
-        cream: '#fefcf0',
-        dark: '#1e293b',
-        black: '#0f172a',
+        cream: '#faf7ee',
+        'yellow-pad': '#fefce8',
+        sage: '#f2f5f0',
+        kraft: '#e7d8be',
+        dark: '#141923',
+        black: '#0a0d14',
       };
-      ctx.fillStyle = paperBgMap[currentPage?.paperColor || 'cream'] || '#fefcf0';
+      ctx.fillStyle = paperBgMap[currentPage?.paperColor || 'cream'] || '#faf7ee';
       ctx.fillRect(offsetX, offsetY, renderW, renderH);
 
       // Page border and drop shadow

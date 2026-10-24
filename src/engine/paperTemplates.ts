@@ -8,16 +8,16 @@ export const PAPER_COLORS: Record<PaperColor, { bg: string; line: string; margin
     text: '#64748b',
   },
   cream: {
-    bg: '#fcfaf2',
-    line: '#e9e3d3',
+    bg: '#faf7ee',
+    line: '#e5dfcf',
     margin: '#f87171',
-    text: '#78716c',
+    text: '#6d685c',
   },
   'yellow-pad': {
     bg: '#fefce8',
-    line: '#fef08a',
+    line: '#f2e8b0',
     margin: '#ef4444',
-    text: '#854d0e',
+    text: '#78350f',
   },
   kraft: {
     bg: '#e7d8be',
@@ -25,11 +25,17 @@ export const PAPER_COLORS: Record<PaperColor, { bg: string; line: string; margin
     margin: '#b91c1c',
     text: '#78350f',
   },
+  sage: {
+    bg: '#f2f5f0',
+    line: '#dae3d6',
+    margin: '#e27b7b',
+    text: '#4a5b48',
+  },
   dark: {
-    bg: '#181b26',
-    line: '#282f44',
+    bg: '#141923',
+    line: '#222938',
     margin: '#e11d48',
-    text: '#94a3b8',
+    text: '#8b9bb2',
   },
 };
 

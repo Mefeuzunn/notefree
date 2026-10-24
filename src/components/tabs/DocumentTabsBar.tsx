@@ -31,7 +31,7 @@ export const DocumentTabsBar: React.FC = () => {
   }
 
   return (
-    <div className="h-10 bg-[#090d16]/90 backdrop-blur-xl border-b border-white/10 px-3 flex items-center justify-between z-30 select-none overflow-hidden shrink-0">
+    <div className="hidden md:flex h-10 bg-[#090d16]/90 backdrop-blur-xl border-b border-white/10 px-3 items-center justify-between z-30 select-none overflow-hidden shrink-0">
       {/* Scrollable Tabs List */}
       <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none flex-1 py-1">
         {openNotebookIds.map((nbId) => {

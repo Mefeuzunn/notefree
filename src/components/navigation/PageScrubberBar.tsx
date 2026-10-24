@@ -170,7 +170,7 @@ export const PageScrubberBar: React.FC = () => {
 
   return (
     <div
-      className="fixed bottom-4 left-1/2 -translate-x-1/2 z-30 select-none flex flex-col items-center pointer-events-auto"
+      className="hidden md:flex fixed bottom-4 left-1/2 -translate-x-1/2 z-30 select-none flex-col items-center pointer-events-auto"
       onMouseEnter={() => setIsExpanded(true)}
       onMouseLeave={() => {
         if (!isScrubbing) setIsExpanded(false);

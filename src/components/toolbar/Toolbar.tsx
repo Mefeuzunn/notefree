@@ -74,6 +74,9 @@ import {
   MoreHorizontal,
   X,
   ChevronDown,
+  ChevronUp,
+  Plus,
+  Maximize2,
   GraduationCap,
   Palette,
 } from 'lucide-react';
@@ -200,6 +203,11 @@ export const Toolbar: React.FC = () => {
     addPageLinkToCurrentPage,
     setStampCreatorModalOpen,
     addTableToCurrentPage,
+    zenMode,
+    toggleZenMode,
+    mobileToolDockCollapsed,
+    toggleMobileToolDockCollapsed,
+    addPage,
   } = useNotebookStore();
 
   // Active Dropdown state
@@ -355,6 +363,19 @@ export const Toolbar: React.FC = () => {
                 title="Sonraki Sayfa"
               >
                 <ChevronRight size={13} />
+              </button>
+
+              <div className="w-px h-3.5 bg-white/10 mx-0.5" />
+              <button
+                type="button"
+                onClick={() => {
+                  triggerHaptic('medium');
+                  addPage();
+                }}
+                className="p-1.5 rounded-lg text-indigo-400 hover:text-white hover:bg-indigo-600/40 transition-colors"
+                title="Yeni Sayfa Ekle"
+              >
+                <Plus size={13} />
               </button>
             </div>
           </div>
@@ -1373,6 +1394,19 @@ export const Toolbar: React.FC = () => {
             <FileDown size={17} />
           </button>
 
+          {/* Zen / Focus Mode Toggle */}
+          <button
+            type="button"
+            onClick={() => {
+              triggerHaptic('medium');
+              toggleZenMode();
+            }}
+            className="p-2 text-slate-400 hover:text-indigo-400 hover:bg-slate-800/80 rounded-xl transition-colors"
+            title="Odaklanma Modu (Tam Ekran)"
+          >
+            <Maximize2 size={17} />
+          </button>
+
           {/* DESKTOP-ONLY ACTIONS (>= 1280px / xl) */}
           <div className="hidden xl:flex items-center gap-1">
             {/* Stickers Drawer */}
@@ -1791,293 +1825,258 @@ export const Toolbar: React.FC = () => {
         </div>
       </header>
 
-      {/* 2. DEDICATED MOBILE INKING SUB-TOOLBAR (Visible only on Mobile < 768px) */}
-      <div className="flex md:hidden h-11 bg-slate-925 border-b border-slate-800 items-center px-2 gap-1 overflow-x-auto scrollbar-none select-none">
-        {/* Core Pens for Mobile */}
-        <button
-          type="button"
-          onClick={() => {
-            triggerHaptic('light');
-            setActiveTool('ballpoint');
-          }}
-          className={`p-1.5 rounded-lg shrink-0 ${
-            activeTool === 'ballpoint'
-              ? 'bg-indigo-600 text-white shadow'
-              : 'text-slate-400 hover:text-white'
-          }`}
-          title="Tükenmez Kalem"
-        >
-          <PenTool size={16} />
-        </button>
-
-        <button
-          type="button"
-          onClick={() => {
-            triggerHaptic('light');
-            setActiveTool('fountain');
-          }}
-          className={`p-1.5 rounded-lg shrink-0 ${
-            activeTool === 'fountain'
-              ? 'bg-indigo-600 text-white shadow'
-              : 'text-slate-400 hover:text-white'
-          }`}
-          title="Dolma Kalem"
-        >
-          <Feather size={16} />
-        </button>
-
-        <button
-          type="button"
-          onClick={() => {
-            triggerHaptic('light');
-            setActiveTool('pencil');
-          }}
-          className={`p-1.5 rounded-lg shrink-0 ${
-            activeTool === 'pencil'
-              ? 'bg-indigo-600 text-white shadow'
-              : 'text-slate-400 hover:text-white'
-          }`}
-          title="Kurşun Kalem"
-        >
-          <Pencil size={16} />
-        </button>
-
-        <button
-          type="button"
-          onClick={() => {
-            triggerHaptic('light');
-            setActiveTool('highlighter');
-          }}
-          className={`p-1.5 rounded-lg shrink-0 ${
-            activeTool === 'highlighter'
-              ? 'bg-amber-500 text-slate-950 font-bold shadow'
-              : 'text-slate-400 hover:text-white'
-          }`}
-          title="Fosforlu Kalem"
-        >
-          <Highlighter size={16} />
-        </button>
-
-        <button
-          type="button"
-          onClick={() => {
-            triggerHaptic('light');
-            if (activeTool === 'eraser') {
-              toggleDropdown('eraser');
-            } else {
-              setActiveTool('eraser');
-            }
-          }}
-          className={`p-1.5 rounded-lg shrink-0 ${
-            activeTool === 'eraser'
-              ? 'bg-rose-600 text-white shadow'
-              : 'text-slate-400 hover:text-white'
-          }`}
-          title="Silgi (Tekrar tıklayarak ayarları açın)"
-        >
-          <Eraser size={16} />
-        </button>
-
-        <button
-          type="button"
-          onClick={() => {
-            triggerHaptic('light');
-            setActiveTool('lasso');
-          }}
-          className={`p-1.5 rounded-lg shrink-0 ${
-            activeTool === 'lasso'
-              ? 'bg-indigo-600 text-white shadow'
-              : 'text-slate-400 hover:text-white'
-          }`}
-          title="Kement Aracı"
-        >
-          <Scissors size={16} />
-        </button>
-
-        <button
-          type="button"
-          onClick={() => {
-            triggerHaptic('light');
-            if (activeTool === 'shape') {
-              toggleDropdown('shape');
-            } else {
-              setActiveTool('shape');
-            }
-          }}
-          className={`p-1.5 rounded-lg shrink-0 ${
-            activeTool === 'shape'
-              ? 'bg-indigo-600 text-white shadow'
-              : 'text-slate-400 hover:text-white'
-          }`}
-          title="Şekiller (Tekrar tıklayarak ayarları açın)"
-        >
-          <Shapes size={16} />
-        </button>
-
-        <button
-          type="button"
-          onClick={() => {
-            triggerHaptic('light');
-            setActiveTool('text');
-          }}
-          className={`p-1.5 rounded-lg shrink-0 ${
-            activeTool === 'text'
-              ? 'bg-indigo-600 text-white shadow'
-              : 'text-slate-400 hover:text-white'
-          }`}
-          title="Metin Kutusu"
-        >
-          <Type size={16} />
-        </button>
-
-        <button
-          type="button"
-          onClick={() => {
-            triggerHaptic('light');
-            toggleRuler();
-          }}
-          className={`p-1.5 rounded-lg shrink-0 ${
-            rulerVisible
-              ? 'bg-indigo-600 text-white shadow'
-              : 'text-slate-400 hover:text-white'
-          }`}
-          title="Cetvel"
-        >
-          <Compass size={16} />
-        </button>
-
-        <button
-          type="button"
-          onClick={() => {
-            triggerHaptic('light');
-            setActiveTool('tape');
-          }}
-          className={`p-1.5 rounded-lg shrink-0 ${
-            activeTool === 'tape'
-              ? 'bg-amber-600 text-white shadow'
-              : 'text-slate-400 hover:text-white'
-          }`}
-          title="Bant"
-        >
-          <Bandage size={16} />
-        </button>
-
-        <button
-          type="button"
-          onClick={() => {
-            triggerHaptic('light');
-            setStampCreatorModalOpen(true);
-          }}
-          className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 shrink-0"
-          title="Damga Tasarla"
-        >
-          <Stamp size={16} />
-        </button>
-
-        {/* More Tools Button on Mobile */}
-        <button
-          type="button"
-          onClick={() => {
-            triggerHaptic('light');
-            toggleDropdown('moreTools');
-          }}
-          className={`p-1.5 rounded-lg shrink-0 relative ${
-            openDropdown === 'moreTools' || isSecondaryToolActive
-              ? 'bg-indigo-600 text-white shadow'
-              : 'text-slate-400 hover:text-white'
-          }`}
-          title="Tüm Geometri ve İleri Araçlar"
-        >
-          <Sparkles size={16} />
-          {isSecondaryToolActive && (
-            <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
-          )}
-        </button>
-
-        <div className="w-px h-4 bg-slate-800 mx-1 shrink-0" />
-
-        {/* Favorite Colors on Mobile */}
-        <div className="flex items-center gap-1.5 shrink-0">
-          {toolSettings.favoriteColors.map((color, idx) => {
-            const isSlotActive =
-              toolSettings.activeColorIndex === idx && toolSettings.color === color;
-            return (
-              <button
-                key={idx}
-                type="button"
-                onClick={() => {
-                  triggerHaptic('light');
-                  selectFavoriteColor(idx);
-                }}
-                onDoubleClick={() => {
-                  setColorStudioSlot(idx);
-                  setColorStudioOpen(true);
-                }}
-                className={`w-5 h-5 rounded-full flex items-center justify-center transition-transform ${
-                  isSlotActive
-                    ? 'ring-2 ring-white scale-110 shadow'
-                    : 'opacity-80 hover:opacity-100 ring-1 ring-white/20'
-                }`}
-                style={{ backgroundColor: color }}
-              >
-                {isSlotActive && (
-                  <Check
-                    size={9}
-                    className={
-                      color === '#facc15' || color === '#ffffff' || color === '#fef08a'
-                        ? 'text-black font-bold'
-                        : 'text-white font-bold'
-                    }
-                  />
-                )}
-              </button>
-            );
-          })}
-
-          {/* Palette button on mobile */}
+      {/* 2. DEDICATED MOBILE FLOATING INKING DOCK (Floating at bottom on Mobile < 768px) */}
+      <div className="md:hidden fixed bottom-3 left-1/2 -translate-x-1/2 z-40 max-w-[96vw] select-none pointer-events-auto">
+        {mobileToolDockCollapsed ? (
+          /* Collapsed Mini Thumb Pill */
           <button
             type="button"
             onClick={() => {
               triggerHaptic('light');
-              setColorStudioSlot(null);
-              setColorStudioOpen(!colorStudioOpen);
+              toggleMobileToolDockCollapsed();
             }}
-            className="p-1 text-slate-400 hover:text-white"
-            title="Tüm Renkler & Paletler"
+            className="flex items-center gap-2.5 px-4 py-2.5 rounded-full bg-[#090d16]/95 border border-white/20 shadow-2xl backdrop-blur-2xl text-xs font-semibold text-white ring-1 ring-white/10 active:scale-95 transition-all"
+            title="Kalemleri Genişlet"
           >
-            <Palette size={15} className="text-indigo-400" />
+            <span
+              className="w-2.5 h-2.5 rounded-full shadow-sm ring-1 ring-white/30"
+              style={{ backgroundColor: toolSettings.color }}
+            />
+            <span className="capitalize">
+              {activeTool === 'ballpoint'
+                ? 'Tükenmez'
+                : activeTool === 'fountain'
+                ? 'Dolma'
+                : activeTool === 'pencil'
+                ? 'Kurşun'
+                : activeTool === 'highlighter'
+                ? 'Fosforlu'
+                : activeTool === 'eraser'
+                ? 'Silgi'
+                : activeTool === 'lasso'
+                ? 'Kement'
+                : activeTool === 'shape'
+                ? 'Şekil'
+                : activeTool === 'text'
+                ? 'Metin'
+                : activeTool}
+            </span>
+            <ChevronUp size={14} className="text-slate-400" />
           </button>
-        </div>
+        ) : (
+          /* Expanded Ergonomic Glass Dock */
+          <div className="bg-[#090d16]/95 backdrop-blur-2xl border border-white/15 shadow-2xl shadow-black/70 rounded-2xl p-1.5 flex items-center gap-1 ring-1 ring-white/10 overflow-x-auto scrollbar-none">
+            {/* 1. Ballpoint */}
+            <button
+              type="button"
+              onClick={() => {
+                triggerHaptic('light');
+                setActiveTool('ballpoint');
+              }}
+              className={`p-2 rounded-xl transition-all shrink-0 ${
+                activeTool === 'ballpoint'
+                  ? 'bg-gradient-to-b from-indigo-500 to-indigo-600 text-white shadow-md shadow-indigo-500/30 ring-1 ring-white/20'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+              title="Tükenmez Kalem"
+            >
+              <PenTool size={16} />
+            </button>
 
-        <div className="w-px h-4 bg-slate-800 mx-1 shrink-0" />
+            {/* 2. Fountain */}
+            <button
+              type="button"
+              onClick={() => {
+                triggerHaptic('light');
+                setActiveTool('fountain');
+              }}
+              className={`p-2 rounded-xl transition-all shrink-0 ${
+                activeTool === 'fountain'
+                  ? 'bg-gradient-to-b from-indigo-500 to-indigo-600 text-white shadow-md shadow-indigo-500/30 ring-1 ring-white/20'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+              title="Dolma Kalem"
+            >
+              <Feather size={16} />
+            </button>
 
-        {/* Favorite Sizes on Mobile */}
-        <div className="flex items-center gap-1 shrink-0">
-          {toolSettings.favoriteSizes.map((size, idx) => {
-            const isSizeActive =
-              toolSettings.activeSizeIndex === idx && toolSettings.size === size;
-            return (
-              <button
-                key={idx}
-                type="button"
-                onClick={() => selectFavoriteSize(idx)}
-                className={`w-5 h-5 rounded-md font-mono text-[10px] font-semibold flex items-center justify-center ${
-                  isSizeActive
-                    ? 'bg-indigo-600 text-white shadow ring-1 ring-indigo-400'
-                    : 'text-slate-400 hover:text-slate-200'
-                }`}
-              >
-                {size}
-              </button>
-            );
-          })}
-        </div>
+            {/* 3. Pencil */}
+            <button
+              type="button"
+              onClick={() => {
+                triggerHaptic('light');
+                setActiveTool('pencil');
+              }}
+              className={`p-2 rounded-xl transition-all shrink-0 ${
+                activeTool === 'pencil'
+                  ? 'bg-gradient-to-b from-indigo-500 to-indigo-600 text-white shadow-md shadow-indigo-500/30 ring-1 ring-white/20'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+              title="Kurşun Kalem"
+            >
+              <Pencil size={16} />
+            </button>
+
+            {/* 4. Highlighter */}
+            <button
+              type="button"
+              onClick={() => {
+                triggerHaptic('light');
+                setActiveTool('highlighter');
+              }}
+              className={`p-2 rounded-xl transition-all shrink-0 ${
+                activeTool === 'highlighter'
+                  ? 'bg-amber-500 text-slate-950 font-bold shadow-md ring-1 ring-amber-300'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+              title="Fosforlu Kalem"
+            >
+              <Highlighter size={16} />
+            </button>
+
+            {/* 5. Eraser */}
+            <button
+              type="button"
+              onClick={() => {
+                triggerHaptic('light');
+                if (activeTool === 'eraser') {
+                  toggleDropdown('eraser');
+                } else {
+                  setActiveTool('eraser');
+                }
+              }}
+              className={`p-2 rounded-xl transition-all shrink-0 ${
+                activeTool === 'eraser'
+                  ? 'bg-rose-600 text-white shadow-md ring-1 ring-rose-400'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+              title="Silgi"
+            >
+              <Eraser size={16} />
+            </button>
+
+            {/* 6. Lasso */}
+            <button
+              type="button"
+              onClick={() => {
+                triggerHaptic('light');
+                setActiveTool('lasso');
+              }}
+              className={`p-2 rounded-xl transition-all shrink-0 ${
+                activeTool === 'lasso'
+                  ? 'bg-indigo-600 text-white shadow-md ring-1 ring-indigo-400'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+              title="Kement Aracı"
+            >
+              <Scissors size={16} />
+            </button>
+
+            {/* 7. Shape */}
+            <button
+              type="button"
+              onClick={() => {
+                triggerHaptic('light');
+                if (activeTool === 'shape') {
+                  toggleDropdown('shape');
+                } else {
+                  setActiveTool('shape');
+                }
+              }}
+              className={`p-2 rounded-xl transition-all shrink-0 ${
+                activeTool === 'shape'
+                  ? 'bg-indigo-600 text-white shadow-md ring-1 ring-indigo-400'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+              title="Şekiller"
+            >
+              <Shapes size={16} />
+            </button>
+
+            <div className="w-px h-5 bg-white/10 mx-0.5 shrink-0" />
+
+            {/* Color Studio & Active Color trigger */}
+            <button
+              type="button"
+              onClick={() => {
+                triggerHaptic('light');
+                setColorStudioSlot(null);
+                setColorStudioOpen(!colorStudioOpen);
+              }}
+              className="p-1 rounded-xl hover:bg-slate-800/80 flex items-center gap-1 shrink-0"
+              title="Renk Stüdyosu & Paletler"
+            >
+              <span
+                className="w-5 h-5 rounded-full border border-white/30 shadow-sm flex items-center justify-center shrink-0"
+                style={{ backgroundColor: toolSettings.color }}
+              />
+              <Palette size={14} className="text-indigo-400 shrink-0" />
+            </button>
+
+            <div className="w-px h-5 bg-white/10 mx-0.5 shrink-0" />
+
+            {/* Favorite Sizes */}
+            <div className="flex items-center gap-1 shrink-0">
+              {toolSettings.favoriteSizes.map((size, idx) => {
+                const isSizeActive =
+                  toolSettings.activeSizeIndex === idx && toolSettings.size === size;
+                return (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => {
+                      triggerHaptic('light');
+                      selectFavoriteSize(idx);
+                    }}
+                    className={`w-6 h-6 rounded-lg font-mono text-[10px] font-semibold flex items-center justify-center transition-all ${
+                      isSizeActive
+                        ? 'bg-indigo-600 text-white shadow ring-1 ring-indigo-400'
+                        : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                    }`}
+                  >
+                    {size}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* More Tools Trigger */}
+            <button
+              type="button"
+              onClick={() => {
+                triggerHaptic('light');
+                toggleDropdown('moreTools');
+              }}
+              className={`p-1.5 rounded-xl transition-all shrink-0 ${
+                openDropdown === 'moreTools' || isSecondaryToolActive
+                  ? 'bg-indigo-600 text-white shadow'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+              title="Diğer Araçlar"
+            >
+              <MoreHorizontal size={15} />
+            </button>
+
+            {/* Collapse button */}
+            <button
+              type="button"
+              onClick={() => {
+                triggerHaptic('light');
+                toggleMobileToolDockCollapsed();
+              }}
+              className="p-1.5 rounded-xl text-slate-500 hover:text-white hover:bg-slate-800 transition-colors shrink-0 ml-0.5"
+              title="Araç Çubuğunu Küçült"
+            >
+              <ChevronDown size={14} />
+            </button>
+          </div>
+        )}
       </div>
 
-      {/* 3. DEDICATED MOBILE FLOATING POPOVERS (Guaranteed unclipped by horizontal scroll) */}
+      {/* 3. DEDICATED MOBILE FLOATING POPOVERS (Emerging from bottom dock) */}
       <div className="md:hidden">
         {openDropdown === 'eraser' && (
-          <div className="fixed top-26 left-3 bg-slate-900 border border-slate-750 shadow-2xl rounded-2xl p-3 w-60 z-50 animate-in fade-in zoom-in-95 backdrop-blur-xl">
+          <div className="fixed bottom-18 left-3 bg-slate-900 border border-slate-750 shadow-2xl rounded-2xl p-3 w-60 z-50 animate-in fade-in zoom-in-95 backdrop-blur-xl">
             <div className="text-[11px] font-semibold text-slate-400 mb-2 uppercase tracking-wider">
               Silgi Ayarları
             </div>
@@ -2133,7 +2132,7 @@ export const Toolbar: React.FC = () => {
         )}
 
         {openDropdown === 'shape' && (
-          <div className="fixed top-26 left-3 bg-slate-900 border border-slate-750 shadow-2xl rounded-2xl p-3 flex flex-col gap-2.5 z-50 animate-in fade-in zoom-in-95 min-w-[280px] max-w-[92vw] backdrop-blur-xl">
+          <div className="fixed bottom-18 left-3 bg-slate-900 border border-slate-750 shadow-2xl rounded-2xl p-3 flex flex-col gap-2.5 z-50 animate-in fade-in zoom-in-95 min-w-[280px] max-w-[92vw] backdrop-blur-xl">
             <div className="text-[11px] font-semibold text-slate-400 px-1 uppercase tracking-wider">
               Şekil Türü
             </div>
@@ -2207,7 +2206,7 @@ export const Toolbar: React.FC = () => {
         )}
 
         {openDropdown === 'moreTools' && (
-          <div className="fixed top-26 left-3 right-3 sm:right-auto sm:w-80 bg-slate-900 border border-slate-750 shadow-2xl rounded-2xl p-3 z-50 animate-in fade-in zoom-in-95 backdrop-blur-2xl space-y-2.5 max-h-[75vh] overflow-y-auto">
+          <div className="fixed bottom-18 left-3 right-3 sm:right-auto sm:w-80 bg-slate-900 border border-slate-750 shadow-2xl rounded-2xl p-3 z-50 animate-in fade-in zoom-in-95 backdrop-blur-2xl space-y-2.5 max-h-[75vh] overflow-y-auto">
             <div className="text-[11px] font-bold text-slate-300 uppercase tracking-wider flex items-center justify-between pb-1.5 border-b border-slate-800">
               <span>Geometri & İleri Araçlar</span>
               <Compass size={13} className="text-indigo-400" />
@@ -2473,7 +2472,7 @@ export const Toolbar: React.FC = () => {
         )}
 
         {activeColorSlot !== null && (
-          <div className="fixed top-26 right-3 bg-slate-900 border border-slate-700 p-2.5 rounded-xl shadow-2xl z-50 w-44 backdrop-blur-xl animate-in fade-in zoom-in-95">
+          <div className="fixed bottom-18 right-3 bg-slate-900 border border-slate-700 p-2.5 rounded-xl shadow-2xl z-50 w-44 backdrop-blur-xl animate-in fade-in zoom-in-95">
             <div className="text-[10px] font-semibold text-slate-400 mb-1.5">
               Rengi Değiştir
             </div>

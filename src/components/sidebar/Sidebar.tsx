@@ -316,11 +316,13 @@ export const Sidebar: React.FC = () => {
                       style={{
                         backgroundColor:
                           pg.paperColor === 'dark'
-                            ? '#181b26'
+                            ? '#141923'
                             : pg.paperColor === 'cream'
-                            ? '#fcfaf2'
+                            ? '#faf7ee'
                             : pg.paperColor === 'yellow-pad'
                             ? '#fefce8'
+                            : pg.paperColor === 'sage'
+                            ? '#f2f5f0'
                             : pg.paperColor === 'kraft'
                             ? '#e7d8be'
                             : '#ffffff',

@@ -207,7 +207,7 @@ export const ColorStudioPopover: React.FC<ColorStudioPopoverProps> = ({
   return (
     <div
       onClick={(e) => e.stopPropagation()}
-      className="fixed top-16 left-1/2 -translate-x-1/2 md:absolute md:top-14 md:left-1/2 md:-translate-x-1/2 bg-[#090d16]/95 border border-white/15 shadow-2xl rounded-3xl p-4 w-[92vw] max-w-[390px] z-50 animate-in fade-in zoom-in-95 duration-150 backdrop-blur-3xl text-white ring-1 ring-white/10 select-none max-h-[85vh] overflow-y-auto"
+      className="fixed bottom-18 left-1/2 -translate-x-1/2 md:absolute md:bottom-auto md:top-14 md:left-1/2 md:-translate-x-1/2 bg-[#090d16]/95 border border-white/15 shadow-2xl rounded-3xl p-4 w-[92vw] max-w-[390px] z-50 animate-in fade-in zoom-in-95 duration-150 backdrop-blur-3xl text-white ring-1 ring-white/10 select-none max-h-[75vh] md:max-h-[85vh] overflow-y-auto"
     >
       {/* Header */}
       <div className="flex items-center justify-between pb-3 border-b border-white/10">

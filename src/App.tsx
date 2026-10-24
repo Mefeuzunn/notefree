@@ -30,6 +30,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Maximize2,
+  Minimize2,
+  EyeOff,
 } from 'lucide-react';
 
 export const App: React.FC = () => {
@@ -42,6 +44,8 @@ export const App: React.FC = () => {
     setPageManagerModalOpen,
     presentationMode,
     setPresentationMode,
+    zenMode,
+    setZenMode,
     toolSettings,
     setLaserStyle,
     activePageIndex,
@@ -59,16 +63,17 @@ export const App: React.FC = () => {
     initialize();
   }, [initialize]);
 
-  // Handle Escape key to exit presentation mode
+  // Handle Escape key to exit presentation or zen mode
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && presentationMode) {
-        setPresentationMode(false);
+      if (e.key === 'Escape') {
+        if (presentationMode) setPresentationMode(false);
+        if (zenMode) setZenMode(false);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [presentationMode, setPresentationMode]);
+  }, [presentationMode, setPresentationMode, zenMode, setZenMode]);
 
   if (isLoading) {
     return (
@@ -88,17 +93,33 @@ export const App: React.FC = () => {
   return (
     <div className="h-screen w-screen flex flex-col overflow-hidden bg-[#090d16] text-slate-100 font-sans select-none">
       {/* 1. Document Tabs Bar (GoodNotes Multi-Document Tabs) */}
-      {!presentationMode && <DocumentTabsBar />}
+      {!presentationMode && !zenMode && <DocumentTabsBar />}
 
-      {/* 2. Top Control Bar (Hidden in Presentation Mode) */}
-      {!presentationMode && <Toolbar />}
+      {/* 2. Top Control Bar (Hidden in Presentation or Zen Focus Mode) */}
+      {!presentationMode && !zenMode && <Toolbar />}
+
+      {/* Zen Mode Exit Floating Pill */}
+      {zenMode && (
+        <div className="fixed top-4 right-4 z-50 animate-in fade-in slide-in-from-top-2">
+          <button
+            type="button"
+            onClick={() => setZenMode(false)}
+            className="px-3.5 py-1.5 rounded-full bg-slate-900/90 hover:bg-slate-800 text-white border border-white/15 shadow-2xl backdrop-blur-xl flex items-center gap-2 text-xs font-semibold hover:border-indigo-500/50 transition-all hover:scale-105 active:scale-95"
+            title="Odak Modundan Çık (Esc)"
+          >
+            <EyeOff size={14} className="text-indigo-400" />
+            <span>Odak Modundan Çık</span>
+            <span className="text-[10px] text-slate-400 font-mono bg-slate-800 px-1.5 py-0.5 rounded">Esc</span>
+          </button>
+        </div>
+      )}
 
       {/* FAZ AL: Presentation Studio & Teleprompter HUD */}
       <PresentationHUD />
 
       {/* 2. Main Workspace Layout */}
       <div className="flex-1 flex overflow-hidden relative">
-        {!presentationMode && <Sidebar />}
+        {!presentationMode && !zenMode && <Sidebar />}
         <NotebookWorkspace />
       </div>
 
