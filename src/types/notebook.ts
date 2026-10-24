@@ -540,6 +540,7 @@ export interface ToolSettings {
   gridSnap?: boolean; // Magnetic snap to paper grid intersections
   // GoodNotes style quick favorite slots
   favoriteColors: string[];
+  recentColors?: string[]; // Pro Color Palette: recently used color history
   favoriteSizes: number[];
   activeColorIndex: number;
   activeSizeIndex: number;

@@ -260,6 +260,7 @@ interface NotebookStoreState {
   // Drawing & Strokes Actions
   setActiveTool: (tool: ToolType) => void;
   setToolColor: (color: string) => void;
+  setToolOpacity: (opacity: number) => void;
   setToolSize: (size: number) => void;
   setEraserMode: (mode: 'stroke' | 'pixel') => void;
   toggleEraseHighlighterOnly: () => void;
@@ -772,6 +773,7 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
     shapeFillColor: undefined,
     shapeFillOpacity: 0.25,
     favoriteColors: ['#0f172a', '#1e40af', '#b91c1c'],
+    recentColors: ['#0f172a', '#1e40af', '#b91c1c', '#047857', '#6d28d9', '#d97706', '#ea580c', '#facc15'],
     favoriteSizes: [2.0, 3.5, 6.0],
     activeColorIndex: 0,
     activeSizeIndex: 1,
@@ -1804,10 +1806,25 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
   },
 
   setToolColor: (color: string) => {
+    set((state) => {
+      const existingRecent = state.toolSettings.recentColors || [];
+      const filtered = existingRecent.filter((c) => c.toLowerCase() !== color.toLowerCase());
+      const updatedRecent = [color, ...filtered].slice(0, 16);
+      return {
+        toolSettings: {
+          ...state.toolSettings,
+          color,
+          recentColors: updatedRecent,
+        },
+      };
+    });
+  },
+
+  setToolOpacity: (opacity: number) => {
     set((state) => ({
       toolSettings: {
         ...state.toolSettings,
-        color,
+        opacity: Math.max(0.05, Math.min(1, opacity)),
       },
     }));
   },

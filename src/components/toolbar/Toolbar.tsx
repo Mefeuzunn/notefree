@@ -75,10 +75,12 @@ import {
   X,
   ChevronDown,
   GraduationCap,
+  Palette,
 } from 'lucide-react';
 import { ShapeType, StylusDoubleTapAction } from '../../types/notebook';
 import { AudioPlayerBar } from '../audio/AudioPlayerBar';
 import { PomodoroBarWidget } from '../pomodoro/PomodoroBarWidget';
+import { ColorStudioPopover } from './ColorStudioPopover';
 import { triggerHaptic } from '../../engine/hapticFeedback';
 
 const COLOR_PALETTE = [
@@ -205,6 +207,8 @@ export const Toolbar: React.FC = () => {
     'eraser' | 'shape' | 'artist' | 'moreTools' | 'overflowActions' | null
   >(null);
   const [activeColorSlot, setActiveColorSlot] = useState<number | null>(null);
+  const [colorStudioOpen, setColorStudioOpen] = useState<boolean>(false);
+  const [colorStudioSlot, setColorStudioSlot] = useState<number | null>(null);
 
   const toolbarRef = useRef<HTMLDivElement | null>(null);
 
@@ -214,6 +218,7 @@ export const Toolbar: React.FC = () => {
       if (toolbarRef.current && !toolbarRef.current.contains(e.target as Node)) {
         setOpenDropdown(null);
         setActiveColorSlot(null);
+        setColorStudioOpen(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -1208,8 +1213,8 @@ export const Toolbar: React.FC = () => {
             <>
               <div className="w-px h-5 bg-slate-750 mx-1 shrink-0" />
 
-              {/* FAVORITE COLOR SLOTS */}
-              <div className="flex items-center gap-1 px-1 relative shrink-0">
+              {/* FAVORITE COLOR SLOTS & FULL PALETTE STUDIO */}
+              <div className="flex items-center gap-1.5 px-1 relative shrink-0">
                 {toolSettings.favoriteColors.map((color, index) => {
                   const isSlotActive =
                     toolSettings.activeColorIndex === index && toolSettings.color === color;
@@ -1218,55 +1223,62 @@ export const Toolbar: React.FC = () => {
                       <button
                         type="button"
                         onClick={() => {
+                          triggerHaptic('light');
                           selectFavoriteColor(index);
-                          setActiveColorSlot(null);
+                        }}
+                        onDoubleClick={() => {
+                          setColorStudioSlot(index);
+                          setColorStudioOpen(true);
                         }}
                         onContextMenu={(e) => {
                           e.preventDefault();
-                          setActiveColorSlot(activeColorSlot === index ? null : index);
+                          setColorStudioSlot(index);
+                          setColorStudioOpen(true);
                         }}
                         className={`w-6 h-6 rounded-full transition-transform flex items-center justify-center shadow-sm ${
                           isSlotActive
-                            ? 'ring-2 ring-white ring-offset-2 ring-offset-slate-800 scale-110'
+                            ? 'ring-2 ring-white ring-offset-2 ring-offset-slate-900 scale-110 shadow-md'
                             : 'hover:scale-105 opacity-80 hover:opacity-100 ring-1 ring-white/20'
                         }`}
                         style={{ backgroundColor: color }}
-                        title={`Renk Yuvası ${index + 1} (Sağ tıkla değiştir)`}
+                        title={`Renk Yuvası ${index + 1} (Tıkla seç, sağ tıkla/çift tıkla paletten değiştir)`}
                       >
                         {isSlotActive && (
                           <Check
                             size={11}
                             className={
-                              color === '#facc15' || color === '#ffffff' ? 'text-black font-bold' : 'text-white font-bold'
+                              color === '#facc15' || color === '#ffffff' || color === '#fef08a'
+                                ? 'text-black font-bold'
+                                : 'text-white font-bold'
                             }
                           />
                         )}
                       </button>
-
-                      {activeColorSlot === index && (
-                        <div className="absolute top-9 left-1/2 -translate-x-1/2 bg-slate-900 border border-slate-700 p-2.5 rounded-xl shadow-2xl z-50 w-44 backdrop-blur-xl">
-                          <div className="text-[10px] font-semibold text-slate-400 mb-1.5">
-                            Rengi Değiştir
-                          </div>
-                          <div className="grid grid-cols-4 gap-1.5">
-                            {COLOR_PALETTE.map((c) => (
-                              <button
-                                key={c}
-                                type="button"
-                                onClick={() => {
-                                  setFavoriteColor(index, c);
-                                  setActiveColorSlot(null);
-                                }}
-                                className="w-6 h-6 rounded-full ring-1 ring-white/20 hover:scale-110 transition-transform"
-                                style={{ backgroundColor: c }}
-                              />
-                            ))}
-                          </div>
-                        </div>
-                      )}
                     </div>
                   );
                 })}
+
+                {/* Pro Full Spectrum & Preset Color Palette Button */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    triggerHaptic('light');
+                    setColorStudioSlot(null);
+                    setColorStudioOpen(!colorStudioOpen);
+                  }}
+                  className={`p-1.5 rounded-xl transition-all flex items-center justify-center relative ${
+                    colorStudioOpen
+                      ? 'bg-indigo-600/30 text-indigo-300 ring-1 ring-indigo-400 border border-indigo-500/40 shadow-xs'
+                      : 'text-slate-400 hover:text-white hover:bg-slate-800/80 border border-transparent'
+                  }`}
+                  title="Tüm Renkler & Palet Stüdyosu (Pastel, Neon, Morandi, Fosforlu, Özel HEX)"
+                >
+                  <Palette size={16} className="text-indigo-400" />
+                  <span
+                    className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border border-slate-900 shadow-xs"
+                    style={{ backgroundColor: toolSettings.color }}
+                  />
+                </button>
               </div>
 
               <div className="w-px h-5 bg-slate-750 mx-1 shrink-0" />
@@ -1996,7 +2008,10 @@ export const Toolbar: React.FC = () => {
                 onClick={() => {
                   triggerHaptic('light');
                   selectFavoriteColor(idx);
-                  setActiveColorSlot(activeColorSlot === idx ? null : idx);
+                }}
+                onDoubleClick={() => {
+                  setColorStudioSlot(idx);
+                  setColorStudioOpen(true);
                 }}
                 className={`w-5 h-5 rounded-full flex items-center justify-center transition-transform ${
                   isSlotActive
@@ -2009,13 +2024,29 @@ export const Toolbar: React.FC = () => {
                   <Check
                     size={9}
                     className={
-                      color === '#facc15' || color === '#ffffff' ? 'text-black font-bold' : 'text-white font-bold'
+                      color === '#facc15' || color === '#ffffff' || color === '#fef08a'
+                        ? 'text-black font-bold'
+                        : 'text-white font-bold'
                     }
                   />
                 )}
               </button>
             );
           })}
+
+          {/* Palette button on mobile */}
+          <button
+            type="button"
+            onClick={() => {
+              triggerHaptic('light');
+              setColorStudioSlot(null);
+              setColorStudioOpen(!colorStudioOpen);
+            }}
+            className="p-1 text-slate-400 hover:text-white"
+            title="Tüm Renkler & Paletler"
+          >
+            <Palette size={15} className="text-indigo-400" />
+          </button>
         </div>
 
         <div className="w-px h-4 bg-slate-800 mx-1 shrink-0" />
@@ -2463,6 +2494,13 @@ export const Toolbar: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* 4. Global Color Studio Popover (Desktop & Mobile) */}
+      <ColorStudioPopover
+        isOpen={colorStudioOpen}
+        onClose={() => setColorStudioOpen(false)}
+        activeSlotIndex={colorStudioSlot}
+      />
     </div>
   );
 };
