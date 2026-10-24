@@ -77,12 +77,18 @@ import {
   ChevronUp,
   Plus,
   Maximize2,
+  PanelLeft,
+  PanelRight,
+  Move,
   GraduationCap,
   Palette,
+  Mic,
+  MicOff,
 } from 'lucide-react';
 import { ShapeType, StylusDoubleTapAction } from '../../types/notebook';
 import { AudioPlayerBar } from '../audio/AudioPlayerBar';
 import { PomodoroBarWidget } from '../pomodoro/PomodoroBarWidget';
+import { speechTranscriptionService } from '../../services/speechTranscriptionService';
 import { ColorStudioPopover } from './ColorStudioPopover';
 import { triggerHaptic } from '../../engine/hapticFeedback';
 
@@ -207,6 +213,8 @@ export const Toolbar: React.FC = () => {
     toggleZenMode,
     mobileToolDockCollapsed,
     toggleMobileToolDockCollapsed,
+    tabletToolbarPlacement,
+    setTabletToolbarPlacement,
     addPage,
   } = useNotebookStore();
 
@@ -217,6 +225,10 @@ export const Toolbar: React.FC = () => {
   const [activeColorSlot, setActiveColorSlot] = useState<number | null>(null);
   const [colorStudioOpen, setColorStudioOpen] = useState<boolean>(false);
   const [colorStudioSlot, setColorStudioSlot] = useState<number | null>(null);
+
+  // Live Speech Dictation State
+  const [isDictating, setIsDictating] = useState(false);
+  const [liveTranscript, setLiveTranscript] = useState('');
 
   const toolbarRef = useRef<HTMLDivElement | null>(null);
 
@@ -408,7 +420,38 @@ export const Toolbar: React.FC = () => {
         </div>
 
         {/* CENTER SECTION: GoodNotes Professional Tool Dock (Visible on Tablets & Desktop >= 768px) */}
-        <div className="hidden md:flex items-center bg-slate-900/90 backdrop-blur-xl p-1.5 rounded-2xl border border-white/10 shadow-lg shadow-black/40 gap-1 overflow-x-auto scrollbar-none max-w-[54vw] lg:max-w-none shrink">
+        {tabletToolbarPlacement !== 'top' ? (
+          <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-2xl bg-slate-900/80 border border-white/10 text-xs text-slate-300">
+            <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
+            <span className="font-semibold text-slate-200">
+              Kalemlik: {tabletToolbarPlacement === 'left' ? 'Sol Kenarda' : 'Sağ Kenarda (Solak)'}
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                triggerHaptic('light');
+                setTabletToolbarPlacement(tabletToolbarPlacement === 'left' ? 'right' : 'top');
+              }}
+              className="px-2 py-0.5 rounded-lg bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-300 font-semibold text-[11px] border border-indigo-500/30 ml-1 transition-colors"
+            >
+              {tabletToolbarPlacement === 'left' ? 'Sağa Al →' : 'Üste Al ↑'}
+            </button>
+          </div>
+        ) : (
+          <div className="hidden md:flex items-center bg-slate-900/90 backdrop-blur-xl p-1.5 rounded-2xl border border-white/10 shadow-lg shadow-black/40 gap-1 overflow-x-auto scrollbar-none max-w-[54vw] lg:max-w-none shrink">
+            {/* Dock Placement Switcher */}
+            <button
+              type="button"
+              onClick={() => {
+                triggerHaptic('light');
+                setTabletToolbarPlacement('left');
+              }}
+              className="p-1.5 rounded-xl text-slate-400 hover:text-indigo-400 hover:bg-slate-800 transition-colors shrink-0"
+              title="Kalemliği Dikey Kenara Taşı (Sol / Sağ)"
+            >
+              <PanelLeft size={15} />
+            </button>
+            <div className="w-px h-5 bg-white/10 mx-0.5 shrink-0" />
           {/* 1. Fountain Pen */}
           <button
             type="button"
@@ -1329,6 +1372,7 @@ export const Toolbar: React.FC = () => {
             </>
           )}
         </div>
+      )}
 
         {/* RIGHT SECTION: Undo/Redo & Actions */}
         <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
@@ -1405,6 +1449,50 @@ export const Toolbar: React.FC = () => {
             title="Odaklanma Modu (Tam Ekran)"
           >
             <Maximize2 size={17} />
+          </button>
+
+          {/* Quick Voice Dictation (Speech-to-Text) */}
+          <button
+            type="button"
+            onClick={() => {
+              if (isDictating) {
+                const text = speechTranscriptionService.stopListening();
+                setIsDictating(false);
+                if (text && text.trim()) {
+                  addStickyNoteToCurrentPage({
+                    id: `sn_dict_${Date.now()}`,
+                    x: 250,
+                    y: 280,
+                    width: 240,
+                    height: 180,
+                    color: 'blue',
+                    text: text.trim(),
+                    createdAt: Date.now(),
+                  });
+                  triggerHaptic('medium');
+                }
+                setLiveTranscript('');
+              } else {
+                if (!speechTranscriptionService.isSupported()) {
+                  alert('Tarayıcınız sesli dikte özelliğini desteklemiyor.');
+                  return;
+                }
+                triggerHaptic('light');
+                setLiveTranscript('');
+                speechTranscriptionService.startListening((full, interim) => {
+                  setLiveTranscript(full + (interim ? ' ' + interim : ''));
+                });
+                setIsDictating(true);
+              }
+            }}
+            className={`p-2 rounded-xl transition-all ${
+              isDictating
+                ? 'bg-rose-600 text-white animate-pulse shadow-lg shadow-rose-600/40 ring-2 ring-rose-400'
+                : 'text-slate-400 hover:text-rose-400 hover:bg-slate-800/80'
+            }`}
+            title={isDictating ? 'Dikteyi Tamamla ve Nota Dönüştür' : 'Sesli Dikte (Konuşarak Not Al)'}
+          >
+            {isDictating ? <MicOff size={17} /> : <Mic size={17} />}
           </button>
 
           {/* DESKTOP-ONLY ACTIONS (>= 1280px / xl) */}
@@ -2057,6 +2145,50 @@ export const Toolbar: React.FC = () => {
               <MoreHorizontal size={15} />
             </button>
 
+            {/* Quick Mic for Mobile Voice Dictation */}
+            <button
+              type="button"
+              onClick={() => {
+                if (isDictating) {
+                  const text = speechTranscriptionService.stopListening();
+                  setIsDictating(false);
+                  if (text && text.trim()) {
+                    addStickyNoteToCurrentPage({
+                      id: `sn_dict_${Date.now()}`,
+                      x: 250,
+                      y: 280,
+                      width: 240,
+                      height: 180,
+                      color: 'blue',
+                      text: text.trim(),
+                      createdAt: Date.now(),
+                    });
+                    triggerHaptic('medium');
+                  }
+                  setLiveTranscript('');
+                } else {
+                  if (!speechTranscriptionService.isSupported()) {
+                    alert('Tarayıcınız sesli dikteyi desteklemiyor.');
+                    return;
+                  }
+                  triggerHaptic('light');
+                  setLiveTranscript('');
+                  speechTranscriptionService.startListening((full, interim) => {
+                    setLiveTranscript(full + (interim ? ' ' + interim : ''));
+                  });
+                  setIsDictating(true);
+                }
+              }}
+              className={`p-1.5 rounded-xl transition-all shrink-0 ${
+                isDictating
+                  ? 'bg-rose-600 text-white animate-pulse shadow-md ring-1 ring-rose-400'
+                  : 'text-slate-400 hover:text-rose-400 hover:bg-slate-800'
+              }`}
+              title="Sesli Dikte"
+            >
+              {isDictating ? <MicOff size={15} /> : <Mic size={15} />}
+            </button>
+
             {/* Collapse button */}
             <button
               type="button"
@@ -2500,6 +2632,269 @@ export const Toolbar: React.FC = () => {
         onClose={() => setColorStudioOpen(false)}
         activeSlotIndex={colorStudioSlot}
       />
+
+      {/* 5. TABLET / IPAD FLOATING VERTICAL DOCK (When docked to Left or Right) */}
+      {tabletToolbarPlacement !== 'top' && (
+        <aside
+          className={`hidden md:flex fixed top-1/2 -translate-y-1/2 z-40 bg-[#090d16]/95 backdrop-blur-2xl border border-white/15 shadow-2xl shadow-black/80 rounded-3xl p-1.5 flex-col items-center gap-1.5 ring-1 ring-white/10 max-h-[88vh] overflow-y-auto scrollbar-none animate-in fade-in zoom-in-95 duration-150 ${
+            tabletToolbarPlacement === 'left' ? 'left-3' : 'right-3'
+          }`}
+        >
+          {/* Dock Placement Switcher */}
+          <button
+            type="button"
+            onClick={() => {
+              triggerHaptic('light');
+              setTabletToolbarPlacement(tabletToolbarPlacement === 'left' ? 'right' : 'top');
+            }}
+            className="p-2 rounded-2xl bg-slate-800/80 hover:bg-indigo-600 text-slate-300 hover:text-white transition-all shadow-sm"
+            title={`Konumu Değiştir (${tabletToolbarPlacement === 'left' ? 'Sağ Kenar (Solak Modu)' : 'Üst Çubuk'})`}
+          >
+            {tabletToolbarPlacement === 'left' ? <PanelRight size={15} /> : <PanelLeft size={15} />}
+          </button>
+
+          <div className="w-6 h-px bg-white/10 my-0.5" />
+
+          {/* Primary Pens */}
+          <button
+            type="button"
+            onClick={() => {
+              triggerHaptic('light');
+              setActiveTool('fountain');
+            }}
+            className={`p-2.5 rounded-2xl transition-all ${
+              activeTool === 'fountain'
+                ? 'bg-gradient-to-b from-indigo-500 to-indigo-600 text-white shadow-lg ring-1 ring-white/20 scale-105'
+                : 'text-slate-400 hover:text-white hover:bg-slate-800'
+            }`}
+            title="Dolma Kalem"
+          >
+            <Feather size={16} />
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              triggerHaptic('light');
+              setActiveTool('ballpoint');
+            }}
+            className={`p-2.5 rounded-2xl transition-all ${
+              activeTool === 'ballpoint'
+                ? 'bg-gradient-to-b from-indigo-500 to-indigo-600 text-white shadow-lg ring-1 ring-white/20 scale-105'
+                : 'text-slate-400 hover:text-white hover:bg-slate-800'
+            }`}
+            title="Tükenmez Kalem"
+          >
+            <PenTool size={16} />
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              triggerHaptic('light');
+              setActiveTool('pencil');
+            }}
+            className={`p-2.5 rounded-2xl transition-all ${
+              activeTool === 'pencil'
+                ? 'bg-gradient-to-b from-indigo-500 to-indigo-600 text-white shadow-lg ring-1 ring-white/20 scale-105'
+                : 'text-slate-400 hover:text-white hover:bg-slate-800'
+            }`}
+            title="Kurşun Kalem"
+          >
+            <Pencil size={16} />
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              triggerHaptic('light');
+              setActiveTool('highlighter');
+            }}
+            className={`p-2.5 rounded-2xl transition-all ${
+              activeTool === 'highlighter'
+                ? 'bg-amber-500 text-slate-950 font-bold shadow-lg ring-1 ring-amber-300 scale-105'
+                : 'text-slate-400 hover:text-white hover:bg-slate-800'
+            }`}
+            title="Fosforlu Kalem"
+          >
+            <Highlighter size={16} />
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              triggerHaptic('light');
+              if (activeTool === 'eraser') {
+                toggleDropdown('eraser');
+              } else {
+                setActiveTool('eraser');
+              }
+            }}
+            className={`p-2.5 rounded-2xl transition-all ${
+              activeTool === 'eraser'
+                ? 'bg-rose-600 text-white shadow-lg ring-1 ring-rose-400 scale-105'
+                : 'text-slate-400 hover:text-white hover:bg-slate-800'
+            }`}
+            title="Silgi"
+          >
+            <Eraser size={16} />
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              triggerHaptic('light');
+              setActiveTool('lasso');
+            }}
+            className={`p-2.5 rounded-2xl transition-all ${
+              activeTool === 'lasso'
+                ? 'bg-indigo-600 text-white shadow-lg ring-1 ring-indigo-400 scale-105'
+                : 'text-slate-400 hover:text-white hover:bg-slate-800'
+            }`}
+            title="Kement Aracı"
+          >
+            <Scissors size={16} />
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              triggerHaptic('light');
+              if (activeTool === 'shape') {
+                toggleDropdown('shape');
+              } else {
+                setActiveTool('shape');
+              }
+            }}
+            className={`p-2.5 rounded-2xl transition-all ${
+              activeTool === 'shape'
+                ? 'bg-indigo-600 text-white shadow-lg ring-1 ring-indigo-400 scale-105'
+                : 'text-slate-400 hover:text-white hover:bg-slate-800'
+            }`}
+            title="Şekiller"
+          >
+            <Shapes size={16} />
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              triggerHaptic('light');
+              setActiveTool('text');
+            }}
+            className={`p-2.5 rounded-2xl transition-all ${
+              activeTool === 'text'
+                ? 'bg-indigo-600 text-white shadow-lg ring-1 ring-indigo-400 scale-105'
+                : 'text-slate-400 hover:text-white hover:bg-slate-800'
+            }`}
+            title="Metin Kutusu"
+          >
+            <Type size={16} />
+          </button>
+
+          <div className="w-6 h-px bg-white/10 my-0.5" />
+
+          {/* Color & Studio Trigger */}
+          <button
+            type="button"
+            onClick={() => {
+              triggerHaptic('light');
+              setColorStudioSlot(null);
+              setColorStudioOpen(!colorStudioOpen);
+            }}
+            className="p-2 rounded-2xl hover:bg-slate-800/80 flex flex-col items-center gap-1 transition-all"
+            title="Renk Stüdyosu & Paletler"
+          >
+            <span
+              className="w-5 h-5 rounded-full border border-white/30 shadow-md ring-1 ring-black/40"
+              style={{ backgroundColor: toolSettings.color }}
+            />
+            <Palette size={12} className="text-indigo-400" />
+          </button>
+
+          {/* Quick Sizes */}
+          <div className="flex flex-col items-center gap-1">
+            {toolSettings.favoriteSizes.map((sz, idx) => {
+              const isSzActive = toolSettings.activeSizeIndex === idx && toolSettings.size === sz;
+              return (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => {
+                    triggerHaptic('light');
+                    selectFavoriteSize(idx);
+                  }}
+                  className={`w-6 h-6 rounded-lg font-mono text-[10px] font-semibold flex items-center justify-center transition-all ${
+                    isSzActive
+                      ? 'bg-indigo-600 text-white shadow ring-1 ring-indigo-400'
+                      : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                  }`}
+                >
+                  {sz}
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="w-6 h-px bg-white/10 my-0.5" />
+
+          {/* More Tools Trigger */}
+          <button
+            type="button"
+            onClick={() => {
+              triggerHaptic('light');
+              toggleDropdown('moreTools');
+            }}
+            className={`p-2 rounded-2xl transition-all ${
+              openDropdown === 'moreTools' || isSecondaryToolActive
+                ? 'bg-indigo-600 text-white shadow'
+                : 'text-slate-400 hover:text-white hover:bg-slate-800'
+            }`}
+            title="Diğer Çizim ve Geometri Araçları"
+          >
+            <MoreHorizontal size={16} />
+          </button>
+        </aside>
+      )}
+
+      {/* 6. Live Speech Dictation HUD Overlay */}
+      {isDictating && (
+        <div className="fixed top-18 left-1/2 -translate-x-1/2 z-50 bg-[#090d16]/95 border border-rose-500/50 shadow-2xl rounded-2xl px-4 py-2.5 backdrop-blur-2xl flex items-center gap-3 animate-in fade-in slide-in-from-top-3 max-w-[90vw]">
+          <span className="w-3 h-3 rounded-full bg-rose-500 animate-ping" />
+          <div className="flex flex-col max-w-[280px] sm:max-w-[400px]">
+            <span className="text-[10px] uppercase font-bold text-rose-400 tracking-wider">
+              Canlı Dikte Ediliyor...
+            </span>
+            <p className="text-xs text-white truncate font-medium">
+              {liveTranscript || 'Konuşun, sesiniz yazıya dökülüyor...'}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              const text = speechTranscriptionService.stopListening();
+              setIsDictating(false);
+              if (text && text.trim()) {
+                addStickyNoteToCurrentPage({
+                  id: `sn_dict_${Date.now()}`,
+                  x: 250,
+                  y: 280,
+                  width: 240,
+                  height: 180,
+                  color: 'blue',
+                  text: text.trim(),
+                  createdAt: Date.now(),
+                });
+                triggerHaptic('medium');
+              }
+              setLiveTranscript('');
+            }}
+            className="px-3 py-1 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-md whitespace-nowrap"
+          >
+            Nota Dönüştür
+          </button>
+        </div>
+      )}
     </div>
   );
 };

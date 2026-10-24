@@ -75,6 +75,12 @@ import {
   GraduationCap,
   Eye,
   EyeOff,
+  Feather,
+  PenTool,
+  Pencil,
+  Highlighter,
+  Eraser,
+  Scissors,
 } from 'lucide-react';
 
 interface CanvasPageProps {
@@ -143,6 +149,8 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
     setActiveTool,
     previousTool,
     setToolColor,
+    selectFavoriteColor,
+    selectFavoriteSize,
     addFavoriteColor,
     addFillToCurrentPage,
     removeFillFromCurrentPage,
@@ -158,7 +166,6 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
     symmetryAxis,
     symmetryPosition,
     undo,
-    selectFavoriteColor,
     rulerVisible,
     rulerPosition,
     rulerWidth,
@@ -225,6 +232,15 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
     isEraser: boolean;
   } | null>(null);
 
+  // 🎯 FAZ T1: Apple Pencil & Stylus Quick Radial Menu State
+  const [radialMenu, setRadialMenu] = useState<{
+    x: number;
+    y: number;
+    visible: boolean;
+  } | null>(null);
+  const longPressRadialTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const longPressStartPosRef = useRef<{ x: number; y: number } | null>(null);
+
   // FAZ M: Stylus Action Handler (Double-Tap or Barrel Button)
   const executeStylusAction = useCallback(
     (action?: StylusDoubleTapAction) => {
@@ -251,6 +267,13 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
           selectFavoriteColor(nextIdx);
           setToastMessage(`🎨 Renk: ${colors[nextIdx]}`);
         }
+      } else if (act === 'show-radial-menu') {
+        const lastPos = lastPenTapRef.current;
+        const rect = liveCanvasRef.current?.getBoundingClientRect();
+        const rx = lastPos && rect ? (lastPos.x - rect.left) / scale : width / 2;
+        const ry = lastPos && rect ? (lastPos.y - rect.top) / scale : height / 2;
+        setRadialMenu({ x: rx, y: ry, visible: true });
+        triggerHaptic('medium');
       } else if (act === 'undo') {
         undo();
         setToastMessage('↩️ Son Çizim Geri Alındı');
@@ -542,6 +565,17 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
   // Pointer Down
   const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
     setHoverIndicator(null);
+    if (radialMenu?.visible) {
+      setRadialMenu(null);
+      return;
+    }
+    if (e.button === 2) {
+      e.preventDefault();
+      const { x: rx, y: ry } = getCanvasCoords(e);
+      triggerHaptic('light');
+      setRadialMenu({ x: rx, y: ry, visible: true });
+      return;
+    }
     if (activeTool === 'pan') return;
 
     if (e.pointerType === 'pen') {
@@ -780,6 +814,33 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
       const ctx = liveCanvas.getContext('2d');
       if (ctx) ctx.clearRect(0, 0, liveCanvas.width, liveCanvas.height);
     }
+
+    // 🎯 FAZ T1: Apple Pencil & Stylus Long-Press to Open Radial Menu
+    const isPenDrawingTool = [
+      'ballpoint',
+      'fountain',
+      'brush',
+      'highlighter',
+      'pencil',
+      'fineliner',
+      'neon',
+      'dashed',
+    ].includes(activeTool);
+    if (isPenDrawingTool && (e.pointerType === 'pen' || e.pointerType === 'mouse')) {
+      longPressStartPosRef.current = { x, y };
+      longPressRadialTimerRef.current = setTimeout(() => {
+        setIsDrawing(false);
+        currentPointsRef.current = [];
+        const liveC = liveCanvasRef.current;
+        if (liveC) {
+          const lCtx = liveC.getContext('2d');
+          if (lCtx) lCtx.clearRect(0, 0, liveC.width, liveC.height);
+        }
+        triggerHaptic('medium');
+        setRadialMenu({ x, y, visible: true });
+        longPressRadialTimerRef.current = null;
+      }, 520);
+    }
   };
 
   // Pointer Move
@@ -873,6 +934,14 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
     if (activeTool === 'eraser') {
       handleEraser(x, y);
       return;
+    }
+
+    if (longPressRadialTimerRef.current && longPressStartPosRef.current) {
+      const dist = Math.hypot(x - longPressStartPosRef.current.x, y - longPressStartPosRef.current.y);
+      if (dist > 8) {
+        clearTimeout(longPressRadialTimerRef.current);
+        longPressRadialTimerRef.current = null;
+      }
     }
 
     const pressure = calculatePressure(x, y, e.pressure);
@@ -1427,6 +1496,12 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
 
   // Pointer Up
   const handlePointerUp = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (longPressRadialTimerRef.current) {
+      clearTimeout(longPressRadialTimerRef.current);
+      longPressRadialTimerRef.current = null;
+    }
+    longPressStartPosRef.current = null;
+
     if (holdToLassoTimerRef.current) {
       clearTimeout(holdToLassoTimerRef.current);
       holdToLassoTimerRef.current = null;
@@ -2862,6 +2937,142 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
               animationDuration: '400ms',
             }}
           />
+        </div>
+      )}
+
+      {/* 🎯 FAZ T1: Apple Pencil Pro & Stylus Quick Radial Palette */}
+      {radialMenu?.visible && (
+        <div
+          className="absolute -translate-x-1/2 -translate-y-1/2 z-50 pointer-events-auto select-none animate-in fade-in zoom-in-90 duration-150"
+          style={{
+            left: `${radialMenu.x * scale}px`,
+            top: `${radialMenu.y * scale}px`,
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="relative w-64 h-64 rounded-full bg-[#090d16]/95 backdrop-blur-3xl border border-white/20 shadow-2xl shadow-black/80 p-2 flex flex-col items-center justify-between ring-1 ring-white/10">
+            {/* Header: Title & Close Button */}
+            <div className="w-full flex items-center justify-between px-2 pt-1">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                <Sparkles size={11} className="text-amber-400" /> Hızlı Kalemlik
+              </span>
+              <button
+                type="button"
+                onClick={() => setRadialMenu(null)}
+                className="p-1 rounded-full text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+                title="Kapat"
+              >
+                <X size={13} />
+              </button>
+            </div>
+
+            {/* Quick Tools Row */}
+            <div className="flex items-center justify-center gap-1.5 py-1">
+              {[
+                { id: 'fountain', label: 'Dolma', icon: <Feather size={15} /> },
+                { id: 'ballpoint', label: 'Tükenmez', icon: <PenTool size={15} /> },
+                { id: 'pencil', label: 'Kurşun', icon: <Pencil size={15} /> },
+                { id: 'highlighter', label: 'Fosforlu', icon: <Highlighter size={15} /> },
+                { id: 'eraser', label: 'Silgi', icon: <Eraser size={15} /> },
+                { id: 'lasso', label: 'Kement', icon: <Scissors size={15} /> },
+              ].map((tool) => (
+                <button
+                  key={tool.id}
+                  type="button"
+                  onClick={() => {
+                    triggerHaptic('light');
+                    setActiveTool(tool.id as any);
+                    setRadialMenu(null);
+                  }}
+                  className={`p-2 rounded-xl transition-all ${
+                    activeTool === tool.id
+                      ? 'bg-gradient-to-b from-indigo-500 to-indigo-600 text-white shadow-lg ring-1 ring-white/30 scale-110'
+                      : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                  }`}
+                  title={tool.label}
+                >
+                  {tool.icon}
+                </button>
+              ))}
+            </div>
+
+            {/* Center Quick Switch Core */}
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  triggerHaptic('medium');
+                  if (activeTool === 'eraser') {
+                    setActiveTool(previousTool || 'fountain');
+                  } else {
+                    setActiveTool('eraser');
+                  }
+                  setRadialMenu(null);
+                }}
+                className="w-12 h-12 rounded-2xl bg-slate-900 border border-white/20 shadow-xl flex flex-col items-center justify-center gap-0.5 active:scale-95 hover:border-indigo-500 transition-all group"
+                title="Kalem ⇄ Silgi Hızlı Geçiş"
+              >
+                <span
+                  className="w-3.5 h-3.5 rounded-full ring-1 ring-white/30 shadow-xs"
+                  style={{ backgroundColor: toolSettings.color }}
+                />
+                <span className="text-[9px] font-bold text-slate-300 group-hover:text-indigo-300">
+                  {activeTool === 'eraser' ? 'Silgi' : 'Kalem'}
+                </span>
+              </button>
+            </div>
+
+            {/* Quick Colors Row */}
+            <div className="flex items-center justify-center gap-2 py-1">
+              {toolSettings.favoriteColors.slice(0, 5).map((col, idx) => {
+                const isActive = toolSettings.color === col;
+                return (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => {
+                      triggerHaptic('light');
+                      selectFavoriteColor(idx);
+                      setRadialMenu(null);
+                    }}
+                    className={`w-6 h-6 rounded-full transition-transform flex items-center justify-center ${
+                      isActive
+                        ? 'ring-2 ring-white scale-125 shadow-lg'
+                        : 'opacity-85 hover:opacity-100 hover:scale-110 ring-1 ring-white/20'
+                    }`}
+                    style={{ backgroundColor: col }}
+                  >
+                    {isActive && <Check size={11} className={col === '#ffffff' ? 'text-black font-bold' : 'text-white font-bold'} />}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Quick Sizes Row */}
+            <div className="flex items-center justify-center gap-2 pb-1.5 border-t border-white/10 w-full pt-1.5">
+              {toolSettings.favoriteSizes.slice(0, 3).map((sz, idx) => {
+                const isSzActive = toolSettings.size === sz;
+                return (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => {
+                      triggerHaptic('light');
+                      selectFavoriteSize(idx);
+                      setRadialMenu(null);
+                    }}
+                    className={`px-3 py-1 rounded-lg text-xs font-mono font-semibold transition-all ${
+                      isSzActive
+                        ? 'bg-indigo-600 text-white shadow-md ring-1 ring-indigo-400'
+                        : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                    }`}
+                  >
+                    {sz}mm
+                  </button>
+                );
+              })}
+            </div>
+          </div>
         </div>
       )}
     </div>

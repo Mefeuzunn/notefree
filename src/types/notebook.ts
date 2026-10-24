@@ -563,6 +563,7 @@ export type StylusDoubleTapAction =
   | 'switch-eraser'
   | 'switch-last-tool'
   | 'show-color-palette'
+  | 'show-radial-menu'
   | 'undo'
   | 'none';
 

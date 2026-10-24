@@ -33,10 +33,13 @@ export const ZoomWindow: React.FC = () => {
     activePageIndex,
     activeTool,
     toolSettings,
+    selectFavoriteColor,
+    selectFavoriteSize,
     addStrokeToCurrentPage,
     eraseStrokesOnCurrentPage,
   } = useNotebookStore();
 
+  const [showWristRest, setShowWristRest] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const liveCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const [isDrawing, setIsDrawing] = useState(false);
@@ -321,10 +324,62 @@ export const ZoomWindow: React.FC = () => {
               </button>
             ))}
           </div>
+
+          {/* Quick Favorite Colors in Zoom Header */}
+          <div className="hidden sm:flex items-center gap-1.5 ml-2 pl-2 border-l border-slate-700/60">
+            {toolSettings.favoriteColors.slice(0, 3).map((col, idx) => (
+              <button
+                key={idx}
+                type="button"
+                onClick={() => {
+                  triggerHaptic('light');
+                  selectFavoriteColor(idx);
+                }}
+                className={`w-4 h-4 rounded-full transition-transform ${
+                  toolSettings.color === col ? 'ring-2 ring-white scale-110' : 'opacity-80 hover:opacity-100 ring-1 ring-white/20'
+                }`}
+                style={{ backgroundColor: col }}
+              />
+            ))}
+          </div>
+
+          {/* Quick Sizes in Zoom Header */}
+          <div className="hidden sm:flex items-center gap-1 ml-1.5">
+            {toolSettings.favoriteSizes.slice(0, 3).map((sz, idx) => (
+              <button
+                key={idx}
+                type="button"
+                onClick={() => {
+                  triggerHaptic('light');
+                  selectFavoriteSize(idx);
+                }}
+                className={`w-5 h-5 rounded font-mono text-[9px] font-semibold flex items-center justify-center transition-colors ${
+                  toolSettings.size === sz
+                    ? 'bg-indigo-600 text-white'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                {sz}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Jump Controls */}
         <div className="flex items-center gap-1.5">
+          {/* Wrist Rest Toggle */}
+          <button
+            type="button"
+            onClick={() => setShowWristRest(!showWristRest)}
+            className={`px-2 py-0.5 rounded-lg text-[10px] font-medium border transition-colors ${
+              showWristRest
+                ? 'bg-emerald-600/30 border-emerald-500/50 text-emerald-300'
+                : 'bg-slate-800/80 border-slate-700/60 text-slate-400 hover:text-white'
+            }`}
+            title="Bilek Dinlendirme Pedini Aç/Kapat"
+          >
+            Bilek Pedi
+          </button>
           <button
             onClick={() => {
               triggerHaptic('light');
@@ -398,6 +453,19 @@ export const ZoomWindow: React.FC = () => {
           <span>Mavi şeride yazınca otomatik ilerler →</span>
         </div>
       </div>
+
+      {/* 🛡️ Ergonomic Wrist Rest Guard (Bilek Dinlendirme Alanı) */}
+      {showWristRest && (
+        <div className="h-12 w-full bg-slate-950/95 border-t border-slate-800 flex items-center justify-between px-4 text-[10px] text-slate-400 select-none touch-none animate-in fade-in slide-in-from-top-1">
+          <span className="flex items-center gap-1.5 font-medium">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+            Bilek Dinlendirme Alanı (Avuç İçi Korumalı)
+          </span>
+          <span className="text-slate-500 font-mono hidden sm:inline">
+            Elini bu alana serbestçe yaslayarak yazabilirsin
+          </span>
+        </div>
+      )}
     </div>
   );
 };
