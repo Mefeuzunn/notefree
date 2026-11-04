@@ -553,6 +553,7 @@ export interface ToolSettings {
   spotlightRadius?: number; // FAZ AL: Spotlight cutout radius in px (default: 95)
   smartInkInversion?: boolean;
   palmRejection?: boolean; // Reject single finger touches when stylus is active
+  onlyStylusDraw?: boolean; // When active, finger touches only pan/zoom; only Apple Pencil draws
   tiltShading?: boolean; // Enable broad graphite pencil shading when stylus is tilted
   stylusDoubleTapAction?: StylusDoubleTapAction; // Hardware / touch double tap action on stylus
   scribbleToErase?: boolean; // GoodNotes 6 scribble gesture to erase strokes automatically

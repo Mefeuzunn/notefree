@@ -245,6 +245,7 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
   } | null>(null);
   const longPressRadialTimerRef = useRef<NodeJS.Timeout | null>(null);
   const longPressStartPosRef = useRef<{ x: number; y: number } | null>(null);
+  const activeTouchPointersRef = useRef<Set<number>>(new Set());
 
   // 📥 FAZ T5: Drag and Drop Support (Images, Text, Sticky Notes from Safari / Files)
   const [isDragOver, setIsDragOver] = useState(false);
@@ -708,9 +709,34 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
       hasStylusUsedRef.current = true;
     }
 
-    // Smart Palm Rejection: If palm rejection is explicitly enabled, reject single-finger touches
-    if (e.pointerType === 'touch' && toolSettings.palmRejection) {
-      return;
+    // 📱 Multi-touch, Palm Rejection & Only Stylus Draw Handling
+    if (e.pointerType === 'touch') {
+      activeTouchPointersRef.current.add(e.pointerId);
+
+      // Multi-finger gesture detected (e.g., 2-finger Undo or pinch-to-zoom): Cancel in-progress single finger drawing
+      if (activeTouchPointersRef.current.size >= 2) {
+        setIsDrawing(false);
+        currentPointsRef.current = [];
+        const liveC = liveCanvasRef.current;
+        if (liveC) {
+          const ctx = liveC.getContext('2d');
+          if (ctx) ctx.clearRect(0, 0, liveC.width, liveC.height);
+        }
+        return;
+      }
+
+      // Explicit "Only Apple Pencil Draws" mode
+      if (toolSettings.onlyStylusDraw) {
+        return;
+      }
+
+      // Smart Palm Rejection: Filter large contact area (palm resting on glass)
+      if (toolSettings.palmRejection) {
+        const isPalmContact = (e.width && e.width > 28) || (e.height && e.height > 28);
+        if (isPalmContact) {
+          return;
+        }
+      }
     }
 
     // FAZ M: Stylus Hardware Double-Tap & Barrel Button Handler
@@ -1622,6 +1648,7 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
 
   // Pointer Up
   const handlePointerUp = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    activeTouchPointersRef.current.delete(e.pointerId);
     if (longPressRadialTimerRef.current) {
       clearTimeout(longPressRadialTimerRef.current);
       longPressRadialTimerRef.current = null;

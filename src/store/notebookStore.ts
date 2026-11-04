@@ -172,6 +172,8 @@ interface NotebookStoreState {
   studySetsModalOpen: boolean;
   searchModalOpen: boolean;
   shortcutsModalOpen: boolean;
+  stylusSettingsModalOpen: boolean;
+  setStylusSettingsModalOpen: (open: boolean) => void;
 
   // Faz 2: AI & Dual Multitasking
   mathModalOpen: boolean;
@@ -270,6 +272,8 @@ interface NotebookStoreState {
   setShapeFillColor: (color: string | undefined) => void;
   setShapeFillOpacity: (opacity: number) => void;
   togglePalmRejection: () => void;
+  toggleOnlyStylusDraw: () => void;
+  setOnlyStylusDraw: (val: boolean) => void;
   toggleTiltShading: () => void;
   setStylusDoubleTapAction: (action: StylusDoubleTapAction) => void;
   toggleScribbleToErase: () => void;
@@ -804,6 +808,7 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
     angleSnap: true,
     gridSnap: false,
     palmRejection: true,
+    onlyStylusDraw: false,
     tiltShading: true,
     stylusDoubleTapAction: 'switch-eraser',
     scribbleToErase: true,
@@ -925,6 +930,7 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
   studySetsModalOpen: false,
   searchModalOpen: false,
   shortcutsModalOpen: false,
+  stylusSettingsModalOpen: false,
 
   // Faz W Initial State
   scratchpadOpen: false,
@@ -4334,6 +4340,10 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
     set({ shortcutsModalOpen: open });
   },
 
+  setStylusSettingsModalOpen: (open: boolean) => {
+    set({ stylusSettingsModalOpen: open });
+  },
+
   setZenMode: (zen: boolean) => {
     set({ zenMode: zen });
   },
@@ -5099,6 +5109,24 @@ export const useNotebookStore = create<NotebookStoreState>((set, get) => ({
       toolSettings: {
         ...state.toolSettings,
         palmRejection: !state.toolSettings.palmRejection,
+      },
+    }));
+  },
+
+  toggleOnlyStylusDraw: () => {
+    set((state) => ({
+      toolSettings: {
+        ...state.toolSettings,
+        onlyStylusDraw: !state.toolSettings.onlyStylusDraw,
+      },
+    }));
+  },
+
+  setOnlyStylusDraw: (val: boolean) => {
+    set((state) => ({
+      toolSettings: {
+        ...state.toolSettings,
+        onlyStylusDraw: val,
       },
     }));
   },

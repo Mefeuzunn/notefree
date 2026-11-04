@@ -53,6 +53,9 @@ const NAV_SHORTCUTS: ShortcutItem[] = [
 ];
 
 const GESTURE_SHORTCUTS: ShortcutItem[] = [
+  { key: '✌️ 2 Parmak Dokunuş', label: 'Hızlı Geri Al (Undo)', desc: 'Ekrana iki parmakla dokunarak son vuruşu veya işlemi anında geri alın' },
+  { key: '🤟 3 Parmak Dokunuş', label: 'Hızlı İleri Al (Redo)', desc: 'Ekrana üç parmakla dokunarak geri alınan işlemi anında tekrar uygulayın' },
+  { key: '🤏 2 Parmak Çimdik', label: 'Çimdikle Büyütme (Pinch-to-Zoom)', desc: 'İki parmağınızı açıp kapatarak sayfayı %40 ile %300 arasında pürüzsüz büyütün' },
   { key: 'Kementle Düzleştir', label: 'El Yazısı Taban Çizgisini Düzleştirme (Straighten)', desc: 'Eğri kayan el yazısını kementle seçip "Düzleştir"e dokunarak yatay hizaya ve kılavuza oturt' },
   { key: 'Zikzak Karalama', label: 'Karalayarak Silme (Scribble-to-Erase)', desc: 'Silgiye geçmeden yanlış kelimenin/çizimin üzerini zikzak karalayarak anında sil' },
   { key: 'Daire Çizip Bekleme', label: 'Daireyle Kement (Circle-to-Lasso)', desc: 'Kalemle bir öbeğin etrafına çember çizip 400ms bekleyerek otomatik kement seçimine dönüştür' },

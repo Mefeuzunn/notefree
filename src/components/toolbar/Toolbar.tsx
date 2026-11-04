@@ -220,6 +220,9 @@ export const Toolbar: React.FC = () => {
     addStickerToCurrentPage,
     eyeComfortMode,
     toggleEyeComfortMode,
+    paperWarmth,
+    setPaperWarmth,
+    setStylusSettingsModalOpen,
   } = useNotebookStore();
 
   // Active Dropdown state
@@ -1698,6 +1701,23 @@ export const Toolbar: React.FC = () => {
             >
               <Sun size={17} className={eyeComfortMode ? 'fill-amber-400/30' : ''} />
             </button>
+
+            {/* 🖊️ Apple Pencil & Stylus Stüdyosu */}
+            <button
+              type="button"
+              onClick={() => {
+                triggerHaptic('light');
+                setStylusSettingsModalOpen(true);
+              }}
+              className={`p-2 rounded-xl transition-all ${
+                toolSettings.onlyStylusDraw
+                  ? 'bg-emerald-500/20 text-emerald-300 ring-1 ring-emerald-500/50 shadow-sm'
+                  : 'text-slate-400 hover:text-indigo-400 hover:bg-slate-800'
+              }`}
+              title="Apple Pencil & Dokunmatik Stüdyosu"
+            >
+              <PenTool size={17} />
+            </button>
           </div>
 
           {/* OVERFLOW ACTIONS DROPDOWN (< 1280px / Tablets & Mobile) */}
@@ -1904,6 +1924,19 @@ export const Toolbar: React.FC = () => {
                     >
                       <Presentation size={15} className="text-rose-400 shrink-0" />
                       <span className="truncate">Sunum Modu</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setStylusSettingsModalOpen(true);
+                        triggerHaptic('light');
+                        closeDropdown();
+                      }}
+                      className="p-2 bg-slate-800/60 hover:bg-slate-800 border border-slate-750 rounded-xl flex items-center gap-2 text-slate-300 hover:text-white text-left"
+                    >
+                      <PenTool size={15} className="text-emerald-400 shrink-0" />
+                      <span className="truncate">Apple Pencil & Stylus</span>
                     </button>
 
                     <button

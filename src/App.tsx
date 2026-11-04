@@ -19,6 +19,7 @@ import { OutlineDrawer } from './components/modals/OutlineDrawer';
 import { CollaborationModal } from './components/modals/CollaborationModal';
 import { FloatingScratchpad } from './components/scratchpad/FloatingScratchpad';
 import { ShortcutsModal } from './components/modals/ShortcutsModal';
+import { StylusSettingsModal } from './components/modals/StylusSettingsModal';
 import { CornellAssistantModal } from './components/modals/CornellAssistantModal';
 import { PresentationHUD } from './components/presentation/PresentationHUD';
 import {
@@ -54,6 +55,8 @@ export const App: React.FC = () => {
     activeNotebookId,
     shortcutsModalOpen,
     setShortcutsModalOpen,
+    stylusSettingsModalOpen,
+    setStylusSettingsModalOpen,
   } = useNotebookStore();
 
   const activeNotebook = notebooks.find((n) => n.id === activeNotebookId);
@@ -149,6 +152,10 @@ export const App: React.FC = () => {
       <ShortcutsModal
         isOpen={shortcutsModalOpen}
         onClose={() => setShortcutsModalOpen(false)}
+      />
+      <StylusSettingsModal
+        isOpen={stylusSettingsModalOpen}
+        onClose={() => setStylusSettingsModalOpen(false)}
       />
     </div>
   );

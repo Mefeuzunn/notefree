@@ -33,6 +33,7 @@ import {
   Keyboard,
   Map as MapIcon,
   Sun,
+  PenTool,
 } from 'lucide-react';
 import { ExportModal } from './modals/ExportModal';
 import { MarginStudyWorkspace } from './margin/MarginStudyWorkspace';
@@ -43,6 +44,7 @@ import { LinkEditorModal } from './modals/LinkEditorModal';
 import { FunctionPlotterModal } from './modals/FunctionPlotterModal';
 import { RubberStampCreatorModal } from './modals/RubberStampCreatorModal';
 import { StickerDrawStudioModal } from './modals/StickerDrawStudioModal';
+import { StylusSettingsModal } from './modals/StylusSettingsModal';
 import { triggerHaptic } from '../engine/hapticFeedback';
 
 export const NotebookWorkspace: React.FC = () => {
@@ -91,6 +93,8 @@ export const NotebookWorkspace: React.FC = () => {
     presentationMode,
     setPresentationMode,
     setShortcutsModalOpen,
+    stylusSettingsModalOpen,
+    setStylusSettingsModalOpen,
     toggleCornellStudyMode,
     eyeComfortMode,
     toggleEyeComfortMode,
@@ -227,10 +231,17 @@ export const NotebookWorkspace: React.FC = () => {
     let initialPinchDistance = 0;
     let initialPinchZoom = zoom;
     let isPinching = false;
+    let touchStartTime = 0;
+    let touchStartCount = 0;
+    let maxTouchMoved = 0;
 
     const handleTouchStart = (e: TouchEvent) => {
+      touchStartCount = e.touches.length;
+      touchStartTime = Date.now();
+      maxTouchMoved = 0;
+
       if (e.touches.length === 2) {
-        // Two-finger touch: could be pinch-to-zoom or swipe gesture
+        // Two-finger touch: could be pinch-to-zoom, tap-to-undo, or swipe gesture
         touchStartX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
         touchStartY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
         initialPinchDistance = Math.hypot(
@@ -238,6 +249,11 @@ export const NotebookWorkspace: React.FC = () => {
           e.touches[0].clientY - e.touches[1].clientY
         );
         initialPinchZoom = zoom;
+        isPinching = false;
+      } else if (e.touches.length === 3) {
+        // Three-finger touch: tap-to-redo candidate
+        touchStartX = (e.touches[0].clientX + e.touches[1].clientX + e.touches[2].clientX) / 3;
+        touchStartY = (e.touches[0].clientY + e.touches[1].clientY + e.touches[2].clientY) / 3;
         isPinching = false;
       } else if (e.touches.length === 1 && (e.target === el || !(e.target as HTMLElement).closest('canvas'))) {
         // One-finger swipe on workspace background/margin
@@ -254,16 +270,45 @@ export const NotebookWorkspace: React.FC = () => {
           e.touches[0].clientY - e.touches[1].clientY
         );
         const distDiff = Math.abs(currentDistance - initialPinchDistance);
-        if (distDiff > 12) {
+        maxTouchMoved = Math.max(maxTouchMoved, distDiff);
+        if (distDiff > 14) {
           isPinching = true;
           const pinchScale = currentDistance / initialPinchDistance;
           const targetZoom = Math.min(3.0, Math.max(0.4, Number((initialPinchZoom * pinchScale).toFixed(2))));
           setZoom(targetZoom);
         }
+      } else if (e.touches.length === 3) {
+        const currentAvgX = (e.touches[0].clientX + e.touches[1].clientX + e.touches[2].clientX) / 3;
+        const currentAvgY = (e.touches[0].clientY + e.touches[1].clientY + e.touches[2].clientY) / 3;
+        maxTouchMoved = Math.max(maxTouchMoved, Math.hypot(currentAvgX - touchStartX, currentAvgY - touchStartY));
       }
     };
 
     const handleTouchEnd = (e: TouchEvent) => {
+      const touchDuration = Date.now() - touchStartTime;
+
+      // ✌️ 2-Finger Tap Gesture: Quick stationary tap with 2 fingers triggers Undo
+      if (touchStartCount === 2 && !isPinching && touchDuration < 340 && maxTouchMoved < 18) {
+        undo();
+        triggerHaptic('light');
+        showShortcutHud('Geri Al', '2 Parmak ↺');
+        isPinching = false;
+        initialPinchDistance = 0;
+        touchStartCount = 0;
+        return;
+      }
+
+      // 🤟 3-Finger Tap Gesture: Quick stationary tap with 3 fingers triggers Redo
+      if (touchStartCount === 3 && !isPinching && touchDuration < 340 && maxTouchMoved < 22) {
+        redo();
+        triggerHaptic('light');
+        showShortcutHud('İleri Al', '3 Parmak ↻');
+        isPinching = false;
+        initialPinchDistance = 0;
+        touchStartCount = 0;
+        return;
+      }
+
       if (isPinching) {
         isPinching = false;
         initialPinchDistance = 0;
@@ -1111,19 +1156,65 @@ export const NotebookWorkspace: React.FC = () => {
                   </span>
                 </button>
                 {eyeComfortMode && (
-                  <div className="px-1.5 py-1 flex items-center gap-2 bg-slate-800/60 rounded-xl">
-                    <span className="text-[10px] text-slate-400 shrink-0">Sıcaklık:</span>
-                    <input
-                      type="range"
-                      min={10}
-                      max={80}
-                      value={paperWarmth}
-                      onChange={(e) => setPaperWarmth(Number(e.target.value))}
-                      className="w-full accent-amber-500 h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer"
-                    />
-                    <span className="text-[10px] font-mono text-amber-400 w-6 text-right">%{paperWarmth}</span>
+                  <div className="space-y-1.5 pt-1">
+                    <div className="px-1.5 py-1 flex items-center gap-2 bg-slate-800/60 rounded-xl">
+                      <span className="text-[10px] text-slate-400 shrink-0">Sıcaklık:</span>
+                      <input
+                        type="range"
+                        min={10}
+                        max={80}
+                        value={paperWarmth}
+                        onChange={(e) => setPaperWarmth(Number(e.target.value))}
+                        className="w-full accent-amber-500 h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer"
+                      />
+                      <span className="text-[10px] font-mono text-amber-400 w-6 text-right">%{paperWarmth}</span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-1 text-[10px]">
+                      {[
+                        { label: 'Doğal Krem', warmth: 20 },
+                        { label: 'Adaçayı', warmth: 35 },
+                        { label: 'Sarı Bloknot', warmth: 45 },
+                        { label: 'Akşam Amber', warmth: 65 },
+                      ].map((preset) => (
+                        <button
+                          key={preset.warmth}
+                          type="button"
+                          onClick={() => {
+                            triggerHaptic('light');
+                            setPaperWarmth(preset.warmth);
+                          }}
+                          className={`py-0.5 px-1.5 rounded-lg text-center transition-colors ${
+                            paperWarmth === preset.warmth
+                              ? 'bg-amber-500/25 border border-amber-500/50 text-amber-300 font-bold'
+                              : 'bg-slate-800/50 hover:bg-slate-800 text-slate-400 hover:text-white'
+                          }`}
+                        >
+                          {preset.label}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 )}
+              </div>
+
+              {/* 🖊️ Apple Pencil & Stylus Stüdyosu */}
+              <div className="pt-1.5 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => {
+                    triggerHaptic('light');
+                    setStylusSettingsModalOpen(true);
+                    setViewMenuOpen(false);
+                  }}
+                  className="w-full flex items-center justify-between p-1.5 rounded-lg text-slate-300 hover:bg-slate-800 text-left"
+                >
+                  <span className="flex items-center gap-1.5">
+                    <PenTool size={13} className="text-emerald-400" />
+                    <span>Apple Pencil & Stylus</span>
+                  </span>
+                  <span className="text-[10px] text-emerald-400 font-semibold">Ayarla →</span>
+                </button>
               </div>
             </div>
           </div>
