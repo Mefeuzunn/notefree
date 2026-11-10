@@ -48,6 +48,7 @@ import { collaborationService } from '../../services/collaborationService';
 import { HandwritingOcrModal } from '../modals/HandwritingOcrModal';
 import { triggerHaptic } from '../../engine/hapticFeedback';
 import { convertPdfToPages } from '../../services/pdfService';
+import { simplifyStrokePoints } from '../../engine/strokeSimplifier';
 import {
   Move,
   RotateCw,
@@ -438,6 +439,13 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
   const height = page.height || 1130;
   const dpr = typeof window !== 'undefined' ? Math.min(window.devicePixelRatio || 1, 2) : 1;
 
+  // ⚡ Phase 1: Low-Latency Hardware Accelerated Live Inking Context
+  const getLiveContext = useCallback(() => {
+    const canvas = liveCanvasRef.current;
+    if (!canvas) return null;
+    return canvas.getContext('2d', { alpha: true, desynchronized: true });
+  }, []);
+
   // 1. Draw Background Layer (Paper Template or PDF image)
   useEffect(() => {
     const canvas = bgCanvasRef.current;
@@ -506,6 +514,17 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
     for (const stroke of page.strokes) {
       if (stroke.tool === 'highlighter' && !layers.highlighters) continue;
       if (stroke.tool !== 'highlighter' && !layers.strokes) continue;
+
+      // ⚡ Spatial Viewport Culling: Skip strokes completely outside the canvas bounds
+      if (
+        stroke.bounds &&
+        (stroke.bounds.maxX < -20 ||
+          stroke.bounds.minX > width + 20 ||
+          stroke.bounds.maxY < -20 ||
+          stroke.bounds.minY > height + 20)
+      ) {
+        continue;
+      }
 
       if (audioPlaying && audioSyncReplay && stroke.audioTimestamp !== undefined) {
         if (stroke.audioTimestamp > audioPlaybackTimeMs) {
@@ -719,7 +738,7 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
         currentPointsRef.current = [];
         const liveC = liveCanvasRef.current;
         if (liveC) {
-          const ctx = liveC.getContext('2d');
+          const ctx = getLiveContext();
           if (ctx) ctx.clearRect(0, 0, liveC.width, liveC.height);
         }
         return;
@@ -963,7 +982,7 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
 
     const liveCanvas = liveCanvasRef.current;
     if (liveCanvas) {
-      const ctx = liveCanvas.getContext('2d');
+      const ctx = getLiveContext();
       if (ctx) ctx.clearRect(0, 0, liveCanvas.width, liveCanvas.height);
     }
 
@@ -985,7 +1004,7 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
         currentPointsRef.current = [];
         const liveC = liveCanvasRef.current;
         if (liveC) {
-          const lCtx = liveC.getContext('2d');
+          const lCtx = getLiveContext();
           if (lCtx) lCtx.clearRect(0, 0, liveC.width, liveC.height);
         }
         triggerHaptic('medium');
@@ -1131,7 +1150,7 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
               // Clear temporary ink from live preview canvas
               const live = liveCanvasRef.current;
               if (live) {
-                const liveCtx = live.getContext('2d');
+                const liveCtx = getLiveContext();
                 if (liveCtx) liveCtx.clearRect(0, 0, live.width, live.height);
               }
 
@@ -1224,7 +1243,7 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
                   // Trigger live render on canvas
                   const live = liveCanvasRef.current;
                   if (live) {
-                    const lCtx = live.getContext('2d');
+                    const lCtx = getLiveContext();
                     if (lCtx) {
                       lCtx.clearRect(0, 0, live.width, live.height);
                       lCtx.save();
@@ -1323,7 +1342,7 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
 
     const liveCanvas = liveCanvasRef.current;
     if (!liveCanvas) return;
-    const ctx = liveCanvas.getContext('2d');
+    const ctx = getLiveContext();
     if (!ctx) return;
 
     ctx.clearRect(0, 0, liveCanvas.width, liveCanvas.height);
@@ -1451,7 +1470,7 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
   const renderLaserTrail = () => {
     const liveCanvas = liveCanvasRef.current;
     if (!liveCanvas) return;
-    const ctx = liveCanvas.getContext('2d');
+    const ctx = getLiveContext();
     if (!ctx) return;
 
     ctx.clearRect(0, 0, liveCanvas.width, liveCanvas.height);
@@ -1690,7 +1709,7 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
 
     const liveCanvas = liveCanvasRef.current;
     if (liveCanvas) {
-      const ctx = liveCanvas.getContext('2d');
+      const ctx = getLiveContext();
       if (ctx) ctx.clearRect(0, 0, liveCanvas.width, liveCanvas.height);
     }
 
@@ -2067,14 +2086,19 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
     };
 
     const strokeId = `st_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-    const bounds = calculateStrokeBounds(finalPoints, toolSettings.size);
+    // ⚡ Phase 1: Optimize freehand strokes using RDP (50-70% point reduction)
+    const optimizedPoints = committedShapeType
+      ? finalPoints
+      : simplifyStrokePoints(finalPoints, 0.7);
+
+    const bounds = calculateStrokeBounds(optimizedPoints, toolSettings.size);
 
     const newStroke: Stroke = {
       id: strokeId,
       tool: (activeTool === 'shape' ? 'ballpoint' : activeTool) as any,
       color: toolSettings.color,
       size: toolSettings.size,
-      points: finalPoints,
+      points: optimizedPoints,
       bounds,
       timestamp: Date.now(),
       videoTimestamp: youtube.isOpen ? Math.floor(youtube.currentTime) : undefined,
@@ -2097,10 +2121,10 @@ export const CanvasPage: React.FC<CanvasPageProps> = ({
     }
 
     // 🪞 Faz D: Real-time Symmetry Mirrored Stroke Commit
-    if (symmetryEnabled && finalPoints.length > 0) {
+    if (symmetryEnabled && optimizedPoints.length > 0) {
       const isVert = symmetryAxis === 'vertical';
       const axisCoord = isVert ? width * symmetryPosition : height * symmetryPosition;
-      const mirroredPoints: StrokePoint[] = finalPoints.map((pt) => ({
+      const mirroredPoints: StrokePoint[] = optimizedPoints.map((pt) => ({
         ...pt,
         x: isVert ? 2 * axisCoord - pt.x : pt.x,
         y: isVert ? pt.y : 2 * axisCoord - pt.y,

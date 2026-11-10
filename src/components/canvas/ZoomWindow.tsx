@@ -3,6 +3,7 @@ import { useNotebookStore } from '../../store/notebookStore';
 import { drawStrokeOnCanvas, isPointNearStroke } from '../../engine/strokeRenderer';
 import { drawPaperTemplate } from '../../engine/paperTemplates';
 import { StrokePoint, Stroke } from '../../types/notebook';
+import { simplifyStrokePoints } from '../../engine/strokeSimplifier';
 import {
   ChevronLeft,
   ChevronRight,
@@ -192,7 +193,7 @@ export const ZoomWindow: React.FC = () => {
 
     const liveCanvas = liveCanvasRef.current;
     if (liveCanvas) {
-      const ctx = liveCanvas.getContext('2d');
+      const ctx = liveCanvas.getContext('2d', { alpha: true, desynchronized: true });
       if (ctx) ctx.clearRect(0, 0, liveCanvas.width, liveCanvas.height);
     }
   };
@@ -223,7 +224,7 @@ export const ZoomWindow: React.FC = () => {
 
     const liveCanvas = liveCanvasRef.current;
     if (!liveCanvas) return;
-    const ctx = liveCanvas.getContext('2d');
+    const ctx = liveCanvas.getContext('2d', { alpha: true, desynchronized: true });
     if (!ctx) return;
 
     const dpr = typeof window !== 'undefined' ? Math.min(window.devicePixelRatio || 1, 2) : 1;
@@ -254,7 +255,7 @@ export const ZoomWindow: React.FC = () => {
 
     const liveCanvas = liveCanvasRef.current;
     if (liveCanvas) {
-      const ctx = liveCanvas.getContext('2d');
+      const ctx = liveCanvas.getContext('2d', { alpha: true, desynchronized: true });
       if (ctx) ctx.clearRect(0, 0, liveCanvas.width, liveCanvas.height);
     }
 
@@ -263,21 +264,23 @@ export const ZoomWindow: React.FC = () => {
       return;
     }
 
-    const minX = Math.min(...currentPointsRef.current.map((p) => p.x));
-    const maxX = Math.max(...currentPointsRef.current.map((p) => p.x));
-    const minY = Math.min(...currentPointsRef.current.map((p) => p.y));
-    const maxY = Math.max(...currentPointsRef.current.map((p) => p.y));
-
     const effectiveTool = ['pen', 'ballpoint', 'fountain', 'brush', 'pencil', 'fineliner', 'highlighter'].includes(activeTool)
       ? activeTool
       : 'ballpoint';
+
+    // ⚡ Phase 1: Optimize points using RDP algorithm (50-70% reduction)
+    const optimizedPoints = simplifyStrokePoints(currentPointsRef.current, 0.7);
+    const minX = Math.min(...optimizedPoints.map((p) => p.x));
+    const maxX = Math.max(...optimizedPoints.map((p) => p.x));
+    const minY = Math.min(...optimizedPoints.map((p) => p.y));
+    const maxY = Math.max(...optimizedPoints.map((p) => p.y));
 
     const newStroke: Stroke = {
       id: `stroke_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
       tool: effectiveTool as any,
       color: toolSettings.color,
       size: toolSettings.size,
-      points: [...currentPointsRef.current],
+      points: optimizedPoints,
       bounds: { minX, minY, maxX, maxY },
       timestamp: Date.now(),
     };

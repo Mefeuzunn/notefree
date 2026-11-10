@@ -157,6 +157,18 @@ export function calculateStrokeBounds(points: StrokePoint[], strokeSize: number)
   };
 }
 
+// ⚡ Hardware-accelerated Path2D Cache for committed strokes
+const strokePathCache = new WeakMap<object, Path2D>();
+const strokeFillPathCache = new WeakMap<object, Path2D>();
+
+/**
+ * Invalidates the Path2D cache for a stroke if its geometry/points are modified (e.g. by lasso transform)
+ */
+export function invalidateStrokeCache(stroke: object) {
+  strokePathCache.delete(stroke);
+  strokeFillPathCache.delete(stroke);
+}
+
 /**
  * Draws a completed or in-progress stroke directly onto a CanvasRenderingContext2D
  */
@@ -167,6 +179,9 @@ export function drawStrokeOnCanvas(
 ) {
   if (!stroke.points || stroke.points.length === 0) return;
 
+  const isCommitted = !!(stroke as Stroke).id;
+  const supportsPath2D = typeof Path2D !== 'undefined';
+
   // Handle Dashed Pen as a clean dashed stroke path
   if (stroke.tool === 'dashed') {
     if (stroke.points.length < 2) return;
@@ -176,12 +191,26 @@ export function drawStrokeOnCanvas(
     ctx.setLineDash([stroke.size * 3, stroke.size * 2]);
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
-    ctx.beginPath();
-    ctx.moveTo(stroke.points[0].x, stroke.points[0].y);
-    for (let i = 1; i < stroke.points.length; i++) {
-      ctx.lineTo(stroke.points[i].x, stroke.points[i].y);
+
+    if (isCommitted && supportsPath2D) {
+      let dashedPath = strokePathCache.get(stroke);
+      if (!dashedPath) {
+        dashedPath = new Path2D();
+        dashedPath.moveTo(stroke.points[0].x, stroke.points[0].y);
+        for (let i = 1; i < stroke.points.length; i++) {
+          dashedPath.lineTo(stroke.points[i].x, stroke.points[i].y);
+        }
+        strokePathCache.set(stroke, dashedPath);
+      }
+      ctx.stroke(dashedPath);
+    } else {
+      ctx.beginPath();
+      ctx.moveTo(stroke.points[0].x, stroke.points[0].y);
+      for (let i = 1; i < stroke.points.length; i++) {
+        ctx.lineTo(stroke.points[i].x, stroke.points[i].y);
+      }
+      ctx.stroke();
     }
-    ctx.stroke();
     ctx.restore();
     return;
   }
@@ -204,12 +233,7 @@ export function drawStrokeOnCanvas(
     }
   }
 
-  const rawPoints = stroke.points.map((pt) => [pt.x, pt.y, pt.pressure]);
-  const outline = getStroke(rawPoints, options);
-
-  if (outline.length === 0) return;
-
-  // FAZ L & FAZ AI: Render shape fill inside closed geometric shapes
+  // 1. Render shape fill inside closed geometric shapes if present
   const strokeWithShape = stroke as Stroke;
   if (
     strokeWithShape.shapeType &&
@@ -230,14 +254,54 @@ export function drawStrokeOnCanvas(
     ctx.fillStyle = strokeWithShape.shapeFillColor;
     ctx.globalAlpha =
       strokeWithShape.shapeFillOpacity !== undefined ? strokeWithShape.shapeFillOpacity : 0.25;
-    ctx.beginPath();
-    ctx.moveTo(stroke.points[0].x, stroke.points[0].y);
-    for (let i = 1; i < stroke.points.length; i++) {
-      ctx.lineTo(stroke.points[i].x, stroke.points[i].y);
+
+    if (isCommitted && supportsPath2D) {
+      let fillPath = strokeFillPathCache.get(strokeWithShape);
+      if (!fillPath) {
+        fillPath = new Path2D();
+        fillPath.moveTo(stroke.points[0].x, stroke.points[0].y);
+        for (let i = 1; i < stroke.points.length; i++) {
+          fillPath.lineTo(stroke.points[i].x, stroke.points[i].y);
+        }
+        fillPath.closePath();
+        strokeFillPathCache.set(strokeWithShape, fillPath);
+      }
+      ctx.fill(fillPath);
+    } else {
+      ctx.beginPath();
+      ctx.moveTo(stroke.points[0].x, stroke.points[0].y);
+      for (let i = 1; i < stroke.points.length; i++) {
+        ctx.lineTo(stroke.points[i].x, stroke.points[i].y);
+      }
+      ctx.closePath();
+      ctx.fill();
     }
-    ctx.closePath();
-    ctx.fill();
     ctx.restore();
+  }
+
+  // 2. Fetch or compute hardware Path2D
+  let cachedPath: Path2D | null = null;
+  if (isCommitted && supportsPath2D) {
+    cachedPath = strokePathCache.get(stroke) || null;
+  }
+
+  let outline: number[][] | null = null;
+  if (!cachedPath) {
+    const rawPoints = stroke.points.map((pt) => [pt.x, pt.y, pt.pressure]);
+    outline = getStroke(rawPoints, options);
+    if (outline.length === 0) return;
+
+    if (isCommitted && supportsPath2D) {
+      cachedPath = new Path2D();
+      cachedPath.moveTo(outline[0][0], outline[0][1]);
+      for (let i = 1; i < outline.length; i++) {
+        const [x0, y0] = outline[i];
+        const [x1, y1] = outline[(i + 1) % outline.length];
+        cachedPath.quadraticCurveTo(x0, y0, (x0 + x1) / 2, (y0 + y1) / 2);
+      }
+      cachedPath.closePath();
+      strokePathCache.set(stroke, cachedPath);
+    }
   }
 
   ctx.save();
@@ -262,23 +326,31 @@ export function drawStrokeOnCanvas(
 
   ctx.fillStyle = stroke.color;
 
-  // Render polygon
-  ctx.beginPath();
-  ctx.moveTo(outline[0][0], outline[0][1]);
-  for (let i = 1; i < outline.length; i++) {
-    const [x0, y0] = outline[i];
-    const [x1, y1] = outline[(i + 1) % outline.length];
-    ctx.quadraticCurveTo(x0, y0, (x0 + x1) / 2, (y0 + y1) / 2);
+  // Render polygon (via cached Path2D or direct canvas path)
+  if (cachedPath) {
+    ctx.fill(cachedPath);
+  } else if (outline && outline.length > 0) {
+    ctx.beginPath();
+    ctx.moveTo(outline[0][0], outline[0][1]);
+    for (let i = 1; i < outline.length; i++) {
+      const [x0, y0] = outline[i];
+      const [x1, y1] = outline[(i + 1) % outline.length];
+      ctx.quadraticCurveTo(x0, y0, (x0 + x1) / 2, (y0 + y1) / 2);
+    }
+    ctx.closePath();
+    ctx.fill();
   }
-  ctx.closePath();
-  ctx.fill();
 
   // Neon bright inner core
   if (stroke.tool === 'neon') {
     ctx.shadowBlur = 0;
     ctx.fillStyle = '#ffffff';
     ctx.globalAlpha = 0.65;
-    ctx.fill();
+    if (cachedPath) {
+      ctx.fill(cachedPath);
+    } else if (outline && outline.length > 0) {
+      ctx.fill();
+    }
   }
 
   ctx.restore();
